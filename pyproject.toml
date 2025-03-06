@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "klax"
+version = "0.0.1"
+description = "Collection of semi-common machine learning architectures and tools build on JAX + Equinox + Paramax"
+authors = [
+    { name = "Fabian Roth", email = "some@email.com" },
+    { name = "Jasper Schommartz", email = "some@email.com" },
+]
+maintainers = [
+    { name = "Fabian Roth", email = "some@email.com" },
+    { name = "Jasper Schommartz", email = "some@email.com" },
+]
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+dependencies = ["jax", "equinox", "paramax"]
+
+[project.optional-dependencies]
+testing = [
+    "pytest"
+]
+
+[tool.setuptools.packages.find]
+where = ["klax"]
+
+[project.urls]
+Repository = "https://github.com/Drenderer/klax"
+Issues = "https://github.com/jaosch/feap-caller/klax"
