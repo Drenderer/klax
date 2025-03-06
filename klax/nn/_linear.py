@@ -16,10 +16,7 @@ from .._misc import default_floating_dtype
 class Linear(eqx.Module, strict=True):
     """Performs a linear transformation.
 
-    Modified from eqx.nn.Linear to allow for custom parameter initialization,
-    similar to flax.nnx.nn.Linear. This also means that there is no limit to
-    the initialized parameters as in eqx.nn.Linear. Instead, it is the users
-    job to define the limits in the initializer that is passed to __init__().
+    This class is modified from eqx.nn.Linear to allow for custom initialization.
     """
 
     weight: Array
@@ -45,6 +42,8 @@ class Linear(eqx.Module, strict=True):
             shape `(in_features,)`
         - `out_features`: The output size. The output from the layer will be a vector
             of shape `(out_features,)`.
+        - `weight_init`: The weight initializer of type `jax.nn.initializers.Initializer`.
+        - `bias_init`: The bias initializer of type `jax.nn.initializers.Initializer`.
         - `use_bias`: Whether to add on a bias as well.
         - `dtype`: The dtype to use for the weight and the bias in this layer.
             Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
@@ -57,6 +56,12 @@ class Linear(eqx.Module, strict=True):
 
         Likewise `out_features` can also be a string `"scalar"`, in which case the
         output from the layer will have shape `()`.
+
+        Further note that, some `jax.nn.initializers.Initializer`s do not work if
+        one of `in_features` or `out_features` is zero.
+
+        Likewise, some `jax.nn.initializers.Initialzers`s do not work when `dtype` is
+        `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         wkey, bkey = jrandom.split(key, 2)
