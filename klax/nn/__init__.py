@@ -1,1 +1,1 @@
-from ._linear import Linear as Linear
+from ._linear import Linear as Linear, FullyLinear as FullyLinear
