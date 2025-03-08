@@ -9,8 +9,10 @@ from jax.nn.initializers import Initializer, zeros
 import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
+import paramax as px
 
 from .._misc import default_floating_dtype
+from ..wrappers import ParameterWrapper
 
 
 class Linear(eqx.Module, strict=True):
@@ -32,6 +34,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
+        weight_wrap: ParameterWrapper | None = None,
+        bias_wrap: ParameterWrapper | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -45,6 +49,10 @@ class Linear(eqx.Module, strict=True):
         - `weight_init`: The weight initializer of type `jax.nn.initializers.Initializer`.
         - `bias_init`: The bias initializer of type `jax.nn.initializers.Initializer`.
         - `use_bias`: Whether to add on a bias as well.
+        - `weight_warp`: An optional `klax.wrappers.ParameterWrapper` that can be passed
+            to enforce weight constraints.
+        - `bias_warp`: An optional `klax.wrappers.ParameterWrapper` that can be passed
+            to enforce bias constraints. 
         - `dtype`: The dtype to use for the weight and the bias in this layer.
             Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
             on whether JAX is in 64-bit mode.
@@ -68,9 +76,14 @@ class Linear(eqx.Module, strict=True):
         in_features_ = 1 if in_features == "scalar" else in_features
         out_features_ = 1 if out_features == "scalar" else out_features
         wshape = (out_features_, in_features_)
-        self.weight = weight_init(wkey, wshape, dtype)
+        weight = weight_init(wkey, wshape, dtype)
+        self.weight = weight if weight_wrap is None else weight_wrap(weight)
         bshape = (out_features_,)
-        self.bias = bias_init(bkey, bshape, dtype) if use_bias else None
+        if use_bias is None:
+            self.bias = None
+        else:
+            bias = bias_init(bkey, bshape, dtype)
+            self.bias = bias if bias_wrap is None else bias_wrap(bias)
 
         self.in_features = in_features
         self.out_features = out_features
