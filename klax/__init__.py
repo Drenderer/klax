@@ -1,2 +1,2 @@
-from . import nn as nn
-from .training import dataloader as dataloader, wrappers as wrappers
+from . import nn as nn, wrappers as wrappers
+from ._training import dataloader as dataloader
