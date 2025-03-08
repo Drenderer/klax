@@ -27,8 +27,8 @@ def dataloader(
 
     !!! example
 
-        This is an example for a nested `Sequence`, where the first and the last
-        element have batch dimension along the first and the second axes, respectively.
+        This is an example for a nested `Sequence`, where the elements x and y
+        have batch dimension along the first axis.
     
         ```python
 
