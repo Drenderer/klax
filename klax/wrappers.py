@@ -12,7 +12,7 @@ import paramax as px
 class ParameterWrapper(px.AbstractUnwrappable[Array]):
     """An abstract class representing parameter wrappers.
     
-    ParameterWrappers replace PyTree leafs, applying custom heaviour upon
+    ParameterWrappers replace PyTree leafs, applying custom behaviour upon
     unwrapping"""
     def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
         raise NotImplementedError("To be implemented by derived classes")
