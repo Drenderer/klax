@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent"
 ]
-dependencies = ["jax", "equinox", "paramax"]
+dependencies = ["jax", "equinox", "paramax", "optax"]
 
 [project.optional-dependencies]
 testing = [
