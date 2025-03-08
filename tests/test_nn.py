@@ -51,7 +51,7 @@ def test_linear(getkey, getwrap):
     x = jrandom.normal(getkey(), (2,))
     assert linear(x).shape == ()
 
-    # Warppers
+    # Wrappers
     linear = klax.nn.Linear(
         3,
         4,
