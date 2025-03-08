@@ -17,7 +17,7 @@ class NonNegative(px.AbstractUnwrappable[Array]):
         `jax.Array`.
     """
 
-    parameter: Array | px.AbstractUnwrappable[Array]
+    parameter: Array
 
     def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
         # Ensure that the parameter fulfills the constraint initially
