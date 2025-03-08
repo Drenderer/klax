@@ -2,10 +2,11 @@ from jax.nn.initializers import uniform, he_normal
 import jax.numpy as jnp
 import jax.random as jrandom
 import klax
+import paramax as px
 import pytest
 
 
-def test_linear(getkey):
+def test_linear(getkey, getwrap):
     # Zero input shape
     linear = klax.nn.Linear(0, 4, uniform(), key=getkey())
     x = jrandom.normal(getkey(), (0,))
@@ -49,6 +50,18 @@ def test_linear(getkey):
     linear = klax.nn.Linear(2, "scalar", uniform(), key=getkey())
     x = jrandom.normal(getkey(), (2,))
     assert linear(x).shape == ()
+
+    # Warppers
+    linear = klax.nn.Linear(
+        3,
+        4,
+        uniform(),
+        weight_wrap=getwrap,
+        bias_wrap=getwrap,
+        key=getkey()
+    )
+    x = jrandom.normal(getkey(), (3,))
+    assert jnp.all(px.unwrap(linear)(x) == 0.0)
 
     # Data type
     linear = klax.nn.Linear(
