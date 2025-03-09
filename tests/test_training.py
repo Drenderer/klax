@@ -5,6 +5,12 @@ import jax.random as jrandom
 import pytest
 
 
+@pytest.fixture
+def dummy_data(getkey):
+    x = jrandom.uniform(getkey(), (10,1))
+    y = 2.*x + 1.0
+    return x, y
+
 def test_dataloader(getkey):
     # Sequence with one element
     x = jrandom.uniform(getkey(), (10,))
@@ -73,12 +79,25 @@ def test_dataloader(getkey):
         next(generator)
 
 
-def test_training(getkey):
-    x = jnp.linspace(0, 1.0, 10).reshape(-1, 1)
-    y = x + 1.0
-    print(type(x))
-    print(type(y))
+def test_training(getkey, dummy_data):
+    x, y = dummy_data
     model = eqx.nn.Linear(1, 1, key=getkey())
-    import jax
-    print(jax.vmap(model)(x))
     model, history = klax.fit(model, x, y, key=getkey())
+
+
+def test_training_early_stopping(getkey, dummy_data):
+    x, y = dummy_data
+
+    def callback(step, **kwargs):
+        if step == 123:
+            return True
+
+    model = eqx.nn.Linear(1, 1, key=getkey())
+    model, history = klax.fit(
+        model, 
+        x, y, 
+        callback=callback, 
+        log_every=1,
+        key=getkey())
+
+    assert history['steps'][-1] == 123

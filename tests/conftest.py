@@ -2,7 +2,7 @@ import typing
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PRNGKeyArray
+from jaxtyping import Array
 import paramax as px
 import pytest
 
@@ -10,7 +10,7 @@ import pytest
 typing.TESTING = True  # pyright: ignore
 
 
-jax.config.update("jax_numpy_dtype_promotion", "strict")
+# jax.config.update("jax_numpy_dtype_promotion", "strict")  # Causes issues because implicit data type promotion is used in klax.fit since the default dataloader works with numpy arrays
 jax.config.update("jax_numpy_rank_promotion", "raise")
 
 

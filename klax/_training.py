@@ -5,7 +5,7 @@ This module implements a basic training loop.
 from collections.abc import Callable
 import datetime
 import time
-from typing import Any, Generator, Sequence, Tuple, TypeVar
+from typing import Any, Generator, Sequence, Tuple, TypeVar, Optional
 
 import equinox as eqx
 import jax
@@ -118,7 +118,7 @@ def dataloader(
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than Jax's, so for
     # fast model training steps this actually makes a huge difference!
-    batched_data = jax.tree.map(lambda x: np.array(x), batched_data) 
+    # batched_data = jax.tree.map(lambda x: np.array(x), batched_data) 
 
     # Reduce batch size if the dataset has less examples than batch size
     batch_size = min(batch_size, dataset_size)
@@ -148,7 +148,7 @@ def fit(model: T,
         log_every: int = 100,
         loss_fn: _LossFunction = mse,
         optimizer: optax.GradientTransformation = optax.adam(1e-3),
-        callback: Callable | None = None,
+        callback: Optional[Callable[...,Optional[bool]]] = None,
         dataloader: _DataLoader = dataloader,
         key: PRNGKeyArray,
         ) -> Tuple[T, dict]:
@@ -184,7 +184,8 @@ def fit(model: T,
      - `optimizer`: The optimizer. Any optax gradient transform to calculate the updates for
         the model. (Defaults to optax.adam(1e-3).)
      - `callback`: A function that is called after every gradient update. The call signature
-        is ```(model, step) -> None```.
+        is ```(model, step) -> Optional[bool]```. A callback return value of True breaks out
+        of the training loop. This can be used to implement early stopping.
      - `dataloader`. The data loader that splits inputs and targets into batches.
         (Defaults to `dataloader`)
      - `key`: A `jax.random.PRNGKey` used to provide randomness for batch generation.
@@ -215,7 +216,6 @@ def fit(model: T,
     # Mark the first dimension as batch dimension for all leaves in x that are
     # not masked
     in_axes = jax.tree.map(lambda x: 0 if x else None, in_mask)
-    print(in_axes)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
     # the loss evaluation for the loss history.
@@ -241,7 +241,7 @@ def fit(model: T,
             opt_state,
             params=eqx.filter(model, eqx.is_inexact_array)
         )
-        # model = eqx.apply_updates(model, updates)
+        model = eqx.apply_updates(model, updates)
 
         flat_model = jax.tree_util.tree_leaves(model)
         flat_opt_state = jax.tree_util.tree_leaves(opt_state)
@@ -249,7 +249,7 @@ def fit(model: T,
         return flat_model, flat_opt_state
 
     # Initialize the history dict
-    history = {'log_every': log_every,
+    history = {'steps': [],
                'loss': [],}
     vx, vy = None, None
     if validation_data is not None:
@@ -283,14 +283,11 @@ def fit(model: T,
             flat_opt_state
         )
 
-        if callback is not None:
-            model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
-            callback(model, step)
-
         # Log the losses
-        if (step % log_every) == 0 or step == steps - 1:
+        if (step % log_every) == 0 or step == steps:
             model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
             train_loss = get_loss(model, x, y)
+            history['steps'].append(step)
             history['loss'].append(train_loss)
             if validation_data is not None:
                 val_loss = get_loss(model, vx, vy)
@@ -299,6 +296,15 @@ def fit(model: T,
                       f"Validation loss: {val_loss:.3e}")
             else:
                 print(f"Step: {step}, Loss: {train_loss:.3e}")
+
+        if callback is not None:
+            model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
+            callbackkwargs = dict(
+                model=model,
+                step=step,
+            )
+            if callback(**callbackkwargs):
+                break
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
