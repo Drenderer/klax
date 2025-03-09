@@ -1,3 +1,4 @@
+import equinox as eqx
 import klax
 import jax.numpy as jnp
 import jax.random as jrandom
@@ -70,3 +71,14 @@ def test_dataloader(getkey):
     ):
         generator = klax.dataloader(data, key=getkey()) 
         next(generator)
+
+
+def test_training(getkey):
+    x = jnp.linspace(0, 1.0, 10).reshape(-1, 1)
+    y = x + 1.0
+    print(type(x))
+    print(type(y))
+    model = eqx.nn.Linear(1, 1, key=getkey())
+    import jax
+    print(jax.vmap(model)(x))
+    model, history = klax.fit(model, x, y, key=getkey())

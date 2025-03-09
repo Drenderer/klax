@@ -2,7 +2,7 @@ import typing
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, PRNGKeyArray
 import paramax as px
 import pytest
 
