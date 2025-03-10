@@ -1,15 +1,13 @@
 import equinox as eqx
 import klax
+import jax
 import jax.numpy as jnp
 import jax.random as jrandom
+import numpy as np
+import optax
 import pytest
 
 
-@pytest.fixture
-def dummy_data(getkey):
-    x = jrandom.uniform(getkey(), (10,1))
-    y = 2.*x + 1.0
-    return x, y
 
 def test_dataloader(getkey):
     # Sequence with one element
@@ -79,25 +77,32 @@ def test_dataloader(getkey):
         next(generator)
 
 
-def test_training(getkey, dummy_data):
-    x, y = dummy_data
+def test_training(getkey, getcallback):
+    # Fitting a linear function
+    x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
+    y = 2.* x + 1.0
     model = eqx.nn.Linear(1, 1, key=getkey())
-    model, history = klax.fit(model, x, y, key=getkey())
-
-
-def test_training_early_stopping(getkey, dummy_data):
-    x, y = dummy_data
-
-    def callback(step, **kwargs):
-        if step == 123:
-            return True
-
-    model = eqx.nn.Linear(1, 1, key=getkey())
-    model, history = klax.fit(
-        model, 
-        x, y, 
-        callback=callback, 
-        log_every=1,
+    model, _ = klax.fit(
+        model,
+        x,
+        y,
+        optimizer=optax.adam(1.0),
         key=getkey())
+    y_pred = jax.vmap(model)(x)
+    assert jnp.all(jnp.abs(y_pred - y) < 1e-6)
 
-    assert history['steps'][-1] == 123
+    # History shape and type
+    x = jrandom.uniform(getkey(), (2, 1))
+    model = eqx.nn.Linear(1, 1, key=getkey())
+    _, history = klax.fit(model, x, x, key=getkey())
+    assert all(isinstance(x, np.ndarray) for _, x in history.items())
+    assert history["steps"].shape == (10,)
+    assert history["loss"].shape == (10,)
+    assert history["training_time"].shape == ()
+
+    # Validation data
+    x = jrandom.uniform(getkey(), (2, 1))
+    model = eqx.nn.Linear(1, 1, key=getkey())
+    _, history = klax.fit(model, x, x, validation_data=(x, x), key=getkey())
+    assert isinstance(history["val_loss"], np.ndarray)
+    assert history["val_loss"].shape == (10,)
