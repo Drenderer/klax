@@ -77,7 +77,7 @@ def test_dataloader(getkey):
         next(generator)
 
 
-def test_training(getkey, getcallback):
+def test_training(getkey):
     # Fitting a linear function
     x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
     y = 2.* x + 1.0
