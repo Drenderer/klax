@@ -28,7 +28,7 @@ testing = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["klax"]
+where = ["."]
 
 [project.urls]
 Repository = "https://github.com/Drenderer/klax"
