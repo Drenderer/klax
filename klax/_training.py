@@ -13,6 +13,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import ArrayLike, PRNGKeyArray, PyTree
 import numpy as np
+from numpy.typing import NDArray
 import optax
 import paramax as px
 
@@ -148,7 +149,6 @@ def fit(model: T,
         log_every: int = 100,
         loss_fn: _LossFunction = mse,
         optimizer: optax.GradientTransformation = optax.adam(1e-3),
-        callback: Optional[Callable[...,Optional[bool]]] = None,
         dataloader: _DataLoader = dataloader,
         key: PRNGKeyArray,
         ) -> Tuple[T, dict]:
@@ -183,9 +183,6 @@ def fit(model: T,
          (Defaults to `mse`.)
      - `optimizer`: The optimizer. Any optax gradient transform to calculate the updates for
         the model. (Defaults to optax.adam(1e-3).)
-     - `callback`: A function that is called after every gradient update. The call signature
-        is ```(model, step) -> Optional[bool]```. A callback return value of True breaks out
-        of the training loop. This can be used to implement early stopping.
      - `dataloader`. The data loader that splits inputs and targets into batches.
         (Defaults to `dataloader`)
      - `key`: A `jax.random.PRNGKey` used to provide randomness for batch generation.
@@ -249,8 +246,7 @@ def fit(model: T,
         return flat_model, flat_opt_state
 
     # Initialize the history dict
-    history = {'steps': [],
-               'loss': [],}
+    history = {'steps': [], 'loss': [],}
     vx, vy = None, None
     if validation_data is not None:
         vx, vy = validation_data
@@ -286,25 +282,17 @@ def fit(model: T,
         # Log the losses
         if (step % log_every) == 0 or step == steps:
             model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
-            train_loss = get_loss(model, x, y)
+            loss = get_loss(model, x, y)
             history['steps'].append(step)
-            history['loss'].append(train_loss)
+            history['loss'].append(loss)
+            message = f"Step: {step}, Loss: {loss:.3e}"
+
             if validation_data is not None:
                 val_loss = get_loss(model, vx, vy)
                 history['val_loss'].append(val_loss)
-                print(f"Step: {step}, Loss: {train_loss:.3e}, " \
-                      f"Validation loss: {val_loss:.3e}")
-            else:
-                print(f"Step: {step}, Loss: {train_loss:.3e}")
+                message += f", Validation loss: {val_loss:.3e}"
 
-        if callback is not None:
-            model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
-            callbackkwargs = dict(
-                model=model,
-                step=step,
-            )
-            if callback(**callbackkwargs):
-                break
+            print(message) 
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
