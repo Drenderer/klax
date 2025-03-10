@@ -18,15 +18,16 @@ import optax
 import paramax as px
 
 
-T = TypeVar("T", bound=eqx.Module)
+Model = TypeVar("Model", bound=eqx.Module)
 type _Data = PyTree[ArrayLike | None]
 type _BatchGenerator = Generator[_Data, None, None]
 type _DataLoader = Callable[[_Data, int, PyTree[bool] | None], _BatchGenerator]
-type _LossFunction = Callable[[T, _Data, _Data, int | None | Sequence[Any]], float]
+type _LossFunction = Callable[[Model, _Data, _Data, int | None | Sequence[Any]], float]
+
 
 
 def mse(
-    model: T,
+    model: Model,
     x: _Data,
     y: _Data,
     in_axes: int | None | Sequence[Any] = 0
@@ -119,7 +120,7 @@ def dataloader(
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than Jax's, so for
     # fast model training steps this actually makes a huge difference!
-    # batched_data = jax.tree.map(lambda x: np.array(x), batched_data) 
+    batched_data = jax.tree.map(lambda x: np.array(x), batched_data) 
 
     # Reduce batch size if the dataset has less examples than batch size
     batch_size = min(batch_size, dataset_size)
@@ -137,7 +138,7 @@ def dataloader(
             end = start + batch_size
 
 
-def fit(model: T,
+def fit(model: Model,
         x: _Data,
         y: _Data,
         batch_size: int = 32,
@@ -151,7 +152,7 @@ def fit(model: T,
         optimizer: optax.GradientTransformation = optax.adam(1e-3),
         dataloader: _DataLoader = dataloader,
         key: PRNGKeyArray,
-        ) -> Tuple[T, dict]:
+        ) -> Tuple[Model, dict]:
     """Trains a model using an optimizer from optax.
 
     **Arguments**:
