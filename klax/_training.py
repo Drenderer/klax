@@ -179,7 +179,7 @@ def fit(model: T,
      - `log_every`: The number of steps between updates of the loss history. A history update
          consists of calculating the training and validation losses *over the etire datasets*
          and storing them in the history dictionary. (Defaults to 10. Keyword only Argument)
-     - `loss_fn`: The loss function with call signature `(prediction, target, model) -> float`.
+     - `loss_fn`: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
          (Defaults to `mse`.)
      - `optimizer`: The optimizer. Any optax gradient transform to calculate the updates for
         the model. (Defaults to optax.adam(1e-3).)
