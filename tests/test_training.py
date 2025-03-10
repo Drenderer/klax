@@ -106,3 +106,26 @@ def test_training(getkey):
     _, history = klax.fit(model, x, x, validation_data=(x, x), key=getkey())
     assert isinstance(history["val_loss"], np.ndarray)
     assert history["val_loss"].shape == (10,)
+
+
+def test_training_callbacks(getkey):
+    x = jnp.linspace(0.0, 1.0, 2)[:, jnp.newaxis]
+    y = 2.* x + 1.0
+
+    # Early stopping callback
+    def callback(cbargs: klax.CallbackArgs):
+        if cbargs.step == 123:
+            return True
+    model = eqx.nn.Linear(1, 1, key=getkey())
+    _, history = klax.fit(
+        model,
+        x,
+        y,
+        steps=1000,
+        optimizer=optax.adam(1.0),
+        callback=callback,
+        log_every=1,
+        key=getkey())
+    assert history['steps'][-1] == 123
+
+
