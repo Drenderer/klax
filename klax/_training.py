@@ -4,13 +4,13 @@ This module implements a basic training loop.
 
 import datetime
 import time
-from typing import Any, Generator, Optional, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Generator, Optional, Sequence, Tuple, TypeVar
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jaxtyping import Array, PRNGKeyArray, PyTree
+from jaxtyping import Array, PRNGKeyArray, PyTree, PyTreeDef, ScalarLike
 import numpy as np
 import optax
 import paramax as px
@@ -37,13 +37,13 @@ class CallbackArgs:
     step: int
     _treedef_model: PyTreeDef
     _flat_model: list
-    _model: Model|None = None
+    _model: T|None = None
     _training_loss: ScalarLike|None = None
     _validation_loss: ScalarLike|None = None
-    _get_train_loss: Callable[[Model], float]
-    _get_vali_loss: Callable[[Model], float]
+    _get_train_loss: Callable[[T], float]
+    _get_vali_loss: Callable[[T], float]
 
-    def __init__(self, get_loss: Callable[[Model, _Data, _Data], float], training_data: tuple[_Data, _Data], validation_data: tuple[_Data, _Data]|None, treedef_model: PyTreeDef):
+    def __init__(self, get_loss: Callable[[T, DataTree, DataTree], float], training_data: tuple[DataTree, DataTree], validation_data: tuple[DataTree, DataTree]|None, treedef_model: PyTreeDef):
         self._get_train_loss = lambda m: get_loss(m, *training_data)
         if validation_data:
             self._get_vali_loss = lambda m: get_loss(m, *validation_data)
@@ -205,7 +205,7 @@ def fit(model: T,
         dataloader: Dataloader = dataloader,
         callback: Callable[[CallbackArgs], Optional[bool]]|None = None,
         key: PRNGKeyArray,
-        ) -> Tuple[Model, dict]:
+        ) -> Tuple[T, dict]:
     """
     Trains a model using an optimizer from optax.
 
