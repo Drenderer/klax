@@ -2,46 +2,47 @@
 This module implements a basic training loop.
 """
 
-from collections.abc import Callable
 import datetime
 import time
-from typing import Any, Generator, Sequence, Tuple, TypeVar, Optional
+from typing import Any, Generator, Optional, Sequence, Tuple, TypeVar
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jaxtyping import ArrayLike, PRNGKeyArray, PyTree
+from jaxtyping import Array, PRNGKeyArray, PyTree
 import numpy as np
-from numpy.typing import NDArray
 import optax
 import paramax as px
 
+from .typing import (
+    Dataloader,
+    DataTree,
+    Loss,
+    MaskTree,
+)
 
-T = TypeVar("T", bound=eqx.Module)
-type _Data = PyTree[ArrayLike | None]
-type _BatchGenerator = Generator[_Data, None, None]
-type _DataLoader = Callable[[_Data, int, PyTree[bool] | None], _BatchGenerator]
-type _LossFunction = Callable[[T, _Data, _Data, int | None | Sequence[Any]], float]
+
+T = TypeVar("T", bound=PyTree | eqx.Module)
 
 
 def mse(
-    model: T,
-    x: _Data,
-    y: _Data,
+    model: PyTree,
+    x: DataTree,
+    y: DataTree,
     in_axes: int | None | Sequence[Any] = 0
-):
+) -> Array:
     y_pred = jax.vmap(model, in_axes=in_axes)(x)
     return jnp.mean((y_pred - y) ** 2)
 
 
 def dataloader(
-    data: _Data,
+    data: DataTree,
     batch_size: int = 32,
-    batch_mask: PyTree[bool] | None = None,
+    batch_mask: Optional[MaskTree] = None,
     *,
-    key:PRNGKeyArray,
-) -> _BatchGenerator:
+    key: PRNGKeyArray,
+) -> Generator[DataTree, None, None]:
     """Returns a batch `Generator` that yields randomly chosen subsets of data
     without replacement.
 
@@ -138,18 +139,18 @@ def dataloader(
 
 
 def fit(model: T,
-        x: _Data,
-        y: _Data,
+        x: DataTree,
+        y: DataTree,
         batch_size: int = 32,
-        in_mask: PyTree[bool] | None = None,
-        out_mask: PyTree[bool] | None = None,
+        in_mask: Optional[MaskTree] = None,
+        out_mask: Optional[MaskTree] = None,
         *,
-        validation_data: Tuple[_Data, _Data] | None = None,
+        validation_data: Optional[Tuple[DataTree, DataTree]] = None,
         steps: int = 1000,
         log_every: int = 100,
-        loss_fn: _LossFunction = mse,
+        loss_fn: Loss = mse,
         optimizer: optax.GradientTransformation = optax.adam(1e-3),
-        dataloader: _DataLoader = dataloader,
+        dataloader: Dataloader = dataloader,
         key: PRNGKeyArray,
         ) -> Tuple[T, dict]:
     """Trains a model using an optimizer from optax.
