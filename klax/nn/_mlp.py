@@ -9,7 +9,6 @@ import equinox as eqx
 import jax
 from jax.nn.initializers import Initializer, zeros
 import jax.random as jrandom
-import jax.tree_util as jtu
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
@@ -20,25 +19,25 @@ class MLP(eqx.Module, strict=True):
     """Standard Multi-Layer Perceptron; also known as a feed-forward network.
     
     
-    This class is modified form `eqx.nn.MLP` to allow for custom initialization.
+    This class is modified form `eqx.nn.MLP` to allow for custom initialization
+    and different node numbers in the hidden layers. Hence, it may also be used
+    for ecoder/decoder tasks.
     """
 
     layers: tuple[Linear, ...]
-    activation: Callable
+    activations: tuple[Callable, ...]
     final_activation: Callable
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
     in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    width_size: int = eqx.field(static=True)
-    depth: int = eqx.field(static=True)
+    width_sizes: tuple[int, ...] = eqx.field(static=True)
 
     def __init__(
         self,
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
-        width_size: int,
-        depth: int,
+        width_sizes: Union[tuple[int, ...], list[int]],
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.relu,
@@ -55,11 +54,7 @@ class MLP(eqx.Module, strict=True):
             shape `(in_features,)`
         - `out_size`: The output size. The output from the module will be a vector
             of shape `(out_features,)`.
-        - `width_size`: The size of each hidden layer.
-        - `depth`: The number of hidden layers, including the output layer.
-            For example, `depth=2` results in an network with layers:
-            [`Linear(in_size, width_size)`, `Linear(width_size, width_size)`,
-            `Linear(width_size, out_size)`].
+        - `width_sizes`: The sizes of each hidden layer in a list.
         - `weight_init`: The weight initializer of type `jax.nn.initializers.Initializer`.
         - `bias_init`: The bias initializer of type `jax.nn.initializers.Initializer`.
         - `activation`: The activation function after each hidden layer. Defaults to
@@ -83,6 +78,7 @@ class MLP(eqx.Module, strict=True):
         output from the module will have shape `()`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
+        depth = len(width_sizes)
         keys = jrandom.split(key, depth + 1)
         layers = []
         if depth == 0:
@@ -101,7 +97,7 @@ class MLP(eqx.Module, strict=True):
             layers.append(
                 Linear(
                     in_size,
-                    width_size,
+                    width_sizes[0],
                     weight_init,
                     bias_init,
                     use_bias,
@@ -112,8 +108,8 @@ class MLP(eqx.Module, strict=True):
             for i in range(depth - 1):
                 layers.append(
                     Linear(
-                        width_size,
-                        width_size,
+                        width_sizes[i],
+                        width_sizes[i + 1],
                         weight_init,
                         bias_init,
                         use_bias,
@@ -123,7 +119,7 @@ class MLP(eqx.Module, strict=True):
                 )
             layers.append(
                 Linear(
-                    width_size,
+                    width_sizes[-1],
                     out_size,
                     weight_init,
                     bias_init,
@@ -135,13 +131,15 @@ class MLP(eqx.Module, strict=True):
         self.layers = tuple(layers)
         self.in_size = in_size
         self.out_size = out_size
-        self.width_size = width_size
-        self.depth = depth
+        self.width_sizes = tuple(width_sizes)
         # In case `activation` or `final_activation` are learnt, then make a separate
         # copy of their weights for every neuron.
-        self.activation = eqx.filter_vmap(
-            eqx.filter_vmap(lambda: activation, axis_size=width_size), axis_size=depth
-        )()
+        activations = []
+        for width in width_sizes:
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
+        self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
         else:
@@ -163,10 +161,11 @@ class MLP(eqx.Module, strict=True):
 
         A JAX array with shape `(out_size,)`. (Or shape `()` if `out_size="scalar"`.)
         """
-        for i, layer in enumerate(self.layers[:-1]):
+        for i, (layer, activation) in enumerate(zip(self.layers[:-1],
+                                                    self.activations)):
             x = layer(x)
-            layer_activation = jtu.tree_map(
-                lambda x: x[i] if eqx.is_array(x) else x, self.activation
+            layer_activation = jax.tree.map(
+                lambda x: x[i] if eqx.is_array(x) else x, activation
             )
             x = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, x)
         x = self.layers[-1](x)

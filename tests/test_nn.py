@@ -192,15 +192,14 @@ def test_fully_linear(getkey):
 
 
 def test_mlp(getkey):
-    mlp = klax.nn.MLP(2, 3, 8, 2, uniform(), key=getkey())
+    mlp = klax.nn.MLP(2, 3, 2*[8], uniform(), key=getkey())
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
 
     mlp = klax.nn.MLP(
         in_size=2,
         out_size=3,
-        width_size=8,
-        depth=2,
+        width_sizes=2*[8],
         weight_init=uniform(),
         bias_init=uniform(),
         key=getkey()
@@ -208,11 +207,11 @@ def test_mlp(getkey):
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
 
-    mlp = klax.nn.MLP("scalar", 2, 2, 2, uniform(), key=getkey())
+    mlp = klax.nn.MLP("scalar", 2, 2*[2], uniform(), key=getkey())
     x = jrandom.normal(getkey(), ())
     assert mlp(x).shape == (2,)
 
-    mlp = klax.nn.MLP(2, "scalar", 2, 2, uniform(), key=getkey())
+    mlp = klax.nn.MLP(2, "scalar", 2*[2], uniform(), key=getkey())
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == ()
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [True, True, True]
@@ -220,8 +219,7 @@ def test_mlp(getkey):
     mlp = klax.nn.MLP(
         2,
         3,
-        8,
-        2,
+        2*[8],
         uniform(),
         use_bias=False,
         use_final_bias=True,
@@ -234,8 +232,7 @@ def test_mlp(getkey):
     mlp = klax.nn.MLP(
         2,
         3,
-        8,
-        2,
+        2*[8],
         uniform(),
         use_bias=True,
         use_final_bias=False,
@@ -243,3 +240,16 @@ def test_mlp(getkey):
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [True, True, False]
+
+    mlp = klax.nn.MLP(
+        2,
+        3,
+        [4, 8],
+        uniform(),
+        use_bias=True,
+        use_final_bias=False,
+        key=getkey())
+    x = jrandom.normal(getkey(), (2,))
+    assert mlp(x).shape == (3,)
+    assert [mlp.layers[i].in_features for i in range(0, 3)] == [2, 4, 8]
+    assert [mlp.layers[i].out_features for i in range(0, 3)] == [4, 8, 3]
