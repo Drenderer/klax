@@ -9,7 +9,6 @@ from jax.nn.initializers import Initializer, zeros
 import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
-import paramax as px
 
 from .._misc import default_floating_dtype
 from ..wrappers import ParameterWrapper
