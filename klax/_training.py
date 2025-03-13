@@ -4,88 +4,51 @@ This module implements a basic training loop.
 
 import datetime
 import time
-from typing import Any, Callable, Generator, Optional, Sequence, Tuple, TypeVar
+import typing
+from typing import (
+    Generator,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    TypeVar
+)
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jaxtyping import Array, PRNGKeyArray, PyTree, PyTreeDef, ScalarLike
+from jaxtyping import PRNGKeyArray, PyTree
 import numpy as np
 import optax
 import paramax as px
 
+from .callbacks import (
+    Callback,
+    CallbackArgs
+)
+from .losses import Loss, mse
 from .typing import (
-    Dataloader,
+    BatchGenerator,
     DataTree,
-    Loss,
     MaskTree,
 )
 
 
 T = TypeVar("T", bound=PyTree | eqx.Module)
 
-class CallbackArgs:
-    """
-    Callback Argument Object. It is designed to work in conjunction with klax.fit and 
-    should not be used elsewhere. 
-    The instances of this class are passed to any callback object in the fit function.
-    The class implements cached and lazy-evaluated values via property methods. This 
-    means that properties like training_loss are only calculated if they are used and 
-    are stored such that they are not calculated multiple times.
-    """
-    step: int
-    _treedef_model: PyTreeDef
-    _flat_model: list
-    _model: T|None = None
-    _training_loss: ScalarLike|None = None
-    _validation_loss: ScalarLike|None = None
-    _get_train_loss: Callable[[T], float]
-    _get_vali_loss: Callable[[T], float]
 
-    def __init__(self, get_loss: Callable[[T, DataTree, DataTree], float], training_data: tuple[DataTree, DataTree], validation_data: tuple[DataTree, DataTree]|None, treedef_model: PyTreeDef):
-        self._get_train_loss = lambda m: get_loss(m, *training_data)
-        if validation_data:
-            self._get_vali_loss = lambda m: get_loss(m, *validation_data)
-        else:
-            self._get_vali_loss = lambda _: None
-        self._treedef_model = treedef_model
-
-    def _update(self, flat_model: list, step: int):
-        self._flat_model = flat_model
-        self.step = step
-        self._training_loss = None
-        self._validation_loss = None
-        self._model = None
-
-    @property
-    def model(self):
-        if self._model is None:
-            self._model = jax.tree_util.tree_unflatten(self._treedef_model, self._flat_model)
-        return self._model
-
-    @property
-    def training_loss(self):
-        if self._training_loss is None:
-            self._training_loss = self._get_train_loss(self.model)
-        return self._training_loss
-
-    @property
-    def validation_loss(self) -> ScalarLike|None:
-        if self._validation_loss is None:
-            self._validation_loss = self._get_vali_loss(self.model)
-        return self._validation_loss
-    
-    
-
-def mse(
-    model: PyTree,
-    x: DataTree,
-    y: DataTree,
-    in_axes: int | None | Sequence[Any] = 0
-) -> Array:
-    y_pred = jax.vmap(model, in_axes=in_axes)(x)
-    return jnp.mean((y_pred - y) ** 2)
+@typing.runtime_checkable
+class Dataloader(Protocol):
+    def __call__(
+        self,
+        data: DataTree,
+        batch_size: int,
+        batch_mask: MaskTree | None,
+        *,
+        key: PRNGKeyArray
+    ) -> BatchGenerator:
+        raise NotImplementedError
 
 
 def dataloader(
@@ -203,7 +166,7 @@ def fit(model: T,
         loss_fn: Loss = mse,
         optimizer: optax.GradientTransformation = optax.adam(1e-3),
         dataloader: Dataloader = dataloader,
-        callback: Callable[[CallbackArgs], Optional[bool]]|None = None,
+        callbacks: Optional[List[Callback]]  = None,
         key: PRNGKeyArray,
         ) -> Tuple[T, dict]:
     """
@@ -240,9 +203,9 @@ def fit(model: T,
         the model. (Defaults to optax.adam(1e-3).)
     - `dataloader`: The data loader that splits inputs and targets into batches.
         (Defaults to `dataloader`)
-    - `callback`: A Callback function that is evaluated after every training step. This callback can
+    - `callbacks`: Callback functions that are evaluated after every training step. They can
         be used to implement early stopping, custom history logging and more. The argument to the 
-        callback function is a CallbackArgs object. (Defaults to `None`)
+        callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
     - `key`: A `jax.random.PRNGKey` used to provide randomness for batch generation.
         (Keyword only argument.)
 
@@ -322,7 +285,7 @@ def fit(model: T,
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
 
-    callbackargs = CallbackArgs(get_loss, (x, y), validation_data, treedef_model)
+    cbargs = CallbackArgs(get_loss, (x, y), validation_data, treedef_model)
 
 
     # Loop over all training steps
@@ -341,24 +304,30 @@ def fit(model: T,
             flat_opt_state
         )
 
-        callbackargs._update(flat_model, step)
+        # Update callbacks arguments with the current state of the model
+        cbargs.update(flat_model, step)
 
         # Log every log_every steps and the last step
         if (step % log_every) == 0 or step == steps:
-            loss = callbackargs.training_loss
-            history['steps'].append(callbackargs.step)
+            loss = cbargs.loss
+            history['steps'].append(cbargs.step)
             history['loss'].append(loss)
             message = f"Step: {step}, Loss: {loss:.3e}"
 
             if validation_data is not None:
-                val_loss = callbackargs.validation_loss
+                val_loss = cbargs.val_loss
                 history['val_loss'].append(val_loss)
                 message += f", Validation loss: {val_loss:.3e}"
 
             print(message) 
 
-        if callback is not None:
-            if callback(callbackargs):
+        if callbacks is not None:
+            # Run all callbacks and break if any of them request termination of
+            # the training loop.
+            # Note! The square brackets are important. Otherwise the loop is
+            # terminated with the first callback that returns true. But we want
+            # to run all callbacks first and then decide, whether to terminate.
+            if any([callback(cbargs) for callback in callbacks]):
                 break
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
