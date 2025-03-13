@@ -38,3 +38,14 @@ def getwrap():
             return jnp.zeros_like(self.parameter)
     
     return Wrapper
+
+
+@pytest.fixture
+def getcallback():
+    import klax
+
+    def callback(cbargs: klax.CallbackArgs):
+        if cbargs.step == 123:
+            return True
+
+    return callback
