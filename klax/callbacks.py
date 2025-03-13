@@ -5,7 +5,7 @@ from typing import Optional, Protocol
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
 
-from ._typing import DataTree
+from .typing import DataTree
 
 
 class CallbackArgs:

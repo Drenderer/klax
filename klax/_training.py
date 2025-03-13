@@ -28,7 +28,7 @@ from .callbacks import (
     CallbackArgs
 )
 from .losses import Loss, mse
-from ._typing import (
+from .typing import (
     BatchGenerator,
     DataTree,
     MaskTree,

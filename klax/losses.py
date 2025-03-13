@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree, Scalar
 
-from ._typing import DataTree
+from .typing import DataTree
 
 
 @typing.runtime_checkable
