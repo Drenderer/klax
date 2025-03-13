@@ -44,7 +44,7 @@ def getwrap():
 def getcallback():
     import klax
 
-    def callback(cbargs: klax.CallbackArgs):
+    def callback(cbargs: klax.callbacks.CallbackArgs):
         if cbargs.step == 123:
             return True
 
