@@ -8,6 +8,7 @@ from jaxtyping import PyTree, PyTreeDef, Scalar
 from .typing import DataTree
 
 
+
 class CallbackArgs:
     """
     Callback Argument Object, designed to work in conjunction with klax.fit. 
@@ -22,9 +23,7 @@ class CallbackArgs:
     step: int
     _treedef_model: PyTreeDef
     _flat_model: list
-    _model: PyTree | None = None
-    _loss: Scalar | None = None
-    _val_loss: Scalar | None = None
+    _cache: dict = {}
     _get_loss: Callable[..., Scalar]
     _get_val_loss: Callable[..., Scalar | None]
 
@@ -46,37 +45,38 @@ class CallbackArgs:
         self._flat_model = flat_model
         self.step = step
 
-        # Reset private properties for lazy evaluation
-        self._model = None
-        self._loss = None
-        self._val_loss = None
+        # Clear cache
+        self._cache = {}
 
-    @property
+    def _lazy_evaluated_and_cached[T:Callable](fun: T) -> T:
+        """Turns fun into property and stores method output in `_cache` `dict`
+        of the class using the fun name as key. If the fun name is already in
+        `_cache` then the correspongind value is used instead of evaluating fun.
+
+        **Arguments:**
+            `fun`: Method to wrap.
+
+        Returns:
+            Wraped method.
+        """
+        attr_name = fun.__name__
+        def new_fun(self):
+            if attr_name not in self._cache:
+                self._cache.setdefault(attr_name, fun(self))
+            return self._cache.get(attr_name)
+        return property(new_fun)
+
+    @_lazy_evaluated_and_cached
     def model(self):
-        # If the following statement is false, it means that the model has
-        # already been unflattened, hence it will be returned without change
-        if self._model is None:
-            self._model = jax.tree_util.tree_unflatten(self._treedef_model,
-                                                       self._flat_model)
-        return self._model
+        return jax.tree_util.tree_unflatten(self._treedef_model, self._flat_model)
 
-    @property
+    @_lazy_evaluated_and_cached
     def loss(self):
-        # If the following statement is false, it means that the loss has
-        # already been computed since the last update, hence it will be returned
-        # without change.
-        if self._loss is None:
-            self._loss = self._get_loss(self.model)
-        return self._loss
+        return self._get_loss(self.model)
 
-    @property
+    @_lazy_evaluated_and_cached
     def val_loss(self) -> Scalar | None:
-        # If the following statement is false, it means that the validation loss
-        # has already been computed since the last update, hence it will be
-        # returned without change.
-        if self._val_loss is None:
-            self._val_loss = self._get_val_loss(self.model)
-        return self._val_loss
+        return self._get_val_loss(self.model)
     
 
 @typing.runtime_checkable
