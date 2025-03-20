@@ -21,24 +21,23 @@ class CallbackArgs:
     are stored such that they are not calculated multiple times.
     """
     step: int
+    data: DataTree
+    val_data: DataTree | None 
     _treedef_model: PyTreeDef
     _flat_model: list
     _cache: dict = {}
     _get_loss: Callable[..., Scalar]
-    _get_val_loss: Callable[..., Scalar | None]
 
     def __init__(
         self,
-        get_loss: Callable[[PyTree, DataTree, DataTree], Scalar],
-        data: tuple[DataTree, DataTree],
-        val_data: Optional[tuple[DataTree, DataTree]],
+        get_loss: Callable[[PyTree, DataTree], Scalar],
+        data: DataTree,
+        val_data: Optional[DataTree],
         treedef_model: PyTreeDef
     ):
-        self._get_loss = lambda m: get_loss(m, *data)
-        if val_data:
-            self._get_val_loss = lambda m: get_loss(m, *val_data)
-        else:
-            self._get_val_loss = lambda _: None
+        self.data = data
+        self.val_data = val_data
+        self._get_loss = get_loss #lambda m: get_loss(m, *data)
         self._treedef_model = treedef_model
 
     def update(self, flat_model: PyTree, step: int):
@@ -50,7 +49,7 @@ class CallbackArgs:
 
     def _lazy_evaluated_and_cached[T:Callable](fun: T) -> T:
         """Turns fun into property and stores method output in `_cache` `dict`
-        of the class using the fun name as key. If the fun name is already in
+        of the class using the function name as key. If the fun name is already in
         `_cache` then the correspongind value is used instead of evaluating fun.
 
         **Arguments:**
@@ -72,11 +71,11 @@ class CallbackArgs:
 
     @_lazy_evaluated_and_cached
     def loss(self):
-        return self._get_loss(self.model)
+        return self._get_loss(self.model, self.data)
 
     @_lazy_evaluated_and_cached
     def val_loss(self) -> Scalar | None:
-        return self._get_val_loss(self.model)
+        return self._get_loss(self.model, self.val_data)
     
 
 @typing.runtime_checkable
