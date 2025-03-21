@@ -2,10 +2,9 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from klax.callbacks import CallbackArgs
+from klax.callbacks import CallbackArgs, DefaultHistoryCallback
 
 def test_callbackargs():
-
     computation_counter = 0
     def get_loss(model, data):
         x, y = data
@@ -24,7 +23,7 @@ def test_callbackargs():
     model = Model()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
-    cbargs = CallbackArgs(get_loss, data, val_data, treedef_model)
+    cbargs = CallbackArgs(get_loss, treedef_model, data, val_data)
     cbargs.update(flat_model, step=1)
 
 
@@ -39,4 +38,36 @@ def test_callbackargs():
     _ = cbargs.loss
     assert computation_counter == 3
 
+def test_default_history_callback():
+
+    # >>> Just define stuff for cbargs
+    def get_loss(model, data):
+        x, y = data
+        y_pred = jax.vmap(model)(x)
+        return jnp.mean(jnp.square(y - y_pred))
+    
+    data = 2*(jnp.array([1,2,3,4,5]),)
+    val_data = 2*(jnp.array([6,7,8]),)
+
+    class Model(eqx.Module):
+        def __call__(self, x):
+            return 1.1*x
+        
+    model = Model()
+    flat_model, treedef_model = jax.tree_util.tree_flatten(model)
+    # <<<
+
+    cbargs = CallbackArgs(get_loss, treedef_model, data, val_data)
+    dhc = DefaultHistoryCallback(log_every=2)
+
+    # First update 
+    cbargs.update(flat_model, step=1)
+    dhc(cbargs)
+    assert len(dhc.loss) == 0
+
+    # Second update
+    cbargs.update(flat_model, step=2)
+    dhc(cbargs)
+    assert len(dhc.loss) == 1
+    
 

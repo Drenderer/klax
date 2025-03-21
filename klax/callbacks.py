@@ -7,6 +7,13 @@ from jaxtyping import PyTree, PyTreeDef, Scalar
 
 from .typing import DataTree
 
+try:
+    from matplotlib import pyplot as plt
+    PYPLOT_AVAILABLE = True
+except ModuleNotFoundError:
+    PYPLOT_AVAILABLE = False
+
+
 
 
 class CallbackArgs:
@@ -31,13 +38,13 @@ class CallbackArgs:
     def __init__(
         self,
         get_loss: Callable[[PyTree, DataTree], Scalar],
+        treedef_model: PyTreeDef,
         data: DataTree,
-        val_data: Optional[DataTree],
-        treedef_model: PyTreeDef
+        val_data: Optional[DataTree] = None,
     ):
         self.data = data
         self.val_data = val_data
-        self._get_loss = get_loss #lambda m: get_loss(m, *data)
+        self._get_loss = get_loss
         self._treedef_model = treedef_model
 
     def update(self, flat_model: PyTree, step: int):
@@ -75,6 +82,8 @@ class CallbackArgs:
 
     @_lazy_evaluated_and_cached
     def val_loss(self) -> Scalar | None:
+        if self.val_data is None:
+            return None
         return self._get_loss(self.model, self.val_data)
     
 
@@ -86,3 +95,57 @@ class Callback(Protocol):
         cbargs: CallbackArgs
     ) -> bool | None:
         raise NotImplementedError
+    
+
+@typing.runtime_checkable
+class HistoryCallback(Protocol):
+    """An abstract history callback."""
+    def __init__(self, log_every:int) -> None:
+        raise NotImplementedError
+    def __call__(self, cbargs: CallbackArgs) -> bool | None:
+        raise NotImplementedError
+    def add_training_time(self, seconds:float) -> None:
+        raise NotImplementedError
+
+class DefaultHistoryCallback:
+    log_every: int
+    steps: list
+    loss: list
+    val_loss: list|None
+    training_time: float
+
+    def __init__(self, log_every:int=100):
+        self.log_every = log_every
+        self.steps = []
+        self.loss = []
+        self.val_loss = []
+        self.training_time = 0.
+
+    def __call__(self, cbargs: CallbackArgs):
+        if cbargs.step % self.log_every == 0:
+            self.steps.append(cbargs.step)
+            self.loss.append(cbargs.loss)
+            if cbargs.val_loss is not None:
+                self.val_loss.append(cbargs.val_loss)
+
+    def add_training_time(self, seconds:float):
+        self.training_time += seconds
+
+    def plot(self, *, loss_kwargs:dict={}, val_loss_kwargs:dict={}, axis=None): # Can't type hint axes without importing pyplot: axis:plt.Axes=None
+        if PYPLOT_AVAILABLE:
+            axis = plt.gca() if axis is None else axis
+            loss_kwargs = dict(label='Loss', ls='-', c='black') | loss_kwargs
+            val_loss_kwargs = dict(label='Validation loss', ls='--', c='red') | val_loss_kwargs
+            plt.plot(self.steps, self.loss, **loss_kwargs)
+            if self.val_loss is not None:
+                plt.plot(self.steps, self.val_loss, **val_loss_kwargs)
+        else:
+            print('Couldn\'t load matplotlib.pyplot.')
+
+    def save(self):
+        raise NotImplementedError
+    
+    def load(self):
+        raise NotImplementedError
+
+

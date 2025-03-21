@@ -24,7 +24,7 @@ dependencies = ["jax", "equinox", "paramax", "optax"]
 
 [project.optional-dependencies]
 testing = [
-    "pytest"
+    "pytest", "matplotlib"
 ]
 
 [tool.setuptools.packages.find]

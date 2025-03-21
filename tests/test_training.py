@@ -94,17 +94,15 @@ def test_training(getkey):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     _, history = klax.fit(model, (x, x), key=getkey())
-    assert all(isinstance(x, np.ndarray) for _, x in history.items())
-    assert history["steps"].shape == (10,)
-    assert history["loss"].shape == (10,)
-    assert history["training_time"].shape == ()
+    assert len(history.steps) == 10
+    assert len(history.loss) == 10
+    assert isinstance(history.training_time, float)
 
     # Validation data
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     _, history = klax.fit(model, (x, x), validation_data=(x, x), key=getkey())
-    assert isinstance(history["val_loss"], np.ndarray)
-    assert history["val_loss"].shape == (10,)
+    assert len(history.val_loss) == 10
 
     # Callbacks
     x = jrandom.uniform(getkey(), (2, 1))
@@ -121,4 +119,4 @@ def test_training(getkey):
         callbacks=[callback],
         key=getkey()
     )
-    assert history['steps'][-1] == 123
+    assert history.steps[-1] == 123
