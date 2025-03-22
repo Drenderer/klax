@@ -77,7 +77,7 @@ def test_linear(getkey, getwrap):
     linear = klax.nn.Linear(
         2,
         "scalar",
-        he_normal(), # since uniform does not acces complex numbers
+        he_normal(), # since uniform does not accept complex numbers
         key=getkey(),
         dtype=jnp.complex64
     )

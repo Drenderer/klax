@@ -3,11 +3,12 @@ from typing import (
     Literal,
     Optional,
     Union,
+    Iterable,
 )
 
 import equinox as eqx
 import jax
-from jax.nn.initializers import Initializer, zeros
+from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
@@ -37,8 +38,8 @@ class MLP(eqx.Module, strict=True):
         self,
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
-        width_sizes: Union[tuple[int, ...], list[int]],
-        weight_init: Initializer,
+        width_sizes: Iterable[int],
+        weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.relu,
         final_activation: Callable = lambda x: x,
@@ -78,60 +79,32 @@ class MLP(eqx.Module, strict=True):
         output from the module will have shape `()`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
-        depth = len(width_sizes)
-        keys = jrandom.split(key, depth + 1)
-        layers = []
-        if depth == 0:
-            layers.append(
-                Linear(
-                    in_size,
-                    out_size,
-                    weight_init,
-                    bias_init,
-                    use_final_bias,
-                    dtype=dtype,
-                    key=keys[0]
-                )
-            )
-        else:
-            layers.append(
-                Linear(
-                    in_size,
-                    width_sizes[0],
-                    weight_init,
-                    bias_init,
-                    use_bias,
-                    dtype=dtype,
-                    key=keys[0]
-                )
-            )
-            for i in range(depth - 1):
-                layers.append(
-                    Linear(
-                        width_sizes[i],
-                        width_sizes[i + 1],
-                        weight_init,
-                        bias_init,
-                        use_bias,
-                        dtype=dtype,
-                        key=keys[i + 1]
-                    )
-                )
-            layers.append(
-                Linear(
-                    width_sizes[-1],
-                    out_size,
-                    weight_init,
-                    bias_init,
-                    use_final_bias,
-                    dtype=dtype,
-                    key=keys[-1]
-                )
-            )
-        self.layers = tuple(layers)
+        width_sizes = tuple(width_sizes)
+
         self.in_size = in_size
         self.out_size = out_size
-        self.width_sizes = tuple(width_sizes)
+        self.width_sizes = width_sizes
+        self.use_bias = use_bias
+        self.use_final_bias = use_final_bias
+
+        layer_in_sizes   = (in_size,) + width_sizes 
+        layer_out_sizes  = width_sizes + (out_size,)
+        layer_use_bias_flags = len(width_sizes)*(use_bias,) + (use_final_bias,)
+        layer_keys = jrandom.split(key, len(layer_out_sizes))
+        self.layers = tuple(
+            Linear(
+                layer_in_size,
+                layer_out_size,
+                weight_init,
+                bias_init,
+                layer_use_bias,
+                dtype=dtype,
+                key=layer_key
+            ) for layer_in_size, layer_out_size, layer_use_bias, layer_key in zip(
+                layer_in_sizes, layer_out_sizes, layer_use_bias_flags, layer_keys
+            )
+        )
+        
         # In case `activation` or `final_activation` are learnt, then make a separate
         # copy of their weights for every neuron.
         activations = []
@@ -146,8 +119,6 @@ class MLP(eqx.Module, strict=True):
             self.final_activation = eqx.filter_vmap(
                 lambda: final_activation, axis_size=out_size
             )()
-        self.use_bias = use_bias
-        self.use_final_bias = use_final_bias
 
     def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
         """**Arguments:**
