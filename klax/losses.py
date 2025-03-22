@@ -27,7 +27,7 @@ def expects_tuple_and_vmap(loss: Callable[[Array, Array], Scalar]):
 
     **Arguments:**
         `loss`: Loss function taking the output prediction and
-        ground truth as intput.
+        ground truth as input.
     """
     def new_loss(
         model: PyTree,
@@ -36,7 +36,7 @@ def expects_tuple_and_vmap(loss: Callable[[Array, Array], Scalar]):
     ) -> Scalar:
         x, y = data
         in_axes, _ = batch_axis
-        y_pred = jax.vmap(model, in_axes=in_axes)(x)
+        y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
         return loss(y_pred, y)
     return new_loss
 
