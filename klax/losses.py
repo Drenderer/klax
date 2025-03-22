@@ -1,9 +1,9 @@
 import typing
-from typing import Any, Protocol, Sequence
+from typing import Any, Callable, Protocol, Sequence
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import PyTree, Scalar
+from jaxtyping import PyTree, Scalar, Array
 
 from .typing import DataTree
 
@@ -13,28 +13,37 @@ class Loss(Protocol):
     def __call__(
         self,
         model: PyTree,
-        x: DataTree,
-        y: DataTree,
-        in_axes: int | None | Sequence[Any]
+        data: DataTree,
+        batch_axis: int | None | Sequence[Any]
     ) -> Scalar:
         raise NotImplementedError
 
 
-def mse(
-    model: PyTree,
-    x: DataTree,
-    y: DataTree,
-    in_axes: int | None | Sequence[Any] = 0
-) -> Scalar:
-    y_pred = jax.vmap(model, in_axes=in_axes)(x)
-    return jnp.mean((y_pred - y) ** 2)
+def expects_tuple_and_vmap(loss: Callable[[Array, Array], Scalar]):
+    """
+    Wrapper for loss functions that splits the data into two,
+    vmaps the model and then passes the output prediction and 
+    the ground truth output to the wrapped function.
 
+    **Arguments:**
+        `loss`: Loss function taking the output prediction and
+        ground truth as input.
+    """
+    def new_loss(
+        model: PyTree,
+        data: DataTree,
+        batch_axis: int | None | Sequence[Any] = 0
+    ) -> Scalar:
+        x, y = data
+        in_axes, _ = batch_axis
+        y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
+        return loss(y_pred, y)
+    return new_loss
 
-def mae(
-    model: PyTree,
-    x: DataTree,
-    y: DataTree,
-    in_axes: int | None | Sequence[Any] = 0
-) -> Scalar:
-    y_pred = jax.vmap(model, in_axes=in_axes)(x)
+@expects_tuple_and_vmap
+def mse(y_pred, y):
+    return jnp.mean(jnp.square(y_pred - y))
+
+@expects_tuple_and_vmap
+def mae(y_pred, y):
     return jnp.mean(jnp.abs(y_pred - y))

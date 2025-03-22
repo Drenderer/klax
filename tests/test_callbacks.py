@@ -7,7 +7,8 @@ from klax.callbacks import CallbackArgs
 def test_callbackargs():
 
     computation_counter = 0
-    def get_loss(model, x, y):
+    def get_loss(model, data):
+        x, y = data
         nonlocal computation_counter
         computation_counter += 1
         y_pred = jax.vmap(model)(x)
