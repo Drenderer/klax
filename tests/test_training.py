@@ -82,7 +82,7 @@ def test_training(getkey):
     model = eqx.nn.Linear(1, 1, key=getkey())
     model, _ = klax.fit(model, (x, y), optimizer=optax.adam(1.0), key=getkey())
     y_pred = jax.vmap(model)(x)
-    assert jnp.all(jnp.abs(y_pred - y) < 1e-6)
+    assert jnp.allclose(y_pred, y)
 
     # Multiple inputs
     class Model(eqx.Module):

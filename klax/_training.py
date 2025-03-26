@@ -143,13 +143,11 @@ def dataloader(
 
 def fit(
     model: T,
-    x: DataTree,
-    y: DataTree,
-    batch_size: int = 32,
-    in_mask: Optional[MaskTree] = None,
-    out_mask: Optional[MaskTree] = None,
+    data: DataTree,
     *,
-    validation_data: Optional[Tuple[DataTree, DataTree]] = None,
+    batch_size: int = 32,
+    data_mask: Optional[MaskTree] = None,
+    validation_data: Optional[DataTree] = None,
     steps: int = 1000,
     log_every: int = 100,
     loss_fn: Loss = mse,
@@ -161,44 +159,35 @@ def fit(
     """Trains a model using an optimizer from optax.
 
     Args:
-        model: The model instance, which should be trained. It must be a
-            subclass of `eqx.Module`. The model may contain
-            `paramax.AbstractUnwrappable` wrappers.
-        x: The input data. It can be any `PyTree` with `ArrayLike` leaves.
-        y: The target data. It can be any `PyTree` with `ArrayLike` leaves.
-        batch_size: The number of examples in a batch.
-        in_mask: The `PyTree` denoting, which leaves of `x` have batch
-            dimension. `in_mask` must have the same structure as `x`, where
+        model`: The model instance, which should be trained. It must be a subclass of
+            `eqx.Module`. The model may contain `paramax.AbstractUnwrappable` wrappers.
+        data`: The training data can be any `PyTree` with `ArrayLike` leaves.
+            Most likely you'll want `data` to be a tuple `(x, y)` with model inputs
+            `x` and model outputs `y`.
+        batch_size`: The number of examples in a batch.
+        data_mask`: The `PyTree` denoting, which leaves of `data` have batch
+            dimension. `data_mask` must have the same structure as `data`, where
             the leaves are replaced with values of type `bool`. `True` indicates
-            that the corresponding leaf in `x` has batch dimension. If `False`,
-            the corresponding leaf will be returned unchanged by the `Generator`.
-            (Defaults to `None`, meaning all leaves in `x` have batch dimension.)
-        out_mask: The `PyTree` denoting, which leaves of `y` have batch
-            dimension. `out_mask` must have the same structure as `y`, where
-            the leaves are replaced with values of type `bool`. `True` indicates
-            that the corresponding leaf in `y` has batch dimension. If `False`, the
+            that the corresponding leaf in `data` has batch dimension. If `False`, the
             corresponding leaf will be returned unchanged by the `Generator`.
-            (Defaults to `None`, meaning all leaves in `y` have batch dimension.)
-        validation_data: A tuple of inputs and targets used for validation
-            during training. (Defaults to None. Keyword only argument)
-        steps: Number of gradient updates to apply. (Defaults to 1000. Keyword
-            only argument)
-        log_every: The number of steps between updates of the loss history. A
-            history update consists of calculating the training and validation
-            losses *over the entire datasets* and storing them in the history
-            dictionary. (Defaults to 10. Keyword only Argument)
-        loss_fn: The loss function with call signature
-            `(model, prediction, target, in_axes) -> float`.
+            (Defaults to `None`, meaning all leaves in `data` have batch dimension.)
+        validation_data`: Arbitrary `PyTree` used for validation during training.
+            Must have the same tree structure as `data`.
+            (Defaults to None. Keyword only argument)
+        steps`: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
+        log_every`: The number of steps between updates of the loss history. A history update
+            consists of calculating the training and validation losses *over the entire datasets*
+            and storing them in the history dictionary. (Defaults to 10. Keyword only Argument)
+        loss_fn`: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
             (Defaults to `mse`.)
-        optimizer: The optimizer. Any optax gradient transform to calculate the
-            updates for the model. (Defaults to optax.adam(1e-3).)
-        dataloader: The data loader that splits inputs and targets into batches.
+        optimizer`: The optimizer. Any optax gradient transform to calculate the updates for
+            the model. (Defaults to optax.adam(1e-3).)
+        dataloader`: The data loader that splits inputs and targets into batches.
             (Defaults to `dataloader`)
-        callbacks: Callback functions that are evaluated after every training
-            step. They can be used to implement early stopping, custom history
-            logging and more. The argument to the callback function is a
-            CallbackArgs object. (Defaults to `None`. Keyword only Argument)
-        key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
+        callbacks`: Callback functions that are evaluated after every training step. They can
+            be used to implement early stopping, custom history logging and more. The argument to the
+            callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
+        key`: A `jax.random.PRNGKey` used to provide randomness for batch generation.
             (Keyword only argument.)
 
     Note:
@@ -206,45 +195,42 @@ def fit(
         the first axes of any `jax.Array`
 
     Returns:
-        Returns a tuple of the trained model and a history dictionary containing
-        the loss history.
+        A tuple of the trained model and a history dictionary containing the loss history.
     """
 
-    # Generate an all true masks if in_axes/out_axes is None
-    if in_mask is None:
-        in_mask = jax.tree.map(lambda x: x is not None, x)
-    if out_mask is None:
-        out_mask = jax.tree.map(lambda x: x is not None, y)
+    # Generate an all true masks if data_mask is None
+    if data_mask is None:
+        data_mask = jax.tree.map(lambda x: x is not None, data)
 
-    # Check that y and x have the same PyTree structure as in_mask and out_mask
-    if jax.tree.structure(x) != jax.tree.structure(in_mask):
-        raise ValueError("Arguments x and in_mask must have equal PyTree structure.")
-    if jax.tree.structure(y) != jax.tree.structure(out_mask):
-        raise ValueError("Arguments y and in_mask must have equal PyTree structure.")
+    # Check that data has the same PyTree structure as data_mask
+    if jax.tree.structure(data) != jax.tree.structure(data_mask):
+        raise ValueError(
+            "Arguments data and data_mask must have equal PyTree structure."
+        )
 
     # Mark the first dimension as batch dimension for all leaves in x that are
     # not masked
-    in_axes = jax.tree.map(lambda x: 0 if x else None, in_mask)
+    batch_axis = jax.tree.map(lambda x: 0 if x else None, data_mask)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
     # the loss evaluation for the loss history.
     @eqx.filter_jit
-    def get_loss(model, x, y):
+    def get_loss(model, batch):
         model = px.unwrap(model)
-        return loss_fn(model, x, y, in_axes=in_axes)
+        return loss_fn(model, batch, batch_axis=batch_axis)
 
     # Get the gradient function
     grad_loss = eqx.filter_grad(get_loss)
 
     @eqx.filter_jit
-    def make_step(x, y, flat_model, optimizer, flat_opt_state):
+    def make_step(batch, flat_model, optimizer, flat_opt_state):
         # Use the unflatten trick to speed up training,
         # see https://docs.kidger.site/equinox/tricks/
         model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
         opt_state = jax.tree_util.tree_unflatten(treedef_opt_state, flat_opt_state)
 
         # Compute and apply the parameter updates
-        grads = grad_loss(model, x, y)
+        grads = grad_loss(model, batch)
         updates, opt_state = optimizer.update(
             grads, opt_state, params=eqx.filter(model, eqx.is_inexact_array)
         )
@@ -260,9 +246,7 @@ def fit(
         "steps": [],
         "loss": [],
     }
-    vx, vy = None, None
     if validation_data is not None:
-        vx, vy = validation_data
         history["val_loss"] = []
 
     val_loss = None
@@ -276,16 +260,21 @@ def fit(
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
-    cbargs = CallbackArgs(get_loss, (x, y), validation_data, treedef_model)
+    cbargs = CallbackArgs(get_loss, data, validation_data, treedef_model)
 
     # Loop over all training steps
     start_time = time.time()
-    for step, (xi, yi) in zip(
+    for step, batch in zip(
         range(1, steps + 1),
-        dataloader((x, y), batch_size, (in_mask, out_mask), key=key),
+        dataloader(
+            data,
+            batch_size,
+            data_mask,  # TODO: Give batch_axis to the dataloader instead and allow for custom batch axis for every pytree leaf
+            key=key,
+        ),
     ):
         flat_model, flat_opt_state = make_step(
-            xi, yi, flat_model, optimizer, flat_opt_state
+            batch, flat_model, optimizer, flat_opt_state
         )
 
         # Update callbacks arguments with the current state of the model
