@@ -8,10 +8,9 @@ from jaxtyping import PyTree, PyTreeDef, Scalar
 from .typing import DataTree
 
 
-
 class CallbackArgs:
     """
-    Callback Argument Object, designed to work in conjunction with klax.fit. 
+    Callback arguments object, designed to work in conjunction with ``klax.fit``.
 
     It should not be used elsewhere!
 
@@ -21,9 +20,10 @@ class CallbackArgs:
     if they are used and are stored such that they are not calculated multiple
     times.
     """
+
     step: int
     data: DataTree
-    val_data: DataTree | None 
+    val_data: DataTree | None
     _treedef_model: PyTreeDef
     _flat_model: list
     _cache: dict = {}
@@ -34,11 +34,11 @@ class CallbackArgs:
         get_loss: Callable[[PyTree, DataTree], Scalar],
         data: DataTree,
         val_data: Optional[DataTree],
-        treedef_model: PyTreeDef
+        treedef_model: PyTreeDef,
     ):
         self.data = data
         self.val_data = val_data
-        self._get_loss = get_loss #lambda m: get_loss(m, *data)
+        self._get_loss = get_loss  # lambda m: get_loss(m, *data)
         self._treedef_model = treedef_model
 
     def update(self, flat_model: PyTree, step: int):
@@ -60,10 +60,12 @@ class CallbackArgs:
             Wraped method.
         """
         attr_name = fun.__name__
+
         def new_fun(self):
             if attr_name not in self._cache:
                 self._cache.setdefault(attr_name, fun(self))
             return self._cache.get(attr_name)
+
         return property(new_fun)
 
     @_lazy_evaluated_and_cached
@@ -77,13 +79,11 @@ class CallbackArgs:
     @_lazy_evaluated_and_cached
     def val_loss(self) -> Scalar | None:
         return self._get_loss(self.model, self.val_data)
-    
+
 
 @typing.runtime_checkable
 class Callback(Protocol):
     """An abstract callback."""
-    def __call__(
-        self,
-        cbargs: CallbackArgs
-    ) -> bool | None:
+
+    def __call__(self, cbargs: CallbackArgs) -> bool | None:
         raise NotImplementedError

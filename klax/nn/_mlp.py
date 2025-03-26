@@ -18,8 +18,8 @@ from ._linear import Linear
 
 class MLP(eqx.Module, strict=True):
     """Standard Multi-Layer Perceptron; also known as a feed-forward network.
-    
-    
+
+
     This class is modified form `eqx.nn.MLP` to allow for custom initialization
     and different node numbers in the hidden layers. Hence, it may also be used
     for ecoder/decoder tasks.
@@ -88,9 +88,9 @@ class MLP(eqx.Module, strict=True):
         self.use_bias = use_bias
         self.use_final_bias = use_final_bias
 
-        layer_in_sizes   = (in_size,) + width_sizes 
-        layer_out_sizes  = width_sizes + (out_size,)
-        layer_use_bias_flags = len(width_sizes)*(use_bias,) + (use_final_bias,)
+        layer_in_sizes = (in_size,) + width_sizes
+        layer_out_sizes = width_sizes + (out_size,)
+        layer_use_bias_flags = len(width_sizes) * (use_bias,) + (use_final_bias,)
         layer_keys = jrandom.split(key, len(layer_out_sizes))
         self.layers = tuple(
             Linear(
@@ -100,19 +100,18 @@ class MLP(eqx.Module, strict=True):
                 bias_init,
                 layer_use_bias,
                 dtype=dtype,
-                key=layer_key
-            ) for layer_in_size, layer_out_size, layer_use_bias, layer_key in zip(
+                key=layer_key,
+            )
+            for layer_in_size, layer_out_size, layer_use_bias, layer_key in zip(
                 layer_in_sizes, layer_out_sizes, layer_use_bias_flags, layer_keys
             )
         )
-        
+
         # In case `activation` or `final_activation` are learnt, then make a separate
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(
-                eqx.filter_vmap(lambda: activation, axis_size=width)()
-            )
+            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -133,8 +132,9 @@ class MLP(eqx.Module, strict=True):
             A JAX array with shape `(out_size,)`. (Or shape `()` if
             `out_size="scalar"`.)
         """
-        for i, (layer, activation) in enumerate(zip(self.layers[:-1],
-                                                    self.activations)):
+        for i, (layer, activation) in enumerate(
+            zip(self.layers[:-1], self.activations)
+        ):
             x = layer(x)
             layer_activation = jax.tree.map(
                 lambda x: x[i] if eqx.is_array(x) else x, activation

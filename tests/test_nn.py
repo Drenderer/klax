@@ -23,21 +23,13 @@ def test_linear(getkey, getwrap):
     assert linear(x).shape == (4,)
 
     # Some keyword arguments
-    linear = klax.nn.Linear(
-        3,
-        out_features=4,
-        weight_init=uniform(),
-        key=getkey()
-    )
+    linear = klax.nn.Linear(3, out_features=4, weight_init=uniform(), key=getkey())
     x = jrandom.normal(getkey(), (3,))
     assert linear(x).shape == (4,)
 
     # All keyword arguments
     linear = klax.nn.Linear(
-        in_features=3,
-        out_features=4,
-        weight_init=uniform(),
-        key=getkey()
+        in_features=3, out_features=4, weight_init=uniform(), key=getkey()
     )
     x = jrandom.normal(getkey(), (3,))
     assert linear(x).shape == (4,)
@@ -53,33 +45,22 @@ def test_linear(getkey, getwrap):
 
     # Wrappers
     linear = klax.nn.Linear(
-        3,
-        4,
-        uniform(),
-        weight_wrap=getwrap,
-        bias_wrap=getwrap,
-        key=getkey()
+        3, 4, uniform(), weight_wrap=getwrap, bias_wrap=getwrap, key=getkey()
     )
     x = jrandom.normal(getkey(), (3,))
     assert jnp.all(px.unwrap(linear)(x) == 0.0)
 
     # Data type
-    linear = klax.nn.Linear(
-        2,
-        "scalar",
-        uniform(),
-        key=getkey(),
-        dtype=jnp.float16
-    )
+    linear = klax.nn.Linear(2, "scalar", uniform(), key=getkey(), dtype=jnp.float16)
     x = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
     assert linear(x).dtype == jnp.float16
 
     linear = klax.nn.Linear(
         2,
         "scalar",
-        he_normal(), # since uniform does not accept complex numbers
+        he_normal(),  # since uniform does not accept complex numbers
         key=getkey(),
-        dtype=jnp.complex64
+        dtype=jnp.complex64,
     )
     x = jrandom.normal(getkey(), (2,), dtype=jnp.complex64)
     assert linear(x).dtype == jnp.complex64
@@ -116,11 +97,7 @@ def test_fully_linear(getkey):
 
     # Some keyword arguments
     fully_linear = klax.nn.FullyLinear(
-        3,
-        2,
-        out_features=4,
-        weight_init=uniform(),
-        key=getkey()
+        3, 2, out_features=4, weight_init=uniform(), key=getkey()
     )
     y = jrandom.normal(getkey(), (3,))
     z = jrandom.normal(getkey(), (2,))
@@ -132,7 +109,7 @@ def test_fully_linear(getkey):
         in_features_z=2,
         out_features=4,
         weight_init=uniform(),
-        key=getkey()
+        key=getkey(),
     )
     y = jrandom.normal(getkey(), (3,))
     z = jrandom.normal(getkey(), (2,))
@@ -149,13 +126,7 @@ def test_fully_linear(getkey):
     z = jrandom.normal(getkey(), ())
     assert fully_linear(y, z).shape == (3,)
 
-    fully_linear = klax.nn.FullyLinear(
-        "scalar",
-        "scalar",
-        3,
-        uniform(),
-        key=getkey()
-    )
+    fully_linear = klax.nn.FullyLinear("scalar", "scalar", 3, uniform(), key=getkey())
     y = jrandom.normal(getkey(), ())
     z = jrandom.normal(getkey(), ())
     assert fully_linear(y, z).shape == (3,)
@@ -167,24 +138,14 @@ def test_fully_linear(getkey):
 
     # Data types
     fully_linear = klax.nn.FullyLinear(
-        2,
-        3,
-        "scalar",
-        uniform(),
-        key=getkey(),
-        dtype=jnp.float16
+        2, 3, "scalar", uniform(), key=getkey(), dtype=jnp.float16
     )
     y = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
     z = jrandom.normal(getkey(), (3,), dtype=jnp.float16)
     assert fully_linear(y, z).dtype == jnp.float16
 
     fully_linear = klax.nn.FullyLinear(
-        2,
-        3,
-        "scalar",
-        he_normal(),
-        key=getkey(),
-        dtype=jnp.complex64
+        2, 3, "scalar", he_normal(), key=getkey(), dtype=jnp.complex64
     )
     y = jrandom.normal(getkey(), (2,), dtype=jnp.complex64)
     z = jrandom.normal(getkey(), (3,), dtype=jnp.complex64)
@@ -192,63 +153,47 @@ def test_fully_linear(getkey):
 
 
 def test_mlp(getkey):
-    mlp = klax.nn.MLP(2, 3, 2*[8], uniform(), key=getkey())
+    mlp = klax.nn.MLP(2, 3, 2 * [8], uniform(), key=getkey())
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
 
     mlp = klax.nn.MLP(
         in_size=2,
         out_size=3,
-        width_sizes=2*[8],
+        width_sizes=2 * [8],
         weight_init=uniform(),
         bias_init=uniform(),
-        key=getkey()
+        key=getkey(),
     )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
 
-    mlp = klax.nn.MLP("scalar", 2, 2*[2], uniform(), key=getkey())
+    mlp = klax.nn.MLP("scalar", 2, 2 * [2], uniform(), key=getkey())
     x = jrandom.normal(getkey(), ())
     assert mlp(x).shape == (2,)
 
-    mlp = klax.nn.MLP(2, "scalar", 2*[2], uniform(), key=getkey())
+    mlp = klax.nn.MLP(2, "scalar", 2 * [2], uniform(), key=getkey())
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == ()
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [True, True, True]
 
     mlp = klax.nn.MLP(
-        2,
-        3,
-        2*[8],
-        uniform(),
-        use_bias=False,
-        use_final_bias=True,
-        key=getkey()
+        2, 3, 2 * [8], uniform(), use_bias=False, use_final_bias=True, key=getkey()
     )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [False, False, True]
 
     mlp = klax.nn.MLP(
-        2,
-        3,
-        2*[8],
-        uniform(),
-        use_bias=True,
-        use_final_bias=False,
-        key=getkey())
+        2, 3, 2 * [8], uniform(), use_bias=True, use_final_bias=False, key=getkey()
+    )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [True, True, False]
 
     mlp = klax.nn.MLP(
-        2,
-        3,
-        [4, 8],
-        uniform(),
-        use_bias=True,
-        use_final_bias=False,
-        key=getkey())
+        2, 3, [4, 8], uniform(), use_bias=True, use_final_bias=False, key=getkey()
+    )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
     assert [mlp.layers[i].in_features for i in range(0, 3)] == [2, 4, 8]

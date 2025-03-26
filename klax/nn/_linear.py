@@ -51,7 +51,7 @@ class Linear(eqx.Module, strict=True):
             weight_warp: An optional `klax.wrappers.ParameterWrapper` that can be passed
                to enforce weight constraints.
             bias_warp: An optional `klax.wrappers.ParameterWrapper` that can be passed
-               to enforce bias constraints. 
+               to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
                on whether JAX is in 64-bit mode.
@@ -128,11 +128,11 @@ class Linear(eqx.Module, strict=True):
 
 class FullyLinear(eqx.Module, strict=True):
     """Performs a linear transformation for two inputs.
-    
-    This layer is useful for formulating, e.g., fully connected multi layer 
+
+    This layer is useful for formulating, e.g., fully connected multi layer
     perceptrons (MLP), where the MLP input is passed as an additional input
     to each hidden layer, alongside the output of the previous layer.
-"""
+    """
 
     weight_y: Array
     weight_z: Array
@@ -204,11 +204,7 @@ class FullyLinear(eqx.Module, strict=True):
         self.use_bias = use_bias
 
     def __call__(
-        self,
-        y: Array,
-        z: Array,
-        *,
-        key: Optional[PRNGKeyArray] = None
+        self, y: Array, z: Array, *, key: Optional[PRNGKeyArray] = None
     ) -> Array:
         """
         Args:
@@ -227,7 +223,7 @@ class FullyLinear(eqx.Module, strict=True):
 
             >>> fully_linear = equinox.nn.FullyLinear(...)
             >>> jax.vmap(fully_linear, (0, 0))(y, z)
-            
+
             will produce the appropriate output of shape `(batch, out_features)`.
 
         Returns:

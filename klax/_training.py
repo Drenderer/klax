@@ -5,14 +5,7 @@ This module implements a basic training loop.
 import datetime
 import time
 import typing
-from typing import (
-    Generator,
-    List,
-    Optional,
-    Protocol,
-    Tuple,
-    TypeVar
-)
+from typing import Generator, List, Optional, Protocol, Tuple, TypeVar
 
 import equinox as eqx
 import jax
@@ -23,10 +16,7 @@ import numpy as np
 import optax
 import paramax as px
 
-from .callbacks import (
-    Callback,
-    CallbackArgs
-)
+from .callbacks import Callback, CallbackArgs
 from .losses import Loss, mse
 from .typing import (
     BatchGenerator,
@@ -46,7 +36,7 @@ class Dataloader(Protocol):
         batch_size: int,
         batch_mask: MaskTree | None,
         *,
-        key: PRNGKeyArray
+        key: PRNGKeyArray,
     ) -> BatchGenerator:
         raise NotImplementedError
 
@@ -62,12 +52,12 @@ def dataloader(
     without replacement.
 
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
-    passed, leaves without batch dimension can be specified.    
+    passed, leaves without batch dimension can be specified.
 
     Example:
         This is an example for a nested `PyTree`, where the elements x and y
         have batch dimension along the first axis.
-    
+
 
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
@@ -82,7 +72,7 @@ def dataloader(
 
     Args:
         data: The data that shall be batched. It can be any `PyTree` with
-            `ArrayLike` leaves. 
+            `ArrayLike` leaves.
         batch_size: The number of examples in a batch.
         batch_mask: The `PyTree` denoting, which leaves of `data` have batch
             dimension. `batch_mask` must have the same structure as `data`,
@@ -94,7 +84,7 @@ def dataloader(
         key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
             (Keyword only argument.)
 
-    Note: 
+    Note:
         Note that the batch axis for all batched leaves must correspond to the
         first array axis.
 
@@ -113,12 +103,13 @@ def dataloader(
     # Generate an all true batch mask if batch_mask = None was passed
     if batch_mask is None:
         batch_mask = jax.tree.map(lambda x: x is not None, data)
-    
+
     # Check that data and batch_mask have the same PyTree structure
     if jax.tree.structure(data) != jax.tree.structure(batch_mask):
         raise ValueError(
-            "Arguments data and batch_mask must have equal PyTree structures.")
-    
+            "Arguments data and batch_mask must have equal PyTree structures."
+        )
+
     # Split the PyTree according to the batch mask
     batched_data, unbatched_data = eqx.partition(data, batch_mask)
 
@@ -132,7 +123,7 @@ def dataloader(
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than Jax's, so for
     # fast model training steps this actually makes a huge difference!
-    batched_data = jax.tree.map(lambda x: np.array(x), batched_data) 
+    batched_data = jax.tree.map(lambda x: np.array(x), batched_data)
 
     # Reduce batch size if the dataset has less examples than batch size
     batch_size = min(batch_size, dataset_size)
@@ -140,7 +131,7 @@ def dataloader(
     indices = jnp.arange(dataset_size)
     while True:
         perm = jr.permutation(key, indices)
-        (key,) = jr.split(key, 1) # Update key
+        (key,) = jr.split(key, 1)  # Update key
         start, end = 0, batch_size
         while end <= dataset_size:
             batch_perm = perm[start:end]
@@ -164,7 +155,7 @@ def fit(
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     dataloader: Dataloader = dataloader,
-    callbacks: Optional[List[Callback]]  = None,
+    callbacks: Optional[List[Callback]] = None,
     key: PRNGKeyArray,
 ) -> Tuple[T, dict]:
     """Trains a model using an optimizer from optax.
@@ -213,7 +204,7 @@ def fit(
     Note:
         This function assumes that the batch dimension is always oriented along
         the first axes of any `jax.Array`
-        
+
     Returns:
         Returns a tuple of the trained model and a history dictionary containing
         the loss history.
@@ -227,11 +218,9 @@ def fit(
 
     # Check that y and x have the same PyTree structure as in_mask and out_mask
     if jax.tree.structure(x) != jax.tree.structure(in_mask):
-        raise ValueError(
-            "Arguments x and in_mask must have equal PyTree structure.")
+        raise ValueError("Arguments x and in_mask must have equal PyTree structure.")
     if jax.tree.structure(y) != jax.tree.structure(out_mask):
-        raise ValueError(
-            "Arguments y and in_mask must have equal PyTree structure.")
+        raise ValueError("Arguments y and in_mask must have equal PyTree structure.")
 
     # Mark the first dimension as batch dimension for all leaves in x that are
     # not masked
@@ -257,9 +246,7 @@ def fit(
         # Compute and apply the parameter updates
         grads = grad_loss(model, x, y)
         updates, opt_state = optimizer.update(
-            grads,
-            opt_state,
-            params=eqx.filter(model, eqx.is_inexact_array)
+            grads, opt_state, params=eqx.filter(model, eqx.is_inexact_array)
         )
         model = eqx.apply_updates(model, updates)
 
@@ -269,11 +256,14 @@ def fit(
         return flat_model, flat_opt_state
 
     # Initialize the history dict
-    history = {'steps': [], 'loss': [],}
+    history = {
+        "steps": [],
+        "loss": [],
+    }
     vx, vy = None, None
     if validation_data is not None:
         vx, vy = validation_data
-        history['val_loss'] = []
+        history["val_loss"] = []
 
     val_loss = None
 
@@ -286,24 +276,16 @@ def fit(
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
-
     cbargs = CallbackArgs(get_loss, (x, y), validation_data, treedef_model)
-
 
     # Loop over all training steps
     start_time = time.time()
-    for step, (xi, yi) in zip(range(1, steps+1), dataloader(
-        (x, y),
-        batch_size,
-        (in_mask, out_mask),
-        key=key
-    )):
+    for step, (xi, yi) in zip(
+        range(1, steps + 1),
+        dataloader((x, y), batch_size, (in_mask, out_mask), key=key),
+    ):
         flat_model, flat_opt_state = make_step(
-            xi,
-            yi,
-            flat_model,
-            optimizer,
-            flat_opt_state
+            xi, yi, flat_model, optimizer, flat_opt_state
         )
 
         # Update callbacks arguments with the current state of the model
@@ -312,16 +294,16 @@ def fit(
         # Log every log_every steps and the last step
         if (step % log_every) == 0 or step == steps:
             loss = cbargs.loss
-            history['steps'].append(cbargs.step)
-            history['loss'].append(loss)
+            history["steps"].append(cbargs.step)
+            history["loss"].append(loss)
             message = f"Step: {step}, Loss: {loss:.3e}"
 
             if validation_data is not None:
                 val_loss = cbargs.val_loss
-                history['val_loss'].append(val_loss)
+                history["val_loss"].append(val_loss)
                 message += f", Validation loss: {val_loss:.3e}"
 
-            print(message) 
+            print(message)
 
         if callbacks is not None:
             # Run all callbacks and break if any of them request termination of
@@ -335,10 +317,10 @@ def fit(
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
     training_time = time.time() - start_time
-    print(f'Training took: {datetime.timedelta(seconds=training_time)}')
-    history['training_time'] = training_time
+    print(f"Training took: {datetime.timedelta(seconds=training_time)}")
+    history["training_time"] = training_time
 
     # Convert history to numpy arrays
-    history = {k: np.array(v) for k,v in history.items()}
+    history = {k: np.array(v) for k, v in history.items()}
 
     return model, history

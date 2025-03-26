@@ -3,14 +3,8 @@ from . import (
     losses as losses,
     nn as nn,
     typing as typing,
-    wrappers as wrappers
+    wrappers as wrappers,
 )
-from ._training import (
-    dataloader as dataloader,
-    fit as fit
-)
+from ._training import dataloader as dataloader, fit as fit
 
-__all__ = [
-    "dataloader",
-    "fit"
-]
+__all__ = ["dataloader", "fit"]

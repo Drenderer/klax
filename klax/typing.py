@@ -1,4 +1,5 @@
 """A collection of useful type aliases used within klax."""
+
 from typing import Generator, TypeAlias
 
 from jaxtyping import ArrayLike, PyTree

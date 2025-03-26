@@ -33,8 +33,8 @@ def getwrap():
 
         def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
             self.parameter = jnp.zeros_like(px.unwrap(parameter))
-        
+
         def unwrap(self) -> Array:
             return jnp.zeros_like(self.parameter)
-    
+
     return Wrapper
