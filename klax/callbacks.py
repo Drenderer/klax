@@ -48,25 +48,29 @@ class CallbackArgs:
         # Clear cache
         self._cache = {}
 
-    def _lazy_evaluated_and_cached[T: Callable](fun: T) -> T:
-        """Turns fun into property and stores method output in `_cache` `dict`
-        of the class using the function name as key. If the fun name is already in
-        `_cache` then the correspongind value is used instead of evaluating fun.
+    @staticmethod
+    def _lazy_evaluated_and_cached(fun: Callable) -> property:
+        """Turns a public method into a property
 
-        **Arguments:**
-            `fun`: Method to wrap.
+        The return value of `fun`is stored in the `_cache` dictionary of the
+        current object using the function name as key. If the name is already in
+        `_cache` then the cached value is simply returned, wihout evaluating
+        `fun`.
+
+        Args:
+            fun: Method to wrap.
 
         Returns:
-            Wraped method.
+            Wraped method as a property.
         """
         attr_name = fun.__name__
 
-        def new_fun(self):
+        def wrapper(self):
             if attr_name not in self._cache:
                 self._cache.setdefault(attr_name, fun(self))
             return self._cache.get(attr_name)
 
-        return property(new_fun)
+        return property(wrapper)
 
     @_lazy_evaluated_and_cached
     def model(self):
