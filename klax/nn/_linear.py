@@ -1,6 +1,7 @@
 from typing import (
     Literal,
     Optional,
+    Type,
     Union,
 )
 
@@ -20,8 +21,8 @@ class Linear(eqx.Module, strict=True):
     This class is modified from eqx.nn.Linear to allow for custom initialization.
     """
 
-    weight: Array
-    bias: Optional[Array]
+    weight: Array | ParameterWrapper
+    bias: Optional[Array | ParameterWrapper]
     in_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -33,8 +34,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: ParameterWrapper | None = None,
-        bias_wrap: ParameterWrapper | None = None,
+        weight_wrap: Type[ParameterWrapper] | None = None,
+        bias_wrap: Type[ParameterWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
