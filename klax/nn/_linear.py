@@ -103,8 +103,17 @@ class Linear(eqx.Module, strict=True):
             "batch dimensions) then use `jax.vmap`. For example, for an input `x` of "
             "shape `(batch, in_features)`, using
 
-            >>> linear = equinox.nn.Linear(...)
-            >>> jax.vmap(linear)(x)
+            >>> import jax
+            >>> from jax.nn.initializers import he_normal
+            >>> import jax.random as jrandom
+            >>> import klax
+            >>>
+            >>> key = jrandom.PRNGKey(0)
+            >>> keys = jrandom.split(key)
+            >>> x = jrandom.uniform(keys[0], (10,))
+            >>> linear = klax.nn.Linear("scalar", "scalar", he_normal(), key=keys[1])
+            >>> jax.vmap(linear)(x).shape
+            (10,)
 
             will produce the appropriate output of shape `(batch, out_features)`.
 
@@ -221,8 +230,20 @@ class FullyLinear(eqx.Module, strict=True):
             `z` of shape `(batch, in_features_y)` and `(batch, in_features_z)`,
             respectively, using
 
-            >>> fully_linear = equinox.nn.FullyLinear(...)
-            >>> jax.vmap(fully_linear, (0, 0))(y, z)
+            >>> import jax
+            >>> from jax.nn.initializers import he_normal
+            >>> import jax.random as jrandom
+            >>> import klax
+            >>>
+            >>> key = jrandom.PRNGKey(0)
+            >>> keys = jrandom.split(key, 3)
+            >>> y = jrandom.uniform(keys[0], (10,))
+            >>> z = jrandom.uniform(keys[1], (10,))
+            >>> fully_linear = klax.nn.FullyLinear(
+            ...     "scalar", "scalar", "scalar", he_normal(), key=keys[2]
+            ... )
+            >>> jax.vmap(fully_linear, (0, 0))(y, z).shape
+            (10,)
 
             will produce the appropriate output of shape `(batch, out_features)`.
 

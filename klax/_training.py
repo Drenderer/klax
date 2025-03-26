@@ -59,16 +59,21 @@ def dataloader(
         have batch dimension along the first axis.
 
 
+        >>> import jax
+        >>> import jax.numpy as jnp
+        >>> from klax import dataloader
+        >>>
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
-        >>> data = (x, {"a": 1.0, "b": y))
+        >>> data = (x, {"a": 1.0, "b": y})
         >>> batch_mask = (True, {"a": False, "b": True})
         >>> iter_data = dataloader(
-        >>>     data,
-        >>>     32,
-        >>>     batch_mask,
-        >>>     key=jax.random.PRNGKey(0)
-        >>> )
+        ...     data,
+        ...     32,
+        ...     batch_mask,
+        ...     key=jax.random.PRNGKey(0)
+        ... )
+        >>>
 
     Args:
         data: The data that shall be batched. It can be any `PyTree` with
