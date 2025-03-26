@@ -3,7 +3,6 @@ import jax.numpy as jnp
 import jax.random as jrandom
 import klax
 import paramax as px
-import pytest
 
 
 def test_linear(getkey, getwrap):

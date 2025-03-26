@@ -3,7 +3,6 @@ import jax.random as jrandom
 import jax.numpy as jnp
 from jaxtyping import Array
 import paramax as px
-import pytest
 
 
 def test_non_negative(getkey):
