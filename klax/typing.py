@@ -8,7 +8,3 @@ MaskTree: TypeAlias = PyTree[bool]
 DataTree: TypeAlias = PyTree[ArrayLike | None]
 
 BatchGenerator: TypeAlias = Generator[DataTree, None, None]
-
-
-
-

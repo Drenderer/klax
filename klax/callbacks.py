@@ -15,10 +15,11 @@ class CallbackArgs:
 
     It should not be used elsewhere!
 
-    The instances of this class are passed to any callback object in the fit function.
-    The class implements cached and lazy-evaluated values via property methods. This 
-    means that properties like training_loss are only calculated if they are used and 
-    are stored such that they are not calculated multiple times.
+    The instances of this class are passed to any callback object in the fit
+    function. The class implements cached and lazy-evaluated values via property
+    methods. This means that properties like training_loss are only calculated
+    if they are used and are stored such that they are not calculated multiple
+    times.
     """
     step: int
     data: DataTree
@@ -47,7 +48,7 @@ class CallbackArgs:
         # Clear cache
         self._cache = {}
 
-    def _lazy_evaluated_and_cached[T:Callable](fun: T) -> T:
+    def _lazy_evaluated_and_cached[T: Callable](fun: T) -> T:
         """Turns fun into property and stores method output in `_cache` `dict`
         of the class using the function name as key. If the fun name is already in
         `_cache` then the correspongind value is used instead of evaluating fun.

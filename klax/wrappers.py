@@ -1,7 +1,4 @@
-"""
-This module implements parameter constraints based on paramax.
-"""
-
+"""This module implements parameter constraints based on paramax."""
 from abc import abstractmethod
 
 import jax.numpy as jnp
@@ -25,11 +22,10 @@ class ParameterWrapper(px.AbstractUnwrappable[Array]):
 class NonNegative(ParameterWrapper):
     """Applies a non-negative constraint.
     
-    **Arguments**:
-
-     - parameter: The parameter that is to be made non-negative. It can either be
-        a `jax.Array` or a `paramax.AbstractUnwrappable`that is wrapped around a
-        `jax.Array`.
+    Args:
+        parameter: The parameter that is to be made non-negative. It can either
+            be a `jax.Array` or a `paramax.AbstractUnwrappable`that is wrapped
+            around a `jax.Array`.
     """
 
     parameter: Array

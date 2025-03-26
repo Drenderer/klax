@@ -25,9 +25,9 @@ def expects_tuple_and_vmap(loss: Callable[[Array, Array], Scalar]):
     vmaps the model and then passes the output prediction and 
     the ground truth output to the wrapped function.
 
-    **Arguments:**
-        `loss`: Loss function taking the output prediction and
-        ground truth as input.
+    Args:
+        loss: Loss function taking the output prediction and
+            ground truth as input.
     """
     def new_loss(
         model: PyTree,
