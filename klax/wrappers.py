@@ -9,6 +9,9 @@ from jaxtyping import Array
 import paramax as px
 
 
+# Alias to px.unwrap
+unwrap = px.unwrap
+
 class ParameterWrapper(px.AbstractUnwrappable[Array]):
     """An abstract class representing parameter wrappers.
     

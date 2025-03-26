@@ -10,8 +10,7 @@ from typing import (
     List,
     Optional,
     Protocol,
-    Tuple,
-    TypeVar
+    Tuple
 )
 
 import equinox as eqx
@@ -25,7 +24,9 @@ import paramax as px
 
 from .callbacks import (
     Callback,
-    CallbackArgs
+    CallbackArgs,
+    HistoryCallback,
+    DefaultHistoryCallback,
 )
 from .losses import Loss, mse
 from .typing import (
@@ -33,9 +34,6 @@ from .typing import (
     DataTree,
     MaskTree,
 )
-
-
-T = TypeVar("T", bound=PyTree | eqx.Module)
 
 
 @typing.runtime_checkable
@@ -153,7 +151,8 @@ def dataloader(
             end = start + batch_size
 
 
-def fit(model: T,
+def fit[Model:PyTree | eqx.Module, History:HistoryCallback](
+        model: Model,
         training_data: DataTree,
         *,
         batch_size: int = 32,
@@ -164,9 +163,10 @@ def fit(model: T,
         loss_fn: Loss = mse,
         optimizer: optax.GradientTransformation = optax.adam(1e-3),
         dataloader: Dataloader = dataloader,
+        history: Optional[History]=None,
         callbacks: Optional[List[Callback]]  = None,
         key: PRNGKeyArray,
-        ) -> Tuple[T, dict]:
+        ) -> Tuple[Model, History]:
     """
     Trains a model using an optimizer from optax.
 
@@ -254,12 +254,9 @@ def fit(model: T,
 
         return flat_model, flat_opt_state
 
-    # Initialize the history dict
-    history = {'steps': [], 'loss': [],}
-    if validation_data is not None:
-        history['val_loss'] = []
-
-    val_loss = None
+    # Initialize the history callback
+    if history is None:
+        history = DefaultHistoryCallback(log_every)
 
     # Initialize the optimizer and 'tell it' to optimize with respect to all
     # inexact arrays in the model
@@ -271,7 +268,12 @@ def fit(model: T,
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
 
-    cbargs = CallbackArgs(get_loss, training_data, validation_data, treedef_model)
+    cbargs = CallbackArgs(
+        get_loss=get_loss, 
+        treedef_model=treedef_model, 
+        data=training_data, 
+        val_data=validation_data
+    )
 
 
     # Loop over all training steps
@@ -292,18 +294,16 @@ def fit(model: T,
         # Update callbacks arguments with the current state of the model
         cbargs.update(flat_model, step)
 
-        # Log every log_every steps and the last step
+        # Call the histroy callback
+        history(cbargs)
+
+        # Print log messages
         if (step % log_every) == 0 or step == steps:
             loss = cbargs.loss
-            history['steps'].append(cbargs.step)
-            history['loss'].append(loss)
             message = f"Step: {step}, Loss: {loss:.3e}"
-
             if validation_data is not None:
                 val_loss = cbargs.val_loss
-                history['val_loss'].append(val_loss)
                 message += f", Validation loss: {val_loss:.3e}"
-
             print(message) 
 
         if callbacks is not None:
@@ -319,9 +319,6 @@ def fit(model: T,
 
     training_time = time.time() - start_time
     print(f'Training took: {datetime.timedelta(seconds=training_time)}')
-    history['training_time'] = training_time
-
-    # Convert history to numpy arrays
-    history = {k: np.array(v) for k,v in history.items()}
+    history.add_training_time(training_time)
 
     return model, history
