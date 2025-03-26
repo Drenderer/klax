@@ -5,10 +5,16 @@ Collection of semi-common machine learning architectures and tools build on JAX 
 
 ## Documentation
 
-To build the documentation run 
+To build the documentation run
 
 ```bash
 make -C docs html
+```
+
+To excute the doctests run
+
+```bash
+make -C docs doctest
 ```
 
 
