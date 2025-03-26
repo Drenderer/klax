@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Callable, Protocol, Sequence, Tuple
+from typing import Any, Callable, Protocol, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -11,6 +11,7 @@ from .typing import DataTree
 @typing.runtime_checkable
 class Loss(Protocol):
     """A callable loss object."""
+
     def __call__(
         self, model: PyTree, data: DataTree, batch_axis: int | None | Sequence[Any]
     ) -> Scalar:
