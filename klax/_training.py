@@ -250,6 +250,7 @@ def fit(
     history = {
         "steps": [],
         "loss": [],
+        "training_time": 0.0
     }
     if validation_data is not None:
         history["val_loss"] = []
