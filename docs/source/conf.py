@@ -39,7 +39,6 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "jax": ("https://jax.readthedocs.io/en/latest/", None),
     "jaxtyping": ("https://docs.kidger.site/jaxtyping", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
     "equinox": ("https://docs.kidger.site/equinox", None),
     "optax": ("https://optax.readthedocs.io/en/latest/", None),
     "paramax": ("https://danielward27.github.io/paramax/", None),
@@ -58,3 +57,11 @@ html_theme_options = {
 }
 
 html_title = "Klax Docs"
+
+autodoc_typehints_description_target = "all"
+autodoc_type_aliases = {
+    "ArrayLike": "jaxtyping.ArrayLike",
+    "PRNGKeyArray": "PRNGKeyArray",
+    "DataTree": "DataTree",
+    "MaskTree": "MaskTree"
+}

@@ -6,10 +6,18 @@
 Klax
 ====
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+A package for building and calibrating semi-common machine learning architectures in JAX.
 
+The package is build on top of Equinox, Optax, and Paramax. It is aimed at
+providing access to implementations of specialized machine learning models, such
+as custom parameter initializations, input convex neural networks (ICNNs) and
+monotonous neural networks (MNNs). On top, we provide methods and classes for
+customized calibration of these model.
+
+All provided models are derived from ``equinox.Module`` without any additional
+abstractions. Hence, all models are are compatible with the JAX and Equinox
+ecosystem. All parameters constraints are derived from
+``paramax.AbstractUnwrappable``, which itself is just an ``equinox.Module``.
 
 .. note::
 

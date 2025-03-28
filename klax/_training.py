@@ -2,6 +2,7 @@
 This module implements a basic training loop.
 """
 
+from __future__ import annotations
 import datetime
 import time
 import typing
@@ -164,35 +165,35 @@ def fit(
     """Trains a model using an optimizer from optax.
 
     Args:
-        model`: The model instance, which should be trained. It must be a subclass of
+        model: The model instance, which should be trained. It must be a subclass of
             `eqx.Module`. The model may contain `paramax.AbstractUnwrappable` wrappers.
-        data`: The training data can be any `PyTree` with `ArrayLike` leaves.
+        data: The training data can be any `PyTree` with `ArrayLike` leaves.
             Most likely you'll want `data` to be a tuple `(x, y)` with model inputs
             `x` and model outputs `y`.
-        batch_size`: The number of examples in a batch.
-        data_mask`: The `PyTree` denoting, which leaves of `data` have batch
+        batch_size: The number of examples in a batch.
+        data_mask: The `PyTree` denoting, which leaves of `data` have batch
             dimension. `data_mask` must have the same structure as `data`, where
             the leaves are replaced with values of type `bool`. `True` indicates
             that the corresponding leaf in `data` has batch dimension. If `False`, the
             corresponding leaf will be returned unchanged by the `Generator`.
             (Defaults to `None`, meaning all leaves in `data` have batch dimension.)
-        validation_data`: Arbitrary `PyTree` used for validation during training.
+        validation_data: Arbitrary `PyTree` used for validation during training.
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
-        steps`: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
-        log_every`: The number of steps between updates of the loss history. A history update
+        steps: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
+        log_every: The number of steps between updates of the loss history. A history update
             consists of calculating the training and validation losses *over the entire datasets*
             and storing them in the history dictionary. (Defaults to 10. Keyword only Argument)
-        loss_fn`: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
+        loss_fn: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
             (Defaults to `mse`.)
-        optimizer`: The optimizer. Any optax gradient transform to calculate the updates for
+        optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
-        dataloader`: The data loader that splits inputs and targets into batches.
+        dataloader: The data loader that splits inputs and targets into batches.
             (Defaults to `dataloader`)
-        callbacks`: Callback functions that are evaluated after every training step. They can
+        callbacks: Callback functions that are evaluated after every training step. They can
             be used to implement early stopping, custom history logging and more. The argument to the
             callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
-        key`: A `jax.random.PRNGKey` used to provide randomness for batch generation.
+        key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
             (Keyword only argument.)
 
     Note:

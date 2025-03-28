@@ -1,5 +1,6 @@
 """This module implements parameter constraints based on paramax."""
 
+from __future__ import annotations
 from abc import abstractmethod
 
 import jax.numpy as jnp
