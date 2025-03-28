@@ -26,6 +26,11 @@ dependencies = ["jax", "equinox", "paramax", "optax"]
 testing = [
     "pytest"
 ]
+docs = [
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-book-theme"
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
