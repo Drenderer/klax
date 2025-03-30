@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections.abc import Callable
 import typing
 from typing import Optional, Protocol
@@ -15,21 +16,22 @@ except ModuleNotFoundError:
 
 
 
-
 class CallbackArgs:
     """
-    Callback Argument Object, designed to work in conjunction with klax.fit. 
+    Callback arguments object, designed to work in conjunction with ``klax.fit``.
 
     It should not be used elsewhere!
 
-    The instances of this class are passed to any callback object in the fit function.
-    The class implements cached and lazy-evaluated values via property methods. This 
-    means that properties like training_loss are only calculated if they are used and 
-    are stored such that they are not calculated multiple times.
+    The instances of this class are passed to any callback object in the fit
+    function. The class implements cached and lazy-evaluated values via property
+    methods. This means that properties like training_loss are only calculated
+    if they are used and are stored such that they are not calculated multiple
+    times.
     """
+
     step: int
     data: DataTree
-    val_data: DataTree | None 
+    val_data: DataTree | None
     _treedef_model: PyTreeDef
     _flat_model: list
     _cache: dict = {}
@@ -54,23 +56,29 @@ class CallbackArgs:
         # Clear cache
         self._cache = {}
 
-    def _lazy_evaluated_and_cached[T:Callable](fun: T) -> T:
-        """Turns fun into property and stores method output in `_cache` `dict`
-        of the class using the function name as key. If the fun name is already in
-        `_cache` then the correspongind value is used instead of evaluating fun.
+    @staticmethod
+    def _lazy_evaluated_and_cached(fun: Callable) -> property:
+        """Turns a public method into a property
 
-        **Arguments:**
-            `fun`: Method to wrap.
+        The return value of `fun`is stored in the `_cache` dictionary of the
+        current object using the function name as key. If the name is already in
+        `_cache` then the cached value is simply returned, wihout evaluating
+        `fun`.
+
+        Args:
+            fun: Method to wrap.
 
         Returns:
-            Wraped method.
+            Wraped method as a property.
         """
         attr_name = fun.__name__
-        def new_fun(self):
+
+        def wrapper(self):
             if attr_name not in self._cache:
                 self._cache.setdefault(attr_name, fun(self))
             return self._cache.get(attr_name)
-        return property(new_fun)
+
+        return property(wrapper)
 
     @_lazy_evaluated_and_cached
     def model(self):
@@ -85,15 +93,12 @@ class CallbackArgs:
         if self.val_data is None:
             return None
         return self._get_loss(self.model, self.val_data)
-    
+
 
 @typing.runtime_checkable
 class Callback(Protocol):
     """An abstract callback."""
-    def __call__(
-        self,
-        cbargs: CallbackArgs
-    ) -> bool | None:
+    def __call__(self, cbargs: CallbackArgs) -> bool | None:
         raise NotImplementedError
     
 
@@ -102,10 +107,13 @@ class HistoryCallback(Protocol):
     """An abstract history callback."""
     def __init__(self, log_every:int) -> None:
         raise NotImplementedError
+
     def __call__(self, cbargs: CallbackArgs) -> bool | None:
         raise NotImplementedError
+
     def add_training_time(self, seconds:float) -> None:
         raise NotImplementedError
+
 
 class DefaultHistoryCallback:
     log_every: int
@@ -131,7 +139,8 @@ class DefaultHistoryCallback:
     def add_training_time(self, seconds:float):
         self.training_time += seconds
 
-    def plot(self, *, loss_kwargs:dict={}, val_loss_kwargs:dict={}, axis=None): # Can't type hint axes without importing pyplot: axis:plt.Axes=None
+    def plot(self, *, loss_kwargs:dict={}, val_loss_kwargs:dict={}, axis=None):
+        # Can't type hint axes without importing pyplot: axis:plt.Axes=None
         if PYPLOT_AVAILABLE:
             axis = plt.gca() if axis is None else axis
             loss_kwargs = dict(label='Loss', ls='-', c='black') | loss_kwargs
@@ -147,5 +156,3 @@ class DefaultHistoryCallback:
     
     def load(self):
         raise NotImplementedError
-
-

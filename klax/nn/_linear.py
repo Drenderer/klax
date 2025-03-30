@@ -1,6 +1,8 @@
+from __future__ import annotations
 from typing import (
     Literal,
     Optional,
+    Type,
     Union,
 )
 
@@ -9,7 +11,6 @@ from jax.nn.initializers import Initializer, zeros
 import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
-import paramax as px
 
 from .._misc import default_floating_dtype
 from ..wrappers import ParameterWrapper
@@ -21,8 +22,8 @@ class Linear(eqx.Module, strict=True):
     This class is modified from eqx.nn.Linear to allow for custom initialization.
     """
 
-    weight: Array
-    bias: Optional[Array]
+    weight: Array | ParameterWrapper
+    bias: Optional[Array | ParameterWrapper]
     in_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -34,42 +35,44 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: ParameterWrapper | None = None,
-        bias_wrap: ParameterWrapper | None = None,
+        weight_wrap: Type[ParameterWrapper] | None = None,
+        bias_wrap: Type[ParameterWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
     ):
-        """**Arguments:**
+        """
+        Args:
+            in_features: The input size. The input to the layer should be a vector of
+               shape `(in_features,)`
+            out_features: The output size. The output from the layer will be a vector
+               of shape `(out_features,)`.
+            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+            use_bias: Whether to add on a bias as well.
+            weight_warp: An optional `klax.wrappers.ParameterWrapper` that can be passed
+               to enforce weight constraints.
+            bias_warp: An optional `klax.wrappers.ParameterWrapper` that can be passed
+               to enforce bias constraints.
+            dtype: The dtype to use for the weight and the bias in this layer.
+               Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
+               on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+               initialisation. (Keyword only argument.)
 
-        - `in_features`: The input size. The input to the layer should be a vector of
-            shape `(in_features,)`
-        - `out_features`: The output size. The output from the layer will be a vector
-            of shape `(out_features,)`.
-        - `weight_init`: The weight initializer of type `jax.nn.initializers.Initializer`.
-        - `bias_init`: The bias initializer of type `jax.nn.initializers.Initializer`.
-        - `use_bias`: Whether to add on a bias as well.
-        - `weight_warp`: An optional `klax.wrappers.ParameterWrapper` that can be passed
-            to enforce weight constraints.
-        - `bias_warp`: An optional `klax.wrappers.ParameterWrapper` that can be passed
-            to enforce bias constraints. 
-        - `dtype`: The dtype to use for the weight and the bias in this layer.
-            Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
-            on whether JAX is in 64-bit mode.
-        - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter
-            initialisation. (Keyword only argument.)
+        Note:
+            Note that `in_features` also supports the string `"scalar"` as a
+            special value. In this case the input to the layer should be of
+            shape `()`.
 
-        Note that `in_features` also supports the string `"scalar"` as a special value.
-        In this case the input to the layer should be of shape `()`.
+            Likewise `out_features` can also be a string `"scalar"`, in which
+            case the output from the layer will have shape `()`.
 
-        Likewise `out_features` can also be a string `"scalar"`, in which case the
-        output from the layer will have shape `()`.
+            Further note that, some `jax.nn.initializers.Initializer`s do not
+            work if one of `in_features` or `out_features` is zero.
 
-        Further note that, some `jax.nn.initializers.Initializer`s do not work if
-        one of `in_features` or `out_features` is zero.
-
-        Likewise, some `jax.nn.initializers.Initialzers`s do not work when `dtype` is
-        `jax.numpy.complex64`.
+            Likewise, some `jax.nn.initializers.Initialzers`s do not work when
+            `dtype` is `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         wkey, bkey = jrandom.split(key, 2)
@@ -90,28 +93,35 @@ class Linear(eqx.Module, strict=True):
         self.use_bias = use_bias
 
     def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
-        """**Arguments:**
+        """
+        Args:
+            x: The input. Should be a JAX array of shape `(in_features,)`. (Or
+                shape `()` if `in_features="scalar"`.)
+            key: Ignored; provided for compatibility with the rest of the
+                Equinox API. (Keyword only argument.)
 
-        - `x`: The input. Should be a JAX array of shape `(in_features,)`. (Or shape
-            `()` if `in_features="scalar"`.)
-        - `key`: Ignored; provided for compatibility with the rest of the Equinox API.
-            (Keyword only argument.)
-
-        !!! info
-
+        Note:
             If you want to use higher order tensors as inputs (for example featuring "
             "batch dimensions) then use `jax.vmap`. For example, for an input `x` of "
             "shape `(batch, in_features)`, using
-            ```python
-            linear = equinox.nn.Linear(...)
-            jax.vmap(linear)(x)
-            ```
+
+            >>> import jax
+            >>> from jax.nn.initializers import he_normal
+            >>> import jax.random as jrandom
+            >>> import klax
+            >>>
+            >>> key = jrandom.PRNGKey(0)
+            >>> keys = jrandom.split(key)
+            >>> x = jrandom.uniform(keys[0], (10,))
+            >>> linear = klax.nn.Linear("scalar", "scalar", he_normal(), key=keys[1])
+            >>> jax.vmap(linear)(x).shape
+            (10,)
+
             will produce the appropriate output of shape `(batch, out_features)`.
 
-        **Returns:**
-
-        A JAX array of shape `(out_features,)`. (Or shape `()` if
-        `out_features="scalar"`.)
+        Returns:
+            A JAX array of shape `(out_features,)`. (Or shape `()` if
+            `out_features="scalar"`.)
         """
 
         if self.in_features == "scalar":
@@ -129,10 +139,11 @@ class Linear(eqx.Module, strict=True):
 
 class FullyLinear(eqx.Module, strict=True):
     """Performs a linear transformation for two inputs.
-    
-    This layer is useful for formulating, e.g., fully connected multi layer 
+
+    This layer is useful for formulating, e.g., fully connected multi layer
     perceptrons (MLP), where the MLP input is passed as an additional input
-    to each hidden layer, alongside the output of the previous layer."""
+    to each hidden layer, alongside the output of the previous layer.
+    """
 
     weight_y: Array
     weight_z: Array
@@ -154,35 +165,37 @@ class FullyLinear(eqx.Module, strict=True):
         *,
         key: PRNGKeyArray,
     ):
-        """**Arguments:**
+        """
+        Args:
+            in_features_y: The input size of the first input. The input to the
+                layer should be a vector of shape `(in_features_y,)`
+            in_features_z: The input size of the second input. The input to the
+                layer should be a vector of shape `(in_features_z,)`
+            out_features: The output size. The output from the layer will be a
+                vector of shape `(out_features,)`.
+            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+            use_bias: Whether to add on a bias as well.
+            dtype: The dtype to use for the weight and the bias in this layer.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+                initialisation. (Keyword only argument.)
 
-        - `in_features_y`: The input size of the first input. The input to the layer
-            should be a vector of shape `(in_features_y,)`
-        - `in_features_z`: The input size of the second input. The input to the layer
-            should be a vector of shape `(in_features_z,)`
-        - `out_features`: The output size. The output from the layer will be a vector
-            of shape `(out_features,)`.
-        - `weight_init`: The weight initializer of type `jax.nn.initializers.Initializer`.
-        - `bias_init`: The bias initializer of type `jax.nn.initializers.Initializer`.
-        - `use_bias`: Whether to add on a bias as well.
-        - `dtype`: The dtype to use for the weight and the bias in this layer.
-            Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
-            on whether JAX is in 64-bit mode.
-        - `key`: A `jax.random.PRNGKey` used to provide randomness for parameter
-            initialisation. (Keyword only argument.)
+        Note:
+            Note that `in_features_y` and `in_features_z` also supports the
+            string `"scalar"` as a special value. In this case the respective
+            input to the layer should be of shape `()`.
 
-        Note that `in_features_y` and `in_features_z` also supports the string `"scalar"`
-        as a special value. In this case the respective input to the layer should be
-        of shape `()`.
+            Likewise `out_features` can also be a string `"scalar"`, in which
+            case the output from the layer will have shape `()`.
 
-        Likewise `out_features` can also be a string `"scalar"`, in which case the
-        output from the layer will have shape `()`.
+            Further note that, some `jax.nn.initializers.Initializer`s do not
+            work if one of `in_features_y`, `in_features_z`, or `out_features`
+            is zero.
 
-        Further note that, some `jax.nn.initializers.Initializer`s do not work if
-        one of `in_features_y`, `in_features_z`, or `out_features` is zero.
-
-        Likewise, some `jax.nn.initializers.Initialzers`s do not work when `dtype` is
-        `jax.numpy.complex64`.
+            Likewise, some `jax.nn.initializers.Initialzers`s do not work when
+            `dtype` is `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         wkey, bkey = jrandom.split(key, 2)
@@ -202,37 +215,43 @@ class FullyLinear(eqx.Module, strict=True):
         self.use_bias = use_bias
 
     def __call__(
-        self,
-        y: Array,
-        z: Array,
-        *,
-        key: Optional[PRNGKeyArray] = None
+        self, y: Array, z: Array, *, key: Optional[PRNGKeyArray] = None
     ) -> Array:
-        """**Arguments:**
+        """
+        Args:
+            y: The first input. Should be a JAX array of shape `(in_features_y,)`.
+                (Or shape `()` if `in_features="scalar"`.)
+            z: The first input. Should be a JAX array of shape `(in_features_z,)`.
+                (Or shape `()` if `in_features="scalar"`.)
+            key: Ignored; provided for compatibility with the rest of the Equinox API.
+                (Keyword only argument.)
 
-        - `y`: The first input. Should be a JAX array of shape `(in_features_y,)`.
-            (Or shape `()` if `in_features="scalar"`.)
-        - `z`: The first input. Should be a JAX array of shape `(in_features_z,)`.
-            (Or shape `()` if `in_features="scalar"`.)
-        - `key`: Ignored; provided for compatibility with the rest of the Equinox API.
-            (Keyword only argument.)
-
-        !!! info
-
+        Note:
             If you want to use higher order tensors as inputs (for example featuring "
             "batch dimensions) then use `jax.vmap`. For example, for inputs `y` and
             `z` of shape `(batch, in_features_y)` and `(batch, in_features_z)`,
             respectively, using
-            ```python
-            fully_linear = equinox.nn.FullyLinear(...)
-            jax.vmap(fully_linear, (0, 0))(y, z)
-            ```
+
+            >>> import jax
+            >>> from jax.nn.initializers import he_normal
+            >>> import jax.random as jrandom
+            >>> import klax
+            >>>
+            >>> key = jrandom.PRNGKey(0)
+            >>> keys = jrandom.split(key, 3)
+            >>> y = jrandom.uniform(keys[0], (10,))
+            >>> z = jrandom.uniform(keys[1], (10,))
+            >>> fully_linear = klax.nn.FullyLinear(
+            ...     "scalar", "scalar", "scalar", he_normal(), key=keys[2]
+            ... )
+            >>> jax.vmap(fully_linear, (0, 0))(y, z).shape
+            (10,)
+
             will produce the appropriate output of shape `(batch, out_features)`.
 
-        **Returns:**
-
-        A JAX array of shape `(out_features,)`. (Or shape `()` if
-        `out_features="scalar"`.)
+        Returns:
+            A JAX array of shape `(out_features,)`. (Or shape `()` if
+            `out_features="scalar"`.)
         """
 
         if self.in_features_y == "scalar":
