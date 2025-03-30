@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Callable
+import importlib
 import typing
 from typing import Optional, Protocol
 
@@ -7,13 +8,6 @@ import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
 
 from .typing import DataTree
-
-try:
-    from matplotlib import pyplot as plt
-    PYPLOT_AVAILABLE = True
-except ModuleNotFoundError:
-    PYPLOT_AVAILABLE = False
-
 
 
 class CallbackArgs:
@@ -98,20 +92,22 @@ class CallbackArgs:
 @typing.runtime_checkable
 class Callback(Protocol):
     """An abstract callback."""
+
     def __call__(self, cbargs: CallbackArgs) -> bool | None:
         raise NotImplementedError
-    
+
 
 @typing.runtime_checkable
 class HistoryCallback(Protocol):
     """An abstract history callback."""
-    def __init__(self, log_every:int) -> None:
+
+    def __init__(self, log_every: int) -> None:
         raise NotImplementedError
 
     def __call__(self, cbargs: CallbackArgs) -> bool | None:
         raise NotImplementedError
 
-    def add_training_time(self, seconds:float) -> None:
+    def add_training_time(self, seconds: float) -> None:
         raise NotImplementedError
 
 
@@ -119,15 +115,15 @@ class DefaultHistoryCallback:
     log_every: int
     steps: list
     loss: list
-    val_loss: list|None
+    val_loss: list
     training_time: float
 
-    def __init__(self, log_every:int=100):
+    def __init__(self, log_every: int = 100):
         self.log_every = log_every
         self.steps = []
         self.loss = []
         self.val_loss = []
-        self.training_time = 0.
+        self.training_time = 0.0
 
     def __call__(self, cbargs: CallbackArgs):
         if cbargs.step % self.log_every == 0:
@@ -136,23 +132,37 @@ class DefaultHistoryCallback:
             if cbargs.val_loss is not None:
                 self.val_loss.append(cbargs.val_loss)
 
-    def add_training_time(self, seconds:float):
+    def add_training_time(self, seconds: float):
         self.training_time += seconds
 
-    def plot(self, *, loss_kwargs:dict={}, val_loss_kwargs:dict={}, axis=None):
-        # Can't type hint axes without importing pyplot: axis:plt.Axes=None
-        if PYPLOT_AVAILABLE:
-            axis = plt.gca() if axis is None else axis
-            loss_kwargs = dict(label='Loss', ls='-', c='black') | loss_kwargs
-            val_loss_kwargs = dict(label='Validation loss', ls='--', c='red') | val_loss_kwargs
-            plt.plot(self.steps, self.loss, **loss_kwargs)
+    def plot(
+        self,
+        *,
+        ax=None,
+        loss_options: dict = {},
+        val_loss_options: dict = {},
+    ):
+        module_name = "matplotlib.pyplot"
+        try:
+            plt = importlib.import_module(module_name)
+            if ax is None:
+                _, ax = plt.subplots()
+            loss_options = dict(label="Loss", ls="-", c="black") | loss_options
+            val_loss_options = (
+                dict(label="Validation loss", ls="--", c="red") | val_loss_options
+            )
+            ax.plot(self.steps, self.loss, **loss_options)
             if self.val_loss is not None:
-                plt.plot(self.steps, self.val_loss, **val_loss_kwargs)
-        else:
-            print('Couldn\'t load matplotlib.pyplot.')
+                ax.plot(self.steps, self.val_loss, **val_loss_options)
+        except ImportError as e:
+            raise ImportError(
+                f"Failed to import module '{module_name}'. "
+                f"Install it with: pip install klax[plotting]. "
+                f"Original error: {str(e)}"
+            )
 
     def save(self):
         raise NotImplementedError
-    
+
     def load(self):
         raise NotImplementedError
