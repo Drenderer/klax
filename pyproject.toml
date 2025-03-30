@@ -18,19 +18,14 @@ readme = "README.md"
 requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
 ]
 dependencies = ["jax", "equinox", "paramax", "optax"]
 
 [project.optional-dependencies]
-testing = [
-    "pytest", "matplotlib"
-]
-docs = [
-    "sphinx",
-    "sphinx-autodoc-typehints",
-    "sphinx-book-theme"
-]
+plotting = ["matplotlib"]
+testing = ["pytest"]
+docs = ["sphinx", "sphinx-autodoc-typehints", "sphinx-book-theme"]
 
 [tool.setuptools.packages.find]
 where = ["."]
