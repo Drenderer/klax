@@ -6,55 +6,55 @@ from klax.callbacks import CallbackArgs, DefaultHistoryCallback
 
 
 def test_callbackargs():
-    computation_counter = 0
+    # Test lazy evaluation of loss function
+    counter = 0
 
     def get_loss(model, data):
         x, y = data
-        nonlocal computation_counter
-        computation_counter += 1
+        nonlocal counter
+        counter += 1
         y_pred = jax.vmap(model)(x)
         return jnp.mean(jnp.square(y - y_pred))
-
-    data = 2 * (jnp.array([1, 2, 3, 4, 5]),)
-    val_data = 2 * (jnp.array([6, 7, 8]),)
 
     class Model(eqx.Module):
         def __call__(self, x):
             return 1.1 * x
+
+    data = 2 * (jnp.array([1, 2, 3, 4, 5]),)
+    val_data = 2 * (jnp.array([6, 7, 8]),)
 
     model = Model()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
     cbargs = CallbackArgs(get_loss, treedef_model, data, val_data)
-    cbargs.update(flat_model, step=1)
+    cbargs.update(flat_model, 1)
 
-    assert computation_counter == 0
-    first_computation = cbargs.loss
-    second_computation = cbargs.loss
-    assert first_computation == second_computation
-    assert computation_counter == 1
+    assert counter == 0
+    loss_1 = cbargs.loss
+    loss_2 = cbargs.loss
+    assert loss_1 == loss_2
+    assert counter == 1
     _ = cbargs.val_loss
-    assert computation_counter == 2
-    cbargs.update(flat_model, step=2)
+    assert counter == 2
+    cbargs.update(flat_model, 2)
     _ = cbargs.loss
-    assert computation_counter == 3
+    assert counter == 3
 
-    
+
 def test_default_history_callback():
-
     # >>> Just define stuff for cbargs
     def get_loss(model, data):
         x, y = data
         y_pred = jax.vmap(model)(x)
         return jnp.mean(jnp.square(y - y_pred))
-    
+
     data = 2 * (jnp.array([1, 2, 3, 4, 5]),)
     val_data = 2 * (jnp.array([6, 7, 8]),)
 
     class Model(eqx.Module):
         def __call__(self, x):
             return 1.1 * x
-        
+
     model = Model()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     # <<<
@@ -62,13 +62,14 @@ def test_default_history_callback():
     cbargs = CallbackArgs(get_loss, treedef_model, data, val_data)
     dhc = DefaultHistoryCallback(log_every=2)
 
-    # First update 
-    cbargs.update(flat_model, step=1)
+    # First update
+    cbargs.update(flat_model, 1)
     dhc(cbargs)
     assert len(dhc.loss) == 0
+    assert len(dhc.val_loss) == 0
 
     # Second update
-    cbargs.update(flat_model, step=2)
+    cbargs.update(flat_model, 2)
     dhc(cbargs)
     assert len(dhc.loss) == 1
-
+    assert len(dhc.val_loss) == 1
