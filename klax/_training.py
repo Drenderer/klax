@@ -6,7 +6,7 @@ from __future__ import annotations
 import datetime
 import time
 import typing
-from typing import Generator, List, Optional, Protocol, Tuple
+from typing import Generator, Optional, Protocol, Tuple
 
 import equinox as eqx
 import jax
@@ -21,7 +21,6 @@ from .callbacks import (
     Callback,
     CallbackArgs,
     HistoryCallback,
-    DefaultHistoryCallback,
 )
 from .losses import Loss, mse
 from .typing import (
@@ -149,22 +148,21 @@ def dataloader(
             end = start + batch_size
 
 
-def fit[M: PyTree | eqx.Module, H: HistoryCallback](
-    model: M,
+def fit[T: PyTree | eqx.Module](
+    model: T,
     data: DataTree,
     *,
     batch_size: int = 32,
     data_mask: Optional[MaskTree] = None,
     validation_data: Optional[DataTree] = None,
     steps: int = 1000,
-    log_every: int = 100,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     dataloader: Dataloader = dataloader,
-    history: Optional[H] = None,
+    history: Optional[HistoryCallback] = None,
     callbacks: Optional[Tuple[Callback, ...]] = None,
     key: PRNGKeyArray,
-) -> Tuple[M, H]:
+) -> Tuple[T, HistoryCallback]:
     """Trains a model using an optimizer from optax.
 
     Args:
@@ -184,15 +182,16 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
         steps: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
-        log_every: The number of steps between updates of the loss history. A history update
-            consists of calculating the training and validation losses *over the entire datasets*
-            and storing them in the history dictionary. (Defaults to 10. Keyword only Argument)
         loss_fn: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
         dataloader: The data loader that splits inputs and targets into batches.
             (Defaults to `dataloader`)
+        History: A callback of type `HistoryCallback` that stores the training metric in every n-th
+            load step. By default the logging interval is set to 100 steps. To change the logging
+            increment, the user may pass a modified `HistoryCallback` object to this argument, e.g.,
+            `history=HistoryCallback(10)` for logging on every 10-th step.
         callbacks: Callback functions that are evaluated after every training step. They can
             be used to implement early stopping, custom history logging and more. The argument to the
             callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
@@ -250,10 +249,6 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
 
         return flat_model, flat_opt_state
 
-    # Initialize the history
-    if history is None:
-        history = DefaultHistoryCallback(log_every)
-
     # Initialize the optimizer and 'tell it' to optimize with respect to all
     # inexact arrays in the model
     opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
@@ -263,10 +258,13 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
+    # Initialize callback arguments and history
     cbargs = CallbackArgs(get_loss, treedef_model, data, validation_data)
+    if history is None:
+        history = HistoryCallback(log_every=100)
 
     # Loop over all training steps
-    start_time = time.time()
+    last_time = time.time()
     for step, batch in zip(
         range(1, steps + 1),
         dataloader(
@@ -281,19 +279,13 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
         )
 
         # Update callbacks arguments with the current state of the model
-        cbargs.update(flat_model, step)
+        current_time = time.time()
+        dt = current_time - last_time
+        last_time = current_time
+        cbargs.update(flat_model, step, dt)
 
-        # Call the histroy callback
+        # # Update the history
         history(cbargs)
-
-        # Print log messages
-        if (step % log_every) == 0 or step == steps:
-            loss = cbargs.loss
-            message = f"Step: {step}, Loss: {loss:.3e}"
-            if validation_data is not None:
-                val_loss = cbargs.val_loss
-                message += f", Validation loss: {val_loss:.3e}"
-            print(message)
 
         if callbacks is not None:
             # Run all callbacks and break if any of them request termination of
@@ -306,8 +298,6 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
-    training_time = time.time() - start_time
-    print(f"Training took: {datetime.timedelta(seconds=training_time)}")
-    history.add_training_time(training_time)
+    print(f"Training took: {datetime.timedelta(seconds=history.training_time)}")
 
     return model, history
