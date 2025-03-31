@@ -1,65 +1,62 @@
-import equinox as eqx
+import sys
+
 import jax
 import jax.numpy as jnp
+import jax.random as jrandom
 
 from klax.callbacks import CallbackArgs, DefaultHistoryCallback
 
 
-def test_callbackargs():
+def test_callbackargs(getkey, getmodel, getloss):
     # Test lazy evaluation of loss function
-    counter = 0
+    count = 0
 
     def get_loss(model, data):
+        nonlocal count
+        count += 1
         x, y = data
-        nonlocal counter
-        counter += 1
         y_pred = jax.vmap(model)(x)
         return jnp.mean(jnp.square(y - y_pred))
 
-    class Model(eqx.Module):
-        def __call__(self, x):
-            return 1.1 * x
+    x = jrandom.uniform(getkey(), (10,))
+    x_val = jrandom.uniform(getkey(), (10,))
 
-    data = 2 * (jnp.array([1, 2, 3, 4, 5]),)
-    val_data = 2 * (jnp.array([6, 7, 8]),)
-
-    model = Model()
+    model = getmodel()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
-    cbargs = CallbackArgs(get_loss, treedef_model, data, val_data)
+    cbargs = CallbackArgs(get_loss, treedef_model, (x, x), (x_val, x_val))
     cbargs.update(flat_model, 1)
 
-    assert counter == 0
+    assert count == 0
     loss_1 = cbargs.loss
     loss_2 = cbargs.loss
+    assert loss_1 == 0
     assert loss_1 == loss_2
-    assert counter == 1
+    assert count == 1
     _ = cbargs.val_loss
-    assert counter == 2
+    assert count == 2
     cbargs.update(flat_model, 2)
     _ = cbargs.loss
-    assert counter == 3
+    assert count == 3
 
+    # Test data reference count
+    x = jrandom.uniform(getkey(), (10,))
+    data = (x, x)
 
-def test_default_history_callback():
-    # >>> Just define stuff for cbargs
-    def get_loss(model, data):
-        x, y = data
-        y_pred = jax.vmap(model)(x)
-        return jnp.mean(jnp.square(y - y_pred))
-
-    data = 2 * (jnp.array([1, 2, 3, 4, 5]),)
-    val_data = 2 * (jnp.array([6, 7, 8]),)
-
-    class Model(eqx.Module):
-        def __call__(self, x):
-            return 1.1 * x
-
-    model = Model()
+    model = getmodel()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
-    # <<<
 
-    cbargs = CallbackArgs(get_loss, treedef_model, data, val_data)
+    assert sys.getrefcount(data) == 2
+    cbargs = CallbackArgs(getloss, treedef_model, data)
+    assert sys.getrefcount(data) == 3
+
+
+def test_default_history_callback(getkey, getmodel, getloss):
+    x = jrandom.uniform(getkey(), (10,))
+    model = getmodel()
+    flat_model, treedef_model = jax.tree_util.tree_flatten(model)
+
+    cbargs = CallbackArgs(getloss, treedef_model, (x, x), (x, x))
     dhc = DefaultHistoryCallback(log_every=2)
 
     # First update

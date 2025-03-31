@@ -150,7 +150,7 @@ def dataloader(
 
 
 def fit[M: PyTree | eqx.Module, H: HistoryCallback](
-    model: T,
+    model: M,
     data: DataTree,
     *,
     batch_size: int = 32,
@@ -162,7 +162,7 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     dataloader: Dataloader = dataloader,
     history: Optional[H] = None,
-    callbacks: Optional[List[Callback]] = None,
+    callbacks: Optional[Tuple[Callback, ...]] = None,
     key: PRNGKeyArray,
 ) -> Tuple[M, H]:
     """Trains a model using an optimizer from optax.
@@ -293,7 +293,7 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
             if validation_data is not None:
                 val_loss = cbargs.val_loss
                 message += f", Validation loss: {val_loss:.3e}"
-            print(message) 
+            print(message)
 
         if callbacks is not None:
             # Run all callbacks and break if any of them request termination of
@@ -307,7 +307,7 @@ def fit[M: PyTree | eqx.Module, H: HistoryCallback](
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
     training_time = time.time() - start_time
-    print(f'Training took: {datetime.timedelta(seconds=training_time)}')
+    print(f"Training took: {datetime.timedelta(seconds=training_time)}")
     history.add_training_time(training_time)
 
     return model, history
