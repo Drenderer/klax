@@ -4,9 +4,10 @@ import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array
-import numpy as np
 import optax
 import pytest
+
+from klax.callbacks import CallbackArgs, HistoryCallback
 
 
 def test_dataloader(getkey):
@@ -124,11 +125,12 @@ def test_training(getkey):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
 
-    def callback(cbargs: klax.callbacks.CallbackArgs):
+    def callback(cbargs: CallbackArgs):
         if cbargs.step == 123:
             return True
 
     _, history = klax.fit(
-        model, (x, x), log_every=1, callbacks=[callback], key=getkey()
+        model, (x, x), history=HistoryCallback(1), callbacks=(callback,), key=getkey()
     )
+    print(history.log_every)
     assert history.steps[-1] == 123
