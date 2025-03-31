@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Callable
 import importlib
+
 import typing
 from typing import Optional, Protocol
 
@@ -24,12 +25,14 @@ class CallbackArgs:
     """
 
     step: int
+    dt: float
     data: DataTree
     val_data: DataTree | None
     _treedef_model: PyTreeDef
     _flat_model: list
     _cache: dict = {}
     _get_loss: Callable[..., Scalar]
+    _start_time: float
 
     def __init__(
         self,
@@ -38,14 +41,16 @@ class CallbackArgs:
         data: DataTree,
         val_data: Optional[DataTree] = None,
     ):
+        self.dt = 0.0
         self.data = data
         self.val_data = val_data
         self._get_loss = get_loss
         self._treedef_model = treedef_model
 
-    def update(self, flat_model: PyTree, step: int):
+    def update(self, flat_model: PyTree, step: int, dt: float):
         self._flat_model = flat_model
         self.step = step
+        self.dt = dt
 
         # Clear cache
         self._cache = {}
@@ -97,29 +102,17 @@ class Callback(Protocol):
         raise NotImplementedError
 
 
-@typing.runtime_checkable
-class HistoryCallback(Protocol):
-    """An abstract history callback."""
-
-    def __init__(self, log_every: int) -> None:
-        raise NotImplementedError
-
-    def __call__(self, cbargs: CallbackArgs) -> bool | None:
-        raise NotImplementedError
-
-    def add_training_time(self, seconds: float) -> None:
-        raise NotImplementedError
-
-
-class DefaultHistoryCallback:
+class HistoryCallback(Callback):
     log_every: int
     steps: list
     loss: list
     val_loss: list
     training_time: float
+    verbose: bool
 
-    def __init__(self, log_every: int = 100):
+    def __init__(self, log_every: int = 100, verbose: bool = True):
         self.log_every = log_every
+        self.verbose = verbose
         self.steps = []
         self.loss = []
         self.val_loss = []
@@ -132,8 +125,14 @@ class DefaultHistoryCallback:
             if cbargs.val_loss is not None:
                 self.val_loss.append(cbargs.val_loss)
 
-    def add_training_time(self, seconds: float):
-        self.training_time += seconds
+            self.training_time += cbargs.dt
+
+            # Print message
+            if self.verbose:
+                message = f"Step: {cbargs.step}, Loss: {cbargs.loss:.3e}"
+                if cbargs.val_data is not None:
+                    message += f", Validation loss: {cbargs.val_loss:.3e}"
+                print(message)
 
     def plot(
         self,
