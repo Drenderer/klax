@@ -35,7 +35,7 @@ def fit(
     data: DataTree,
     *,
     batch_size: int = 32,
-    data_mask: Optional[MaskTree] = None,
+    batch_axis: PyTree[int | None] = 0,
     validation_data: Optional[DataTree] = None,
     steps: int = 1000,
     log_every: int = 100,
@@ -86,20 +86,6 @@ def fit(
     Returns:
         A tuple of the trained model and a history dictionary containing the loss history.
     """
-
-    # Generate an all true masks if data_mask is None
-    if data_mask is None:
-        data_mask = jax.tree.map(lambda x: x is not None, data)
-
-    # Check that data has the same PyTree structure as data_mask
-    if jax.tree.structure(data) != jax.tree.structure(data_mask):
-        raise ValueError(
-            "Arguments data and data_mask must have equal PyTree structure."
-        )
-
-    # Mark the first dimension as batch dimension for all leaves in x that are
-    # not masked
-    batch_axis = jax.tree.map(lambda x: 0 if x else None, data_mask)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
     # the loss evaluation for the loss history.
@@ -159,7 +145,7 @@ def fit(
         dataloader(
             data,
             batch_size,
-            data_mask,  # TODO: Give batch_axis to the dataloader instead and allow for custom batch axis for every pytree leaf
+            batch_axis,  # TODO: Give batch_axis to the dataloader instead and allow for custom batch axis for every pytree leaf
             key=key,
         ),
     ):
