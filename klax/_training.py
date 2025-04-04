@@ -5,163 +5,35 @@ This module implements a basic training loop.
 from __future__ import annotations
 import datetime
 import time
-import typing
-from typing import Generator, List, Optional, Protocol, Tuple, TypeVar
+from typing import Any, Iterable, Optional
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
-import jax.random as jr
 from jaxtyping import PRNGKeyArray, PyTree
 import numpy as np
 import optax
 import paramax as px
 
 from .callbacks import Callback, CallbackArgs
+from .datahandler import dataloader, Dataloader, broadcast_and_get_batch_size
 from .losses import Loss, mse
-from .typing import (
-    BatchGenerator,
-    DataTree,
-    MaskTree,
-)
 
 
-T = TypeVar("T", bound=PyTree | eqx.Module)
-
-
-@typing.runtime_checkable
-class Dataloader(Protocol):
-    def __call__(
-        self,
-        data: DataTree,
-        batch_size: int,
-        batch_mask: MaskTree | None,
-        *,
-        key: PRNGKeyArray,
-    ) -> BatchGenerator:
-        raise NotImplementedError
-
-
-def dataloader(
-    data: DataTree,
-    batch_size: int = 32,
-    batch_mask: Optional[MaskTree] = None,
-    *,
-    key: PRNGKeyArray,
-) -> Generator[DataTree, None, None]:
-    """Returns a batch `Generator` that yields randomly chosen subsets of data
-    without replacement.
-
-    The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
-    passed, leaves without batch dimension can be specified.
-
-    Example:
-        This is an example for a nested `PyTree`, where the elements x and y
-        have batch dimension along the first axis.
-
-
-        >>> import jax
-        >>> import jax.numpy as jnp
-        >>> from klax import dataloader
-        >>>
-        >>> x = jnp.array([1., 2.])
-        >>> y = jnp.array([[1.], [2.]])
-        >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_mask = (True, {"a": False, "b": True})
-        >>> iter_data = dataloader(
-        ...     data,
-        ...     32,
-        ...     batch_mask,
-        ...     key=jax.random.PRNGKey(0)
-        ... )
-        >>>
-
-    Args:
-        data: The data that shall be batched. It can be any `PyTree` with
-            `ArrayLike` leaves.
-        batch_size: The number of examples in a batch.
-        batch_mask: The `PyTree` denoting, which leaves of `data` have batch
-            dimension. `batch_mask` must have the same structure as `data`,
-            where the leaves are replaced with values of type `bool`. `True`
-            indicates that the corresponding leaf in `data` has batch dimension.
-            If `False`, the corresponding leaf will be returned unchanged by the
-            `Generator`. (Defaults to `None`, meaning all leaves in `data` have
-            batch dimension.)
-        key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
-            (Keyword only argument.)
-
-    Note:
-        Note that the batch axis for all batched leaves must correspond to the
-        first array axis.
-
-    Returns:
-        A `Generator` that yields a random batch of data every time is is called.
-
-    Yields:
-        A `PyTree[ArrayLike]` with the same structure as `data`. Where all
-        batched leaves have `batch_size`.
-
-    Note:
-        Note that if the size of the dataset is smaller than `batch_size`, the
-        obtained batches will have dataset size.
-    """
-
-    # Generate an all true batch mask if batch_mask = None was passed
-    if batch_mask is None:
-        batch_mask = jax.tree.map(lambda x: x is not None, data)
-
-    # Check that data and batch_mask have the same PyTree structure
-    if jax.tree.structure(data) != jax.tree.structure(batch_mask):
-        raise ValueError(
-            "Arguments data and batch_mask must have equal PyTree structures."
-        )
-
-    # Split the PyTree according to the batch mask
-    batched_data, unbatched_data = eqx.partition(data, batch_mask)
-
-    # Check that all batched leaves has the same dimension along the first axis
-    batched_leafs = jax.tree.leaves(batched_data)
-    if len(batched_leafs) == 0:
-        raise ValueError("At least one element must have batch dimension.")
-    dataset_size = batched_leafs[0].shape[0]
-    if not all(arr.shape[0] == dataset_size for arr in batched_leafs[1:]):
-        raise ValueError("All batched arrays must have equal batch dimension.")
-
-    # Convert to Numpy arrays. Numpy's slicing is much faster than Jax's, so for
-    # fast model training steps this actually makes a huge difference!
-    batched_data = jax.tree.map(lambda x: np.array(x), batched_data)
-
-    # Reduce batch size if the dataset has less examples than batch size
-    batch_size = min(batch_size, dataset_size)
-
-    indices = jnp.arange(dataset_size)
-    while True:
-        perm = jr.permutation(key, indices)
-        (key,) = jr.split(key, 1)  # Update key
-        start, end = 0, batch_size
-        while end <= dataset_size:
-            batch_perm = perm[start:end]
-            bs = jax.tree.map(lambda x: x[batch_perm], batched_data)
-            yield eqx.combine(bs, unbatched_data)
-            start = end
-            end = start + batch_size
-
-
-def fit(
+def fit[T: eqx.Module](
     model: T,
-    data: DataTree,
+    data: PyTree[Any],
     *,
     batch_size: int = 32,
-    data_mask: Optional[MaskTree] = None,
-    validation_data: Optional[DataTree] = None,
+    batch_axis: PyTree[int | None] = 0,
+    validation_data: Optional[PyTree[Any]] = None,
     steps: int = 1000,
     log_every: int = 100,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     dataloader: Dataloader = dataloader,
-    callbacks: Optional[List[Callback]] = None,
+    callbacks: Optional[Iterable[Callback]] = None,
     key: PRNGKeyArray,
-) -> Tuple[T, dict]:
+) -> tuple[T, dict]:
     """Trains a model using an optimizer from optax.
 
     Args:
@@ -171,12 +43,10 @@ def fit(
             Most likely you'll want `data` to be a tuple `(x, y)` with model inputs
             `x` and model outputs `y`.
         batch_size: The number of examples in a batch.
-        data_mask: The `PyTree` denoting, which leaves of `data` have batch
-            dimension. `data_mask` must have the same structure as `data`, where
-            the leaves are replaced with values of type `bool`. `True` indicates
-            that the corresponding leaf in `data` has batch dimension. If `False`, the
-            corresponding leaf will be returned unchanged by the `Generator`.
-            (Defaults to `None`, meaning all leaves in `data` have batch dimension.)
+        batch_axis: A `PyTree` denoting, which axis is the batch axis for arrays in `data`.
+            `batch_axis` must be a prefix of `data`. By specifying `batch_axis` as a `PyTree`
+            it is possible to specify different batch axes for different leaves of `data`.
+            (Defaults to `0`, meaning the first axis of arrays in `data` are batch dimensions.)
         validation_data: Arbitrary `PyTree` used for validation during training.
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
@@ -204,19 +74,12 @@ def fit(
         A tuple of the trained model and a history dictionary containing the loss history.
     """
 
-    # Generate an all true masks if data_mask is None
-    if data_mask is None:
-        data_mask = jax.tree.map(lambda x: x is not None, data)
-
-    # Check that data has the same PyTree structure as data_mask
-    if jax.tree.structure(data) != jax.tree.structure(data_mask):
-        raise ValueError(
-            "Arguments data and data_mask must have equal PyTree structure."
-        )
-
-    # Mark the first dimension as batch dimension for all leaves in x that are
-    # not masked
-    batch_axis = jax.tree.map(lambda x: 0 if x else None, data_mask)
+    # Braodcast the batch_axis to the data. While this happens again in the dataloader,
+    # doing it here allows the use of the broadcasted batch_axis in the loss function.
+    # If `batch_axis` is a prefix of `data`, this ensures that only leafs of
+    # type ArrayLike are vmapped. Thus it is possible to have data like `(str, array)`
+    # ans still use `batch_axis=0` instead of `batch_axis=(None, 0)`.
+    batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
     # the loss evaluation for the loss history.
@@ -248,11 +111,7 @@ def fit(
         return flat_model, flat_opt_state
 
     # Initialize the history dict
-    history = {
-        "steps": [],
-        "loss": [],
-        "training_time": 0.0
-    }
+    history = {"steps": [], "loss": [], "training_time": 0.0}
     if validation_data is not None:
         history["val_loss"] = []
 
@@ -276,7 +135,7 @@ def fit(
         dataloader(
             data,
             batch_size,
-            data_mask,  # TODO: Give batch_axis to the dataloader instead and allow for custom batch axis for every pytree leaf
+            batch_axis,
             key=key,
         ),
     ):
