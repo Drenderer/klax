@@ -6,15 +6,13 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree, Scalar, Array
 
-from .typing import DataTree
-
 
 @typing.runtime_checkable
 class Loss(Protocol):
     """A callable loss object."""
 
     def __call__(
-        self, model: PyTree, data: DataTree, batch_axis: int | None | Sequence[Any]
+        self, model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any]
     ) -> Scalar:
         raise NotImplementedError
 
@@ -54,7 +52,7 @@ def make_batched_xy_loss(loss_core: Callable[[Array, Array], Scalar]) -> Loss:
     """
 
     def loss(
-        model: PyTree, data: DataTree, batch_axis: int | None | Sequence[Any] = 0
+        model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any] = 0
     ) -> Scalar:
         x, y = data
         if isinstance(batch_axis, tuple):
