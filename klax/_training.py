@@ -19,7 +19,6 @@ from .datahandler import dataloader, Dataloader, broadcast_and_get_batch_size
 from .losses import Loss, mse
 
 
-
 def fit[T: eqx.Module](
     model: T,
     data: PyTree[Any],
@@ -44,9 +43,9 @@ def fit[T: eqx.Module](
             Most likely you'll want `data` to be a tuple `(x, y)` with model inputs
             `x` and model outputs `y`.
         batch_size: The number of examples in a batch.
-        batch_axis: A `PyTree` denoting, which axis is the batch axis for arrays in `data`. 
-            `batch_axis` must be a prefix of `data`. By specifying `batch_axis` as a `PyTree` 
-            it is possible to specify different batch axes for different leaves of `data`. 
+        batch_axis: A `PyTree` denoting, which axis is the batch axis for arrays in `data`.
+            `batch_axis` must be a prefix of `data`. By specifying `batch_axis` as a `PyTree`
+            it is possible to specify different batch axes for different leaves of `data`.
             (Defaults to `0`, meaning the first axis of arrays in `data` are batch dimensions.)
         validation_data: Arbitrary `PyTree` used for validation during training.
             Must have the same tree structure as `data`.
@@ -77,9 +76,9 @@ def fit[T: eqx.Module](
 
     # Braodcast the batch_axis to the data. While this happens again in the dataloader,
     # doing it here allows the use of the broadcasted batch_axis in the loss function.
-    # If `batch_axis` is a prefix of `data`, this ensures that only leafs of 
+    # If `batch_axis` is a prefix of `data`, this ensures that only leafs of
     # type ArrayLike are vmapped. Thus it is possible to have data like `(str, array)`
-    # ans still use `batch_axis=0` instead of `batch_axis=(None, 0)`. 
+    # ans still use `batch_axis=0` instead of `batch_axis=(None, 0)`.
     batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
@@ -112,11 +111,7 @@ def fit[T: eqx.Module](
         return flat_model, flat_opt_state
 
     # Initialize the history dict
-    history = {
-        "steps": [],
-        "loss": [],
-        "training_time": 0.0
-    }
+    history = {"steps": [], "loss": [], "training_time": 0.0}
     if validation_data is not None:
         history["val_loss"] = []
 

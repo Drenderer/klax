@@ -14,6 +14,7 @@ import jax.random as jr
 from jaxtyping import PRNGKeyArray, PyTree
 import numpy as np
 
+
 def broadcast_and_get_batch_size(
     data: PyTree[Any], batch_axis: PyTree[int | None]
 ) -> tuple[PyTree[int | None], int]:
@@ -143,7 +144,12 @@ def dataloader(
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so for
     # fast model training steps this actually makes a huge difference! However,
     # be aware that this is likely only true if JAX runs on CPU.
-    data = jax.tree.map(lambda x, a: x if a is None else np.array(x), data, batch_axis, is_leaf=lambda x: x is None)
+    data = jax.tree.map(
+        lambda x, a: x if a is None else np.array(x),
+        data,
+        batch_axis,
+        is_leaf=lambda x: x is None,
+    )
 
     # Reduce batch size if the dataset has less examples than batch size
     batch_size = min(batch_size, dataset_size)
@@ -155,7 +161,12 @@ def dataloader(
         start, end = 0, batch_size
         while end <= dataset_size:
             batch_perm = perm[start:end]
-            yield jax.tree.map(lambda a, x: x if a is None else x[batch_perm], batch_axis, data, is_leaf=lambda x: x is None)
+            yield jax.tree.map(
+                lambda a, x: x if a is None else x[batch_perm],
+                batch_axis,
+                data,
+                is_leaf=lambda x: x is None,
+            )
             start = end
             end = start + batch_size
 
@@ -193,11 +204,11 @@ def split_data(
     Args:
         data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
         proportions: Iterable of floats, where each float is the proportion of the
-            corresponding partition, e.g., `(0.8, 0.2)` for a 80 to 20 split. 
+            corresponding partition, e.g., `(0.8, 0.2)` for a 80 to 20 split.
             The proportions must be non-negative and sum to 1.
         batch_axis: PyTree of the batch axis indices. `None` is used to indicate
             that the corresponding leaf or subtree in data does not have a batch axis.
-            `batch_axis` must have the same structure as `data` or have `data` as a prefix. 
+            `batch_axis` must have the same structure as `data` or have `data` as a prefix.
             (Defaults to 0)
         key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
             (Keyword only argument.)
