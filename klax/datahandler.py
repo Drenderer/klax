@@ -4,7 +4,7 @@ This module implements methods for handling data, such as batching and splitting
 
 from __future__ import annotations
 import typing
-from typing import Generator, Optional, Protocol, Iterable, Any
+from typing import Generator, Protocol, Iterable, Any
 import warnings
 
 import equinox as eqx
@@ -14,14 +14,7 @@ import jax.random as jr
 from jaxtyping import PRNGKeyArray, PyTree
 import numpy as np
 
-from .typing import (
-    BatchGenerator,
-    DataTree,
-    MaskTree,
-)
-
-
-def _broadcast_and_validate(
+def broadcast_and_get_batch_size(
     data: PyTree[Any], batch_axis: PyTree[int | None]
 ) -> tuple[PyTree[int | None], int]:
     """Given a `batch_axis` prefix of data, broadcast `batch_axis` to
@@ -77,7 +70,7 @@ class Dataloader(Protocol):
         batch_axis: PyTree[int | None],
         *,
         key: PRNGKeyArray,
-    ) -> BatchGenerator:
+    ) -> Generator[PyTree[Any], None, None]:
         raise NotImplementedError
 
 
@@ -145,7 +138,7 @@ def dataloader(
         obtained batches will have dataset size.
     """
 
-    batch_axis, dataset_size = _broadcast_and_validate(data, batch_axis)
+    batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so for
     # fast model training steps this actually makes a huge difference! However,
@@ -217,7 +210,7 @@ def split_data(
     if sum(proportions) - 1.0 > 1e-6:
         raise ValueError("Proportions must sum to 1.")
 
-    batch_axis, dataset_size = _broadcast_and_validate(data, batch_axis)
+    batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
 
     # Make permutation
     indices = jnp.arange(dataset_size)

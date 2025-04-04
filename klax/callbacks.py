@@ -6,7 +6,6 @@ from typing import Optional, Protocol
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
 
-from .typing import DataTree
 
 
 class CallbackArgs:
@@ -23,8 +22,8 @@ class CallbackArgs:
     """
 
     step: int
-    data: DataTree
-    val_data: DataTree | None
+    data: PyTree
+    val_data: PyTree | None
     _treedef_model: PyTreeDef
     _flat_model: list
     _cache: dict = {}
@@ -32,9 +31,9 @@ class CallbackArgs:
 
     def __init__(
         self,
-        get_loss: Callable[[PyTree, DataTree], Scalar],
-        data: DataTree,
-        val_data: Optional[DataTree],
+        get_loss: Callable[[PyTree, PyTree], Scalar],
+        data: PyTree,
+        val_data: Optional[PyTree],
         treedef_model: PyTreeDef,
     ):
         self.data = data

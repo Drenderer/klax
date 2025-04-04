@@ -26,13 +26,13 @@ def test_training(getkey):
             return b + self.weight * x
 
     x = jrandom.uniform(key=getkey(), shape=(10,))
-    b = jnp.array(2.0)
+    b = 2.0
     y = b + 2 * x
     model = Model(weight=jnp.array(1.0))
     model, _ = klax.fit(
         model,
         ((b, x), y),
-        batch_axis=((None, 0), 0),
+        batch_axis=0,   # Test automatic batch axis braodcasting to data
         optimizer=optax.adam(1.0),
         key=getkey(),
     )
