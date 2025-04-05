@@ -6,7 +6,7 @@ import jax.random as jrandom
 from jaxtyping import Array
 import optax
 
-from klax.callbacks import CallbackArgs, HistoryCallback
+from klax.callbacks import Callback, CallbackArgs, HistoryCallback
 
 def test_training(getkey):
     # Fitting a linear function
@@ -42,10 +42,18 @@ def test_training(getkey):
     # History shape and type
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
-    _, history = klax.fit(model, (x, x), key=getkey())
+    history = HistoryCallback(log_every=100)
+    model, history = klax.fit(model, (x, x), steps=1000, history=history, key=getkey())
     assert len(history.steps) == 10
     assert len(history.loss) == 10
-    assert isinstance(history.training_time, float)
+    time_1 = history.training_time
+    model, history = klax.fit(model, (x, x), steps=500, history=history, key=getkey())
+    assert len(history.steps) == 15
+    assert len(history.loss) == 15
+    assert history.steps[-1] == 1500
+    time_2 = history.training_time
+    assert time_1 < time_2
+
 
     # Validation data
     x = jrandom.uniform(getkey(), (2, 1))
@@ -57,12 +65,13 @@ def test_training(getkey):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
 
-    def callback(cbargs: CallbackArgs):
-        if cbargs.step == 123:
-            return True
+    class MyCallback(Callback):
+        def __call__(self, cbargs: CallbackArgs):
+            if cbargs.step == 123:
+                return True
 
     _, history = klax.fit(
-        model, (x, x), history=HistoryCallback(1), callbacks=(callback,), key=getkey()
+        model, (x, x), history=HistoryCallback(1), callbacks=(MyCallback(),), key=getkey()
     )
     print(history.log_every)
     assert history.steps[-1] == 123

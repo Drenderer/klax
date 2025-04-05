@@ -25,7 +25,7 @@ def test_callbackargs(getkey, getmodel, getloss):
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
     cbargs = CallbackArgs(get_loss, treedef_model, (x, x), (x_val, x_val))
-    cbargs.update(flat_model, 1, 1.0)
+    cbargs.update(flat_model, 1)
 
     assert count == 0
     loss_1 = cbargs.loss
@@ -35,7 +35,7 @@ def test_callbackargs(getkey, getmodel, getloss):
     assert count == 1
     _ = cbargs.val_loss
     assert count == 2
-    cbargs.update(flat_model, 2, 1.0)
+    cbargs.update(flat_model, 2)
     _ = cbargs.loss
     assert count == 3
 
@@ -51,24 +51,32 @@ def test_callbackargs(getkey, getmodel, getloss):
     assert sys.getrefcount(data) == 3
 
 
-def test_default_history_callback(getkey, getmodel, getloss):
+def test_history_callback(getkey, getmodel, getloss):
     x = jrandom.uniform(getkey(), (10,))
     model = getmodel()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
-    cbargs = CallbackArgs(getloss, treedef_model, (x, x), (x, x))
+    cbargs = CallbackArgs(getloss, treedef_model, (x, x), None)
     dhc = HistoryCallback(2)
 
+    # On training start update
+    cbargs.update(flat_model, 0)
+    dhc.on_training_start(cbargs)
+
     # First update
-    cbargs.update(flat_model, 1, 1.0)
+    cbargs.update(flat_model, 1)
     dhc(cbargs)
     assert len(dhc.loss) == 0
     assert len(dhc.val_loss) == 0
-    assert dhc.training_time == 0.0
 
     # Second update
-    cbargs.update(flat_model, 2, 2.0)
+    cbargs.update(flat_model, 2)
     dhc(cbargs)
     assert len(dhc.loss) == 1
     assert len(dhc.val_loss) == 1
-    assert dhc.training_time == 2.0
+
+    # On training start update
+    cbargs.update(flat_model, -1)
+    dhc.on_training_end(cbargs)
+
+    assert dhc.training_time > 0

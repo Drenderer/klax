@@ -3,14 +3,11 @@ This module implements a basic training loop.
 """
 
 from __future__ import annotations
-import datetime
-import time
 from typing import Any, Iterable, Optional
 
 import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray, PyTree
-import numpy as np
 import optax
 import paramax as px
 
@@ -124,13 +121,22 @@ def fit[T: eqx.Module](
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
+    # Make callbacks iterable 
+    callbacks = [] if callbacks is None else list(callbacks)
+
     # Initialize callback arguments and history
-    cbargs = CallbackArgs(get_loss, treedef_model, data, validation_data)
     if history is None:
         history = HistoryCallback(log_every=100)
+    callbacks.append(history)
+
+    cbargs = CallbackArgs(get_loss, treedef_model, data, validation_data)
+
+    # Call callbacks after training
+    cbargs.update(flat_model, 0)
+    for callback in callbacks:
+        callback.on_training_start(cbargs)
 
     # Loop over all training steps
-    last_time = time.time()
     for step, batch in zip(
         range(1, steps + 1),
         dataloader(
@@ -145,25 +151,21 @@ def fit[T: eqx.Module](
         )
 
         # Update callbacks arguments with the current state of the model
-        current_time = time.time()
-        dt = current_time - last_time
-        last_time = current_time
-        cbargs.update(flat_model, step, dt)
+        cbargs.update(flat_model, step)
 
-        # # Update the history
-        history(cbargs)
-
-        if callbacks is not None:
-            # Run all callbacks and break if any of them request termination of
-            # the training loop.
-            # Note! The square brackets are important. Otherwise the loop is
-            # terminated with the first callback that returns true. But we want
-            # to run all callbacks first and then decide, whether to terminate.
-            if any([callback(cbargs) for callback in callbacks]):
-                break
+        # Run all callbacks and break if any of them request termination of
+        # the training loop.
+        # Note! The square brackets are important. Otherwise the loop is
+        # terminated with the first callback that returns true. But we want
+        # to run all callbacks first and then decide, whether to terminate.
+        if any([callback(cbargs) for callback in callbacks]):
+            break
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
-    print(f"Training took: {datetime.timedelta(seconds=history.training_time)}")
+    # Call callbacks after training
+    cbargs.update(flat_model, -1)
+    for callback in callbacks:
+        callback.on_training_end(cbargs)
 
     return model, history

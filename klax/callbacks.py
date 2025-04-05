@@ -2,8 +2,11 @@ from __future__ import annotations
 from collections.abc import Callable
 import importlib
 
-import typing
-from typing import Optional, Protocol
+from typing import Optional
+from abc import ABC
+
+import datetime
+import time
 
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
@@ -24,7 +27,7 @@ class CallbackArgs:
     """
 
     step: int
-    dt: float
+    update_time: float  # Time of the last update to CallbackArgs
     data: PyTree
     val_data: PyTree | None
     _treedef_model: PyTreeDef
@@ -46,10 +49,10 @@ class CallbackArgs:
         self._get_loss = get_loss
         self._treedef_model = treedef_model
 
-    def update(self, flat_model: PyTree, step: int, dt: float):
+    def update(self, flat_model: PyTree, step: int):
         self._flat_model = flat_model
         self.step = step
-        self.dt = dt
+        self.update_time = time.time()
 
         # Clear cache
         self._cache = {}
@@ -93,12 +96,20 @@ class CallbackArgs:
         return self._get_loss(self.model, self.val_data)
 
 
-@typing.runtime_checkable
-class Callback(Protocol):
+class Callback(ABC):
     """An abstract callback."""
 
     def __call__(self, cbargs: CallbackArgs) -> bool | None:
-        raise NotImplementedError
+        """Called after each step during training."""
+        pass
+
+    def on_training_end(self, cbargs: CallbackArgs) -> None:
+        """Called when training ends."""
+        pass
+
+    def on_training_start(self, cbargs: CallbackArgs) -> None:
+        """Called when training starts."""
+        pass
 
 
 class HistoryCallback(Callback):
@@ -106,8 +117,11 @@ class HistoryCallback(Callback):
     steps: list
     loss: list
     val_loss: list
-    training_time: float
+    last_start_time: float      # start time of the last training
+    last_end_time: float        # End time of the last training
+    training_time: float = 0    # Total training time of all trainings
     verbose: bool
+    step_offset: int = 0    # Potential offset due to previous trainings
 
     def __init__(self, log_every: int = 100, verbose: bool = True):
         self.log_every = log_every
@@ -115,16 +129,12 @@ class HistoryCallback(Callback):
         self.steps = []
         self.loss = []
         self.val_loss = []
-        self.training_time = 0.0
 
     def __call__(self, cbargs: CallbackArgs):
         if cbargs.step % self.log_every == 0:
-            self.steps.append(cbargs.step)
+            self.steps.append(self.step_offset + cbargs.step)
             self.loss.append(cbargs.loss)
-            if cbargs.val_loss is not None:
-                self.val_loss.append(cbargs.val_loss)
-
-            self.training_time += cbargs.dt
+            self.val_loss.append(cbargs.val_loss)
 
             # Print message
             if self.verbose:
@@ -132,6 +142,18 @@ class HistoryCallback(Callback):
                 if cbargs.val_data is not None:
                     message += f", Validation loss: {cbargs.val_loss:.3e}"
                 print(message)
+    
+    def on_training_start(self, cbargs: CallbackArgs):
+        self.last_start_time = cbargs.update_time
+        if self.steps:
+            self.step_offset = self.steps[-1]
+
+    def on_training_end(self, cbargs: CallbackArgs):
+        self.last_end_time = cbargs.update_time
+        self.training_time += self.last_end_time - self.last_start_time
+        if self.verbose:
+            print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
+
 
     def plot(
         self,
@@ -145,6 +167,13 @@ class HistoryCallback(Callback):
             plt = importlib.import_module(module_name)
             if ax is None:
                 _, ax = plt.subplots()
+                ax.set(
+                    xlabel='Step',
+                    ylabel='Loss',
+                    yscale='log',
+                    title='Training History',
+                )
+                ax.grid(True)
             loss_options = dict(label="Loss", ls="-", c="black") | loss_options
             val_loss_options = (
                 dict(label="Validation loss", ls="--", c="red") | val_loss_options
