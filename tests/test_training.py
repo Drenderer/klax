@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array
-import numpy as np
 import optax
 
+from klax.callbacks import Callback, CallbackArgs, HistoryCallback
 
 def test_training(getkey):
     # Fitting a linear function
@@ -42,28 +42,36 @@ def test_training(getkey):
     # History shape and type
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
-    _, history = klax.fit(model, (x, x), key=getkey())
-    assert all(isinstance(x, np.ndarray) for _, x in history.items())
-    assert history["steps"].shape == (10,)
-    assert history["loss"].shape == (10,)
-    assert history["training_time"].shape == ()
+    history = HistoryCallback(log_every=100)
+    model, history = klax.fit(model, (x, x), steps=1000, history=history, key=getkey())
+    assert len(history.steps) == 10
+    assert len(history.loss) == 10
+    time_1 = history.training_time
+    model, history = klax.fit(model, (x, x), steps=500, history=history, key=getkey())
+    assert len(history.steps) == 15
+    assert len(history.loss) == 15
+    assert history.steps[-1] == 1500
+    time_2 = history.training_time
+    assert time_1 < time_2
+
 
     # Validation data
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     _, history = klax.fit(model, (x, x), validation_data=(x, x), key=getkey())
-    assert isinstance(history["val_loss"], np.ndarray)
-    assert history["val_loss"].shape == (10,)
+    assert len(history.val_loss) == 10
 
     # Callbacks
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
 
-    def callback(cbargs: klax.callbacks.CallbackArgs):
-        if cbargs.step == 123:
-            return True
+    class MyCallback(Callback):
+        def __call__(self, cbargs: CallbackArgs):
+            if cbargs.step == 123:
+                return True
 
     _, history = klax.fit(
-        model, (x, x), log_every=1, callbacks=[callback], key=getkey()
+        model, (x, x), history=HistoryCallback(1), callbacks=(MyCallback(),), key=getkey()
     )
-    assert history["steps"][-1] == 123
+    print(history.log_every)
+    assert history.steps[-1] == 123

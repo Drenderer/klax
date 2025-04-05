@@ -38,3 +38,24 @@ def getwrap():
             return jnp.zeros_like(self.parameter)
 
     return Wrapper
+
+
+@pytest.fixture
+def getmodel():
+    import equinox as eqx
+
+    class Model(eqx.Module):
+        def __call__(self, x):
+            return x
+
+    return Model
+
+
+@pytest.fixture
+def getloss():
+    def init(model, data):
+        x, y = data
+        y_pred = jax.vmap(model)(x)
+        return jnp.mean(jnp.square(y - y_pred))
+
+    return init
