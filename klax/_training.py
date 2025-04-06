@@ -3,18 +3,19 @@ This module implements a basic training loop.
 """
 
 from __future__ import annotations
-import datetime
-import time
 from typing import Any, Iterable, Optional
 
 import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray, PyTree
-import numpy as np
 import optax
 import paramax as px
 
-from .callbacks import Callback, CallbackArgs
+from .callbacks import (
+    Callback,
+    CallbackArgs,
+    HistoryCallback,
+)
 from .datahandler import dataloader, Dataloader, broadcast_and_get_batch_size
 from .losses import Loss, mse
 
@@ -27,13 +28,13 @@ def fit[T: eqx.Module](
     batch_axis: PyTree[int | None] = 0,
     validation_data: Optional[PyTree[Any]] = None,
     steps: int = 1000,
-    log_every: int = 100,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     dataloader: Dataloader = dataloader,
+    history: Optional[HistoryCallback] = None,
     callbacks: Optional[Iterable[Callback]] = None,
     key: PRNGKeyArray,
-) -> tuple[T, dict]:
+) -> tuple[T, HistoryCallback]:
     """Trains a model using an optimizer from optax.
 
     Args:
@@ -51,15 +52,16 @@ def fit[T: eqx.Module](
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
         steps: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
-        log_every: The number of steps between updates of the loss history. A history update
-            consists of calculating the training and validation losses *over the entire datasets*
-            and storing them in the history dictionary. (Defaults to 10. Keyword only Argument)
         loss_fn: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
         dataloader: The data loader that splits inputs and targets into batches.
             (Defaults to `dataloader`)
+        History: A callback of type `HistoryCallback` that stores the training metric in every n-th
+            load step. By default the logging interval is set to 100 steps. To change the logging
+            increment, the user may pass a modified `HistoryCallback` object to this argument, e.g.,
+            `history=HistoryCallback(10)` for logging on every 10-th step.
         callbacks: Callback functions that are evaluated after every training step. They can
             be used to implement early stopping, custom history logging and more. The argument to the
             callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
@@ -110,13 +112,6 @@ def fit[T: eqx.Module](
 
         return flat_model, flat_opt_state
 
-    # Initialize the history dict
-    history = {"steps": [], "loss": [], "training_time": 0.0}
-    if validation_data is not None:
-        history["val_loss"] = []
-
-    val_loss = None
-
     # Initialize the optimizer and 'tell it' to optimize with respect to all
     # inexact arrays in the model
     opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
@@ -126,18 +121,25 @@ def fit[T: eqx.Module](
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
-    cbargs = CallbackArgs(get_loss, data, validation_data, treedef_model)
+    # Make callbacks iterable
+    callbacks = [] if callbacks is None else list(callbacks)
+
+    # Initialize callback arguments and history
+    if history is None:
+        history = HistoryCallback(log_every=100)
+    callbacks.append(history)
+
+    cbargs = CallbackArgs(get_loss, treedef_model, data, validation_data)
+
+    # Call callbacks after training
+    cbargs.update(flat_model, 0)
+    for callback in callbacks:
+        callback.on_training_start(cbargs)
 
     # Loop over all training steps
-    start_time = time.time()
     for step, batch in zip(
         range(1, steps + 1),
-        dataloader(
-            data,
-            batch_size,
-            batch_axis,
-            key=key,
-        ),
+        dataloader(data, batch_size, batch_axis, key=key),
     ):
         flat_model, flat_opt_state = make_step(
             batch, flat_model, optimizer, flat_opt_state
@@ -146,36 +148,19 @@ def fit[T: eqx.Module](
         # Update callbacks arguments with the current state of the model
         cbargs.update(flat_model, step)
 
-        # Log every log_every steps and the last step
-        if (step % log_every) == 0 or step == steps:
-            loss = cbargs.loss
-            history["steps"].append(cbargs.step)
-            history["loss"].append(loss)
-            message = f"Step: {step}, Loss: {loss:.3e}"
-
-            if validation_data is not None:
-                val_loss = cbargs.val_loss
-                history["val_loss"].append(val_loss)
-                message += f", Validation loss: {val_loss:.3e}"
-
-            print(message)
-
-        if callbacks is not None:
-            # Run all callbacks and break if any of them request termination of
-            # the training loop.
-            # Note! The square brackets are important. Otherwise the loop is
-            # terminated with the first callback that returns true. But we want
-            # to run all callbacks first and then decide, whether to terminate.
-            if any([callback(cbargs) for callback in callbacks]):
-                break
+        # Run all callbacks and break if any of them request termination of
+        # the training loop.
+        # Note! The square brackets are important. Otherwise the loop is
+        # terminated with the first callback that returns true. But we want
+        # to run all callbacks first and then decide, whether to terminate.
+        if any([callback(cbargs) for callback in callbacks]):
+            break
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
-    training_time = time.time() - start_time
-    print(f"Training took: {datetime.timedelta(seconds=training_time)}")
-    history["training_time"] = training_time
-
-    # Convert history to numpy arrays
-    history = {k: np.array(v) for k, v in history.items()}
+    # Call callbacks after training
+    cbargs.update(flat_model, -1)
+    for callback in callbacks:
+        callback.on_training_end(cbargs)
 
     return model, history
