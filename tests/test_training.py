@@ -39,17 +39,17 @@ def test_training(getkey):
     y_pred = jax.vmap(model, in_axes=((None, 0),))((b, x))
     assert jnp.allclose(y_pred, y)
 
-    # History shape and type
+    # History shape
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     history = HistoryCallback(log_every=100)
     model, history = klax.fit(model, (x, x), steps=1000, history=history, key=getkey())
-    assert len(history.steps) == 10
-    assert len(history.loss) == 10
+    assert len(history.steps) == 11
+    assert len(history.loss) == 11
     time_1 = history.training_time
     model, history = klax.fit(model, (x, x), steps=500, history=history, key=getkey())
-    assert len(history.steps) == 15
-    assert len(history.loss) == 15
+    assert len(history.steps) == 16
+    assert len(history.loss) == 16
     assert history.steps[-1] == 1500
     time_2 = history.training_time
     assert time_1 < time_2
@@ -59,7 +59,7 @@ def test_training(getkey):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     _, history = klax.fit(model, (x, x), validation_data=(x, x), key=getkey())
-    assert len(history.val_loss) == 10
+    assert len(history.val_loss) == 11
 
     # Callbacks
     x = jrandom.uniform(getkey(), (2, 1))
@@ -75,3 +75,46 @@ def test_training(getkey):
     )
     print(history.log_every)
     assert history.steps[-1] == 123
+
+
+    # Test all optax optimizers
+    optimizers = [
+        optax.adabelief(1.0),
+        optax.adadelta(1.0),
+        optax.adan(1.0),
+        optax.adafactor(1.0),
+        optax.adagrad(1.0),
+        optax.adam(1.0),
+        optax.adamw(1.0),
+        optax.adamax(1.0),
+        optax.adamaxw(1.0),
+        optax.amsgrad(1.0),
+        optax.fromage(1.0),
+        optax.lamb(1.0),
+        optax.lars(1.0),
+        optax.lbfgs(1.0),
+        optax.lion(1.0),
+        optax.nadam(1.0),
+        optax.nadamw(1.0),
+        optax.noisy_sgd(1.0),
+        optax.novograd(1.0),
+        optax.optimistic_gradient_descent(1.0),
+        optax.optimistic_adam(1.0),
+        optax.polyak_sgd(1.0),
+        optax.radam(1.0),
+        optax.rmsprop(1.0),
+        optax.sgd(1.0),
+        optax.sign_sgd(1.0),
+        optax.sm3(1.0),
+        optax.yogi(1.0),
+    ]
+    x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
+    y = 2.0 * x + 1.0
+    for optimizer in optimizers:
+        model = eqx.nn.Linear(1, 1, key=getkey())
+        try:
+            model, _ = klax.fit(model, (x, y), optimizer=optimizer, key=getkey())
+        except Exception as e:
+            print(f"Optimizer {optimizer} failed with error: {e}")
+            raise e
+
