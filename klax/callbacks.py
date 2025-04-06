@@ -29,6 +29,8 @@ class CallbackArgs:
     val_data: PyTree | None
     _treedef_model: PyTreeDef
     _flat_model: list
+    _treedef_opt_state: PyTreeDef
+    _flat_opt_state: list
     _cache: dict = {}
     _get_loss: Callable[..., Scalar]
     _start_time: float
@@ -37,6 +39,7 @@ class CallbackArgs:
         self,
         get_loss: Callable[[PyTree, PyTree], Scalar],
         treedef_model: PyTreeDef,
+        treedef_opt_state: PyTreeDef,
         data: PyTree,
         val_data: Optional[PyTree] = None,
     ):
@@ -44,9 +47,11 @@ class CallbackArgs:
         self.val_data = val_data
         self._get_loss = get_loss
         self._treedef_model = treedef_model
+        self._treedef_opt_state = treedef_opt_state
 
-    def update(self, flat_model: PyTree, step: int):
+    def update(self, flat_model: PyTree, flat_opt_state: PyTree, step: int):
         self._flat_model = flat_model
+        self._flat_opt_state = flat_opt_state
         self.step = step
         self.time_on_last_update = time.time()
 
@@ -80,6 +85,12 @@ class CallbackArgs:
     @_lazy_evaluated_and_cached
     def model(self):
         return jax.tree_util.tree_unflatten(self._treedef_model, self._flat_model)
+
+    @_lazy_evaluated_and_cached
+    def opt_state(self):
+        return jax.tree_util.tree_unflatten(
+            self._treedef_opt_state, self._flat_opt_state
+        )
 
     @_lazy_evaluated_and_cached
     def loss(self):
@@ -118,6 +129,7 @@ class HistoryCallback(Callback):
     training_time: float = 0  # Total training time of all trainings
     verbose: bool
     step_offset: int = 0  # Potential offset due to previous trainings
+    last_opt_state: PyTree | None = None
 
     def __init__(self, log_every: int = 100, verbose: bool = True):
         self.log_every = log_every
@@ -149,6 +161,7 @@ class HistoryCallback(Callback):
     def on_training_end(self, cbargs: CallbackArgs):
         self.last_end_time = cbargs.time_on_last_update
         self.training_time += self.last_end_time - self.last_start_time
+        self.last_opt_state = cbargs.opt_state
         if self.verbose:
             print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
 
