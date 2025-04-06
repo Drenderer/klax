@@ -139,12 +139,7 @@ def fit[T: eqx.Module](
     # Loop over all training steps
     for step, batch in zip(
         range(1, steps + 1),
-        dataloader(
-            data,
-            batch_size,
-            batch_axis,
-            key=key,
-        ),
+        dataloader(data, batch_size, batch_axis, key=key),
     ):
         flat_model, flat_opt_state = make_step(
             batch, flat_model, optimizer, flat_opt_state
