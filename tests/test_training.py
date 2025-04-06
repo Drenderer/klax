@@ -108,10 +108,10 @@ def test_training(getkey):
         optax.sm3(1.0),
         optax.yogi(1.0),
     ]
-    x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
+    x = jnp.linspace(0.0, 1.0, 2)[:, None]
     y = 2.0 * x + 1.0
     for optimizer in optimizers:
-        model = eqx.nn.Linear(1, 1, key=getkey())
+        model = eqx.nn.MLP(1, 1, 64, 2, key=getkey())
         try:
             model, _ = klax.fit(model, (x, y), optimizer=optimizer, key=getkey())
         except Exception as e:
