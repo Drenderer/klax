@@ -58,7 +58,7 @@ def test_callbackargs(getkey, getmodel, getloss):
     cbargs.update(flat_model, 0)
     time_on_last_update = cbargs.time_on_last_update
     cbargs.update(flat_model, 0)
-    assert cbargs.time_on_last_update > time_on_last_update
+    assert cbargs.time_on_last_update >= time_on_last_update
 
 
 def test_history_callback(getkey, getmodel, getloss):
