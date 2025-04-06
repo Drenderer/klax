@@ -143,6 +143,8 @@ class HistoryCallback(Callback):
         self.last_start_time = cbargs.time_on_last_update
         if self.steps:
             self.step_offset = self.steps[-1]
+        else:
+            self(cbargs)
 
     def on_training_end(self, cbargs: CallbackArgs):
         self.last_end_time = cbargs.time_on_last_update
