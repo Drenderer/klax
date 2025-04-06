@@ -19,6 +19,8 @@ from .callbacks import (
 from .datahandler import dataloader, Dataloader, broadcast_and_get_batch_size
 from .losses import Loss, mse
 
+from functools import partial
+
 
 def fit[T: eqx.Module](
     model: T,
@@ -91,7 +93,7 @@ def fit[T: eqx.Module](
         return loss_fn(model, batch, batch_axis=batch_axis)
 
     # Get the gradient function
-    grad_loss = eqx.filter_grad(get_loss)
+    value_and_grad_loss = eqx.filter_value_and_grad(get_loss)
 
     @eqx.filter_jit
     def make_step(batch, flat_model, optimizer, flat_opt_state):
@@ -101,9 +103,14 @@ def fit[T: eqx.Module](
         opt_state = jax.tree_util.tree_unflatten(treedef_opt_state, flat_opt_state)
 
         # Compute and apply the parameter updates
-        grads = grad_loss(model, batch)
+        value, grads = value_and_grad_loss(model, batch)
         updates, opt_state = optimizer.update(
-            grads, opt_state, params=eqx.filter(model, eqx.is_inexact_array)
+            grads,
+            opt_state,
+            params=eqx.filter(model, eqx.is_inexact_array),
+            value=value,
+            grad=grads, 
+            value_fn=partial(get_loss, batch=batch),
         )
         model = eqx.apply_updates(model, updates)
 

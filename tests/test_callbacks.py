@@ -76,14 +76,14 @@ def test_history_callback(getkey, getmodel, getloss):
     # First update
     cbargs.update(flat_model, 1)
     history(cbargs)
-    assert len(history.loss) == 0
-    assert len(history.val_loss) == 0
+    assert len(history.loss) == 1
+    assert len(history.val_loss) == 1
 
     # Second update
     cbargs.update(flat_model, 2)
     history(cbargs)
-    assert len(history.loss) == 1
-    assert len(history.val_loss) == 1
+    assert len(history.loss) == 2
+    assert len(history.val_loss) == 2
 
     # On training end update
     cbargs.update(flat_model, -1)
