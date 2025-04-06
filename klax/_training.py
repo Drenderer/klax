@@ -105,14 +105,14 @@ def fit[T: eqx.Module](
         opt_state = jax.tree_util.tree_unflatten(treedef_opt_state, flat_opt_state)
 
         # Compute and apply the parameter updates
-        value, grads = value_and_grad_loss(model, batch)
+        value, grad = value_and_grad_loss(model, batch)
         params, non_train_params = eqx.partition(model, eqx.is_inexact_array)
         updates, opt_state = optimizer.update(
-            grads,
+            grad,
             opt_state,
             params=params,
             value=value,
-            grad=grads,
+            grad=grad,
             value_fn=jax.tree_util.Partial(
                 get_loss_for_optax, non_train_params=non_train_params, batch=batch
             ),
