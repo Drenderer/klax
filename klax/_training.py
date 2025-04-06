@@ -121,7 +121,7 @@ def fit[T: eqx.Module](
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
     flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
 
-    # Make callbacks iterable 
+    # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
 
     # Initialize callback arguments and history

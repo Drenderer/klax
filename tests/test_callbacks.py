@@ -42,13 +42,23 @@ def test_callbackargs(getkey, getmodel, getloss):
     # Test data reference count
     x = jrandom.uniform(getkey(), (10,))
     data = (x, x)
-
     model = getmodel()
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
     assert sys.getrefcount(data) == 2
     cbargs = CallbackArgs(getloss, treedef_model, data)
     assert sys.getrefcount(data) == 3
+
+    # Test update time
+    x = jrandom.uniform(getkey(), (10,))
+    data = (x, x)
+    model = getmodel()
+    flat_model, treedef_model = jax.tree_util.tree_flatten(model)
+    cbargs = CallbackArgs(getloss, treedef_model, data)
+    cbargs.update(flat_model, 0)
+    time_on_last_update = cbargs.time_on_last_update
+    cbargs.update(flat_model, 0)
+    assert cbargs.time_on_last_update > time_on_last_update
 
 
 def test_history_callback(getkey, getmodel, getloss):
@@ -57,26 +67,26 @@ def test_history_callback(getkey, getmodel, getloss):
     flat_model, treedef_model = jax.tree_util.tree_flatten(model)
 
     cbargs = CallbackArgs(getloss, treedef_model, (x, x), None)
-    dhc = HistoryCallback(2)
+    history = HistoryCallback(2)
 
     # On training start update
     cbargs.update(flat_model, 0)
-    dhc.on_training_start(cbargs)
+    history.on_training_start(cbargs)
 
     # First update
     cbargs.update(flat_model, 1)
-    dhc(cbargs)
-    assert len(dhc.loss) == 0
-    assert len(dhc.val_loss) == 0
+    history(cbargs)
+    assert len(history.loss) == 0
+    assert len(history.val_loss) == 0
 
     # Second update
     cbargs.update(flat_model, 2)
-    dhc(cbargs)
-    assert len(dhc.loss) == 1
-    assert len(dhc.val_loss) == 1
+    history(cbargs)
+    assert len(history.loss) == 1
+    assert len(history.val_loss) == 1
 
-    # On training start update
+    # On training end update
     cbargs.update(flat_model, -1)
-    dhc.on_training_end(cbargs)
+    history.on_training_end(cbargs)
 
-    assert dhc.training_time > 0
+    assert history.training_time > 0.0

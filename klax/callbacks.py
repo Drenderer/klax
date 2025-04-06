@@ -1,16 +1,13 @@
 from __future__ import annotations
-from collections.abc import Callable
-import importlib
-
-from typing import Optional
 from abc import ABC
-
+from collections.abc import Callable
 import datetime
+import importlib
 import time
+from typing import Optional
 
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
-
 
 
 class CallbackArgs:
@@ -27,7 +24,7 @@ class CallbackArgs:
     """
 
     step: int
-    update_time: float  # Time of the last update to CallbackArgs
+    time_on_last_update: float
     data: PyTree
     val_data: PyTree | None
     _treedef_model: PyTreeDef
@@ -43,7 +40,6 @@ class CallbackArgs:
         data: PyTree,
         val_data: Optional[PyTree] = None,
     ):
-        self.dt = 0.0
         self.data = data
         self.val_data = val_data
         self._get_loss = get_loss
@@ -52,7 +48,7 @@ class CallbackArgs:
     def update(self, flat_model: PyTree, step: int):
         self._flat_model = flat_model
         self.step = step
-        self.update_time = time.time()
+        self.time_on_last_update = time.time()
 
         # Clear cache
         self._cache = {}
@@ -117,11 +113,11 @@ class HistoryCallback(Callback):
     steps: list
     loss: list
     val_loss: list
-    last_start_time: float      # start time of the last training
-    last_end_time: float        # End time of the last training
-    training_time: float = 0    # Total training time of all trainings
+    last_start_time: float  # start time of the last training
+    last_end_time: float  # End time of the last training
+    training_time: float = 0  # Total training time of all trainings
     verbose: bool
-    step_offset: int = 0    # Potential offset due to previous trainings
+    step_offset: int = 0  # Potential offset due to previous trainings
 
     def __init__(self, log_every: int = 100, verbose: bool = True):
         self.log_every = log_every
@@ -142,36 +138,29 @@ class HistoryCallback(Callback):
                 if cbargs.val_data is not None:
                     message += f", Validation loss: {cbargs.val_loss:.3e}"
                 print(message)
-    
+
     def on_training_start(self, cbargs: CallbackArgs):
-        self.last_start_time = cbargs.update_time
+        self.last_start_time = cbargs.time_on_last_update
         if self.steps:
             self.step_offset = self.steps[-1]
 
     def on_training_end(self, cbargs: CallbackArgs):
-        self.last_end_time = cbargs.update_time
+        self.last_end_time = cbargs.time_on_last_update
         self.training_time += self.last_end_time - self.last_start_time
         if self.verbose:
             print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
 
-
-    def plot(
-        self,
-        *,
-        ax=None,
-        loss_options: dict = {},
-        val_loss_options: dict = {},
-    ):
+    def plot(self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}):
         module_name = "matplotlib.pyplot"
         try:
             plt = importlib.import_module(module_name)
             if ax is None:
                 _, ax = plt.subplots()
                 ax.set(
-                    xlabel='Step',
-                    ylabel='Loss',
-                    yscale='log',
-                    title='Training History',
+                    xlabel="Step",
+                    ylabel="Loss",
+                    yscale="log",
+                    title="Training History",
                 )
                 ax.grid(True)
             loss_options = dict(label="Loss", ls="-", c="black") | loss_options
@@ -181,6 +170,7 @@ class HistoryCallback(Callback):
             ax.plot(self.steps, self.loss, **loss_options)
             if self.val_loss is not None:
                 ax.plot(self.steps, self.val_loss, **val_loss_options)
+
         except ImportError as e:
             raise ImportError(
                 f"Failed to import module '{module_name}'. "
