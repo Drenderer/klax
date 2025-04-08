@@ -198,14 +198,14 @@ class FullyLinear(eqx.Module, strict=True):
             `dtype` is `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
-        wkey, bkey = jrandom.split(key, 2)
+        wykey, wzkey, bkey = jrandom.split(key, 3)
         in_features_y_ = 1 if in_features_y == "scalar" else in_features_y
         in_features_z_ = 1 if in_features_z == "scalar" else in_features_z
         out_features_ = 1 if out_features == "scalar" else out_features
         wshape_y = (out_features_, in_features_y_)
-        self.weight_y = weight_init(wkey, wshape_y, dtype)
+        self.weight_y = weight_init(wykey, wshape_y, dtype)
         wshape_z = (out_features_, in_features_z_)
-        self.weight_z = weight_init(wkey, wshape_z, dtype)
+        self.weight_z = weight_init(wzkey, wshape_z, dtype)
         bshape = (out_features_,)
         self.bias = bias_init(bkey, bshape, dtype) if use_bias else None
 
@@ -227,8 +227,8 @@ class FullyLinear(eqx.Module, strict=True):
                 (Keyword only argument.)
 
         Note:
-            If you want to use higher order tensors as inputs (for example featuring "
-            "batch dimensions) then use `jax.vmap`. For example, for inputs `y` and
+            If you want to use higher order tensors as inputs (for example featuring 
+            batch dimensions) then use `jax.vmap`. For example, for inputs `y` and
             `z` of shape `(batch, in_features_y)` and `(batch, in_features_z)`,
             respectively, using
 
@@ -250,8 +250,8 @@ class FullyLinear(eqx.Module, strict=True):
             will produce the appropriate output of shape `(batch, out_features)`.
 
         Returns:
-            A JAX array of shape `(out_features,)`. (Or shape `()` if
-            `out_features="scalar"`.)
+            A JAX array of shape `(out_features,)` (or shape `()` if
+            `out_features="scalar").
         """
 
         if self.in_features_y == "scalar":
