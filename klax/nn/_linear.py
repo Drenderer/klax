@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import (
     Literal,
     Optional,
-    Type,
     Union,
 )
+from collections.abc import Sequence
 
 import equinox as eqx
 from jax.nn.initializers import Initializer, zeros
@@ -35,8 +35,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: Type[ParameterWrapper] | None = None,
-        bias_wrap: Type[ParameterWrapper] | None = None,
+        weight_wrap: ParameterWrapper | None = None,
+        bias_wrap: ParameterWrapper | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -137,29 +137,30 @@ class Linear(eqx.Module, strict=True):
         return x
 
 
-class FullyLinear(eqx.Module, strict=True):
-    """Performs a linear transformation for two inputs.
+class InputSplitLinear(eqx.Module, strict=True):
+    """Performs a linear transformation for multiple inputs:
+    `y = [W_1, W_2, ..., W_n]@[x_1, x_2, ..., x_n]^T + b`
 
-    This layer is useful for formulating, e.g., fully connected multi layer
-    perceptrons (MLP), where the MLP input is passed as an additional input
-    to each hidden layer, alongside the output of the previous layer.
+    This layer is useful for formulating transformations with multiple
+    inputs where different inputs requre different weight constraints
+    or initialization for the corresponding weight matrices.
     """
 
-    weight_y: Array
-    weight_z: Array
+    num_inputs: int
+    weights: list[Array]
     bias: Optional[Array]
-    in_features_y: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    in_features_z: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    in_features: tuple[Union[int, Literal["scalar"]]] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
 
     def __init__(
         self,
-        in_features_y: Union[int, Literal["scalar"]],
-        in_features_z: Union[int, Literal["scalar"]],
+        in_features: Sequence[Union[int, Literal["scalar"]]],
         out_features: Union[int, Literal["scalar"]],
-        weight_init: Initializer,
+        weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
+        weight_wraps: Sequence[ParameterWrapper] | ParameterWrapper | None = None,
+        bias_wrap: ParameterWrapper | None = None,
         use_bias: bool = True,
         dtype=None,
         *,
@@ -167,14 +168,22 @@ class FullyLinear(eqx.Module, strict=True):
     ):
         """
         Args:
-            in_features_y: The input size of the first input. The input to the
-                layer should be a vector of shape `(in_features_y,)`
-            in_features_z: The input size of the second input. The input to the
-                layer should be a vector of shape `(in_features_z,)`
+            in_features: The input sizes of each input. The n-th input to the
+                layer should be a vectors of shape `(in_features[n],)`
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+            weight_inits: Weight initializer or sequence of weight initializers
+                of type `jax.nn.initializers.Initializer`. By specifying a sequence
+                it is possible to apply a different inializer to each weight matrix.
+                The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+            weight_wraps: An optional `klax.wrappers.ParameterWrapper` or sequence of
+                `klax.wrappers.ParameterWrapper` that can be passed to enforce weight
+                constraints. By specifying a sequence it is possible to apply a
+                different wrapper to each weight matrix. The sequence must have the
+                same length as in_features.
+            bias_wrap: An optional `klax.wrappers.ParameterWrapper` that can be passed
+               to enforce bias constraints.
             use_bias: Whether to add on a bias as well.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
@@ -183,7 +192,7 @@ class FullyLinear(eqx.Module, strict=True):
                 initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_features_y` and `in_features_z` also supports the
+            Note that `in_features` also supports the
             string `"scalar"` as a special value. In this case the respective
             input to the layer should be of shape `()`.
 
@@ -191,81 +200,73 @@ class FullyLinear(eqx.Module, strict=True):
             case the output from the layer will have shape `()`.
 
             Further note that, some `jax.nn.initializers.Initializer`s do not
-            work if one of `in_features_y`, `in_features_z`, or `out_features`
+            work if one of `in_features` or `out_features`
             is zero.
 
             Likewise, some `jax.nn.initializers.Initialzers`s do not work when
             `dtype` is `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
-        wykey, wzkey, bkey = jrandom.split(key, 3)
-        in_features_y_ = 1 if in_features_y == "scalar" else in_features_y
-        in_features_z_ = 1 if in_features_z == "scalar" else in_features_z
-        out_features_ = 1 if out_features == "scalar" else out_features
-        wshape_y = (out_features_, in_features_y_)
-        self.weight_y = weight_init(wykey, wshape_y, dtype)
-        wshape_z = (out_features_, in_features_z_)
-        self.weight_z = weight_init(wzkey, wshape_z, dtype)
-        bshape = (out_features_,)
-        self.bias = bias_init(bkey, bshape, dtype) if use_bias else None
 
-        self.in_features_y = in_features_y
-        self.in_features_z = in_features_z
+        # Broadcast weight initializers and weight wrappers
+        num_inputs = len(in_features)
+        if isinstance(weight_inits, Sequence):
+            assert len(weight_inits) == num_inputs, (
+                "The length of the weight_inits iterable must equal the length of in_features"
+            )
+        else:
+            weight_inits = num_inputs * (weight_inits,)
+        if isinstance(weight_wraps, Sequence):
+            assert len(weight_wraps) == num_inputs, (
+                "The length of the weight_wraps iterable must equal the length of in_features"
+            )
+        else:
+            weight_wraps = num_inputs * (weight_wraps,)
+
+        key, bkey = jrandom.split(key, 2)
+        wkeys = jrandom.split(key, num_inputs)
+
+        in_features_ = [1 if f == "scalar" else f for f in in_features]
+        out_features_ = 1 if out_features == "scalar" else out_features
+
+        wshapes = [(out_features_, i_f_) for i_f_ in in_features_]
+        weights = [
+            winit(wkey, wshape, dtype)
+            for winit, wkey, wshape in zip(weight_inits, wkeys, wshapes)
+        ]
+        self.weights = [
+            w if wwrap is None else wwrap(w) for w, wwrap in zip(weights, weight_wraps)
+        ]
+
+        bshape = (out_features_,)
+        bias = bias_init(bkey, bshape, dtype) if use_bias else None
+        self.bias = bias if bias_wrap is None else bias_wrap(bias)
+
+        self.in_features = in_features
         self.out_features = out_features
         self.use_bias = use_bias
+        self.num_inputs = num_inputs
 
-    def __call__(
-        self, y: Array, z: Array, *, key: Optional[PRNGKeyArray] = None
-    ) -> Array:
-        """
-        Args:
-            y: The first input. Should be a JAX array of shape `(in_features_y,)`.
-                (Or shape `()` if `in_features="scalar"`.)
-            z: The first input. Should be a JAX array of shape `(in_features_z,)`.
-                (Or shape `()` if `in_features="scalar"`.)
-            key: Ignored; provided for compatibility with the rest of the Equinox API.
-                (Keyword only argument.)
+    def __call__(self, *xs: Array, key: Optional[PRNGKeyArray] = None) -> Array:
+        if len(xs) != self.num_inputs:
+            raise ValueError(
+                f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self.num_inputs})"
+            )
 
-        Note:
-            If you want to use higher order tensors as inputs (for example featuring 
-            batch dimensions) then use `jax.vmap`. For example, for inputs `y` and
-            `z` of shape `(batch, in_features_y)` and `(batch, in_features_z)`,
-            respectively, using
+        def mult(weight, in_feature, x):
+            if in_feature == "scalar":
+                if jnp.shape(x) != ():
+                    raise ValueError("y must have scalar shape")
+                x = jnp.broadcast_to(x, (1,))
+            return weight @ x
 
-            >>> import jax
-            >>> from jax.nn.initializers import he_normal
-            >>> import jax.random as jrandom
-            >>> import klax
-            >>>
-            >>> key = jrandom.PRNGKey(0)
-            >>> keys = jrandom.split(key, 3)
-            >>> y = jrandom.uniform(keys[0], (10,))
-            >>> z = jrandom.uniform(keys[1], (10,))
-            >>> fully_linear = klax.nn.FullyLinear(
-            ...     "scalar", "scalar", "scalar", he_normal(), key=keys[2]
-            ... )
-            >>> jax.vmap(fully_linear, (0, 0))(y, z).shape
-            (10,)
-
-            will produce the appropriate output of shape `(batch, out_features)`.
-
-        Returns:
-            A JAX array of shape `(out_features,)` (or shape `()` if
-            `out_features="scalar").
-        """
-
-        if self.in_features_y == "scalar":
-            if jnp.shape(y) != ():
-                raise ValueError("y must have scalar shape")
-            y = jnp.broadcast_to(y, (1,))
-        if self.in_features_z == "scalar":
-            if jnp.shape(z) != ():
-                raise ValueError("z must have scalar shape")
-            z = jnp.broadcast_to(z, (1,))
-        x = self.weight_y @ y + self.weight_z @ z
+        y = jnp.stack(
+            [mult(w, f, x) for w, f, x in zip(self.weights, self.in_features, xs)],
+            axis=0,
+        ).sum(axis=0)
         if self.bias is not None:
-            x = x + self.bias
+            y = y + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(x) == (1,)
-            x = jnp.squeeze(x)
-        return x
+            assert jnp.shape(y) == (1,)
+            y = jnp.squeeze(y)
+        return y
