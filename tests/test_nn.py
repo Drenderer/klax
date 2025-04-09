@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import paramax as px
-from klax.nn import Linear, FullyLinear, InputSplitLinear, MLP
+from klax.nn import Linear, InputSplitLinear, MLP
 from klax.wrappers import NonNegative
 
 
@@ -65,100 +65,6 @@ def test_linear(getkey, getwrap):
     assert linear(x).dtype == jnp.complex64
 
 
-def test_fully_linear(getkey):
-    # Zero input shape
-    fully_linear = FullyLinear(0, 0, 4, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (0,))
-    z = jrandom.normal(getkey(), (0,))
-    assert fully_linear(y, z).shape == (4,)
-
-    fully_linear = FullyLinear(0, 3, 4, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (0,))
-    z = jrandom.normal(getkey(), (3,))
-    assert fully_linear(y, z).shape == (4,)
-
-    fully_linear = FullyLinear(3, 0, 4, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (3,))
-    z = jrandom.normal(getkey(), (0,))
-    assert fully_linear(y, z).shape == (4,)
-
-    # Zero output shape
-    fully_linear = FullyLinear(4, 3, 0, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (4,))
-    z = jrandom.normal(getkey(), (3,))
-    assert fully_linear(y, z).shape == (0,)
-
-    # Positional arguments
-    fully_linear = FullyLinear(3, 2, 4, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (3,))
-    z = jrandom.normal(getkey(), (2,))
-    assert fully_linear(y, z).shape == (4,)
-
-    # Some keyword arguments
-    fully_linear = FullyLinear(
-        in_features_y=3,
-        in_features_z=2,
-        out_features=4,
-        weight_y_init=uniform(),
-        weight_z_init=uniform(),
-        key=getkey(),
-    )
-    y = jrandom.normal(getkey(), (3,))
-    z = jrandom.normal(getkey(), (2,))
-    assert fully_linear(y, z).shape == (4,)
-
-    # All keyword arguments
-    fully_linear = FullyLinear(
-        in_features_y=3,
-        in_features_z=2,
-        out_features=4,
-        weight_y_init=uniform(),
-        weight_z_init=uniform(),
-        key=getkey(),
-    )
-    y = jrandom.normal(getkey(), (3,))
-    z = jrandom.normal(getkey(), (2,))
-    assert fully_linear(y, z).shape == (4,)
-
-    # Scalar shapes
-    fully_linear = FullyLinear("scalar", 2, 3, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), ())
-    z = jrandom.normal(getkey(), (2,))
-    assert fully_linear(y, z).shape == (3,)
-
-    fully_linear = FullyLinear(2, "scalar", 3, uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (2,))
-    z = jrandom.normal(getkey(), ())
-    assert fully_linear(y, z).shape == (3,)
-
-    fully_linear = FullyLinear(
-        "scalar", "scalar", 3, uniform(), uniform(), key=getkey()
-    )
-    y = jrandom.normal(getkey(), ())
-    z = jrandom.normal(getkey(), ())
-    assert fully_linear(y, z).shape == (3,)
-
-    fully_linear = FullyLinear(2, 3, "scalar", uniform(), uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (2,))
-    z = jrandom.normal(getkey(), (3,))
-    assert fully_linear(y, z).shape == ()
-
-    # Data types
-    fully_linear = FullyLinear(
-        2, 3, "scalar", uniform(), uniform(), key=getkey(), dtype=jnp.float16
-    )
-    y = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
-    z = jrandom.normal(getkey(), (3,), dtype=jnp.float16)
-    assert fully_linear(y, z).dtype == jnp.float16
-
-    fully_linear = FullyLinear(
-        2, 3, "scalar", he_normal(), he_normal(), key=getkey(), dtype=jnp.complex64
-    )
-    y = jrandom.normal(getkey(), (2,), dtype=jnp.complex64)
-    z = jrandom.normal(getkey(), (3,), dtype=jnp.complex64)
-    assert fully_linear(y, z).dtype == jnp.complex64
-
-
 def test_input_split_linear(getkey):
     input_split_linear = InputSplitLinear([3, 2], 4, uniform(), key=getkey())
     y = jrandom.normal(getkey(), (3,))
@@ -174,7 +80,7 @@ def test_input_split_linear(getkey):
     assert input_split_linear(y, z).shape == (3,)
 
     input_split_linear = InputSplitLinear(
-        jnp.array([2, 3]), "scalar", uniform(), key=getkey()
+        [2, 3], "scalar", uniform(), key=getkey()
     )
     y = jrandom.normal(getkey(), (2,))
     z = jrandom.normal(getkey(), (3,))
@@ -182,7 +88,7 @@ def test_input_split_linear(getkey):
 
     # Weight wrappers
     input_split_linear = InputSplitLinear(
-        jnp.array([2, 3]),
+        [2, 3],
         "scalar",
         uniform(),
         weight_wraps=[NonNegative, None],

@@ -13,6 +13,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
+from ._misc import transposed_initialize
 from ..wrappers import ParameterWrapper
 
 
@@ -79,7 +80,7 @@ class Linear(eqx.Module, strict=True):
         in_features_ = 1 if in_features == "scalar" else in_features
         out_features_ = 1 if out_features == "scalar" else out_features
         wshape = (out_features_, in_features_)
-        weight = weight_init(wkey, wshape, dtype)
+        weight = transposed_initialize(weight_init, wkey, wshape, dtype)
         self.weight = weight if weight_wrap is None else weight_wrap(weight)
         bshape = (out_features_,)
         if use_bias is None:
@@ -231,7 +232,7 @@ class InputSplitLinear(eqx.Module, strict=True):
 
         wshapes = [(out_features_, i_f_) for i_f_ in in_features_]
         weights = [
-            winit(wkey, wshape, dtype)
+            transposed_initialize(winit, wkey, wshape, dtype)
             for winit, wkey, wshape in zip(weight_inits, wkeys, wshapes)
         ]
         self.weights = [

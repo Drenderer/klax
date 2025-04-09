@@ -40,7 +40,7 @@ class MLP(eqx.Module, strict=True):
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
         width_sizes: Iterable[int],
-        weight_init: Initializer = he_normal(in_axis=-1, out_axis=-2),
+        weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.relu,
         final_activation: Callable = lambda x: x,
