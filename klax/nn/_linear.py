@@ -13,7 +13,6 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from ._misc import transposed_initialize
 from ..wrappers import ParameterWrapper
 
 
@@ -79,8 +78,8 @@ class Linear(eqx.Module, strict=True):
         wkey, bkey = jrandom.split(key, 2)
         in_features_ = 1 if in_features == "scalar" else in_features
         out_features_ = 1 if out_features == "scalar" else out_features
-        wshape = (out_features_, in_features_)
-        weight = transposed_initialize(weight_init, wkey, wshape, dtype)
+        wshape = (in_features_, out_features_)
+        weight = weight_init(wkey, wshape, dtype)
         self.weight = weight if weight_wrap is None else weight_wrap(weight)
         bshape = (out_features_,)
         if use_bias is None:
@@ -129,7 +128,7 @@ class Linear(eqx.Module, strict=True):
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
             x = jnp.broadcast_to(x, (1,))
-        x = self.weight @ x
+        x = jnp.matmul(x, self.weight)
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
@@ -139,8 +138,8 @@ class Linear(eqx.Module, strict=True):
 
 
 class InputSplitLinear(eqx.Module, strict=True):
-    """Performs a linear transformation for multiple inputs:
-    `y = [W_1, W_2, ..., W_n]@[x_1, x_2, ..., x_n]^T + b`
+    """Performs a linear transformation for multiple inputs `x_1, ..., x_n`:
+    `y = x_1@W_1 + x_2@W_2 + ... +x_n@W_n + b`
 
     This layer is useful for formulating transformations with multiple
     inputs where different inputs requre different weight constraints
@@ -230,9 +229,9 @@ class InputSplitLinear(eqx.Module, strict=True):
         in_features_ = [1 if f == "scalar" else f for f in in_features]
         out_features_ = 1 if out_features == "scalar" else out_features
 
-        wshapes = [(out_features_, i_f_) for i_f_ in in_features_]
+        wshapes = [(i_f_, out_features_) for i_f_ in in_features_]
         weights = [
-            transposed_initialize(winit, wkey, wshape, dtype)
+            winit(wkey, wshape, dtype)
             for winit, wkey, wshape in zip(weight_inits, wkeys, wshapes)
         ]
         self.weights = [
@@ -249,6 +248,18 @@ class InputSplitLinear(eqx.Module, strict=True):
         self.num_inputs = num_inputs
 
     def __call__(self, *xs: Array, key: Optional[PRNGKeyArray] = None) -> Array:
+        """
+        Args:
+            xs: The inputs. Should be n JAX arrays x_i of shape `(in_features[i],)`. (Or
+                shape `()` if `in_features[i]="scalar"`.)
+            key: Ignored; provided for compatibility with the rest of the
+                Equinox API. (Keyword only argument.)
+
+        Returns:
+            A JAX array of shape `(out_features,)`. (Or shape `()` if
+            `out_features="scalar"`.)
+        """
+
         if len(xs) != self.num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self.num_inputs})"
@@ -259,7 +270,7 @@ class InputSplitLinear(eqx.Module, strict=True):
                 if jnp.shape(x) != ():
                     raise ValueError("y must have scalar shape")
                 x = jnp.broadcast_to(x, (1,))
-            return weight @ x
+            return jnp.matmul(x, weight)
 
         y = jnp.stack(
             [mult(w, f, x) for w, f, x in zip(self.weights, self.in_features, xs)],
