@@ -100,12 +100,12 @@ def dataloader(
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
         >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_mask = (True, {"a": False, "b": True})
+        >>> batch_mask = (0, {"a": None, "b": 0})
         >>> iter_data = dataloader(
         ...     data,
         ...     32,
         ...     batch_mask,
-        ...     key=jax.random.PRNGKey(0)
+        ...     key=jax.random.key(0)
         ... )
         >>>
 
@@ -193,7 +193,7 @@ def split_data(
         >>> y = jax.numpy.array([[1., 2.]])
         >>> data = (x, {"a": 1.0, "b": y})
         >>> batch_axis = (0, 1)
-        >>> iter_data = dataloader(
+        >>> iter_data = split_data(
         ...     data,
         ...     (0.5, 0.5),
         ...     batch_axis,

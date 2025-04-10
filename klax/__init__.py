@@ -7,4 +7,4 @@ from . import (
 )
 from ._training import fit as fit
 
-__all__ = ["dataloader", "fit"]
+__all__ = ["fit"]
