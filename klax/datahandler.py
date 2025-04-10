@@ -63,7 +63,7 @@ def broadcast_and_get_batch_size(
 
 
 @typing.runtime_checkable
-class Dataloader(Protocol):
+class BatchGenerator(Protocol):
     def __call__(
         self,
         data: PyTree[Any],
@@ -75,7 +75,7 @@ class Dataloader(Protocol):
         raise NotImplementedError
 
 
-def dataloader(
+def batch_data(
     data: PyTree[Any],
     batch_size: int = 32,
     batch_axis: PyTree[int | None] = 0,
@@ -95,13 +95,13 @@ def dataloader(
 
         >>> import jax
         >>> import jax.numpy as jnp
-        >>> from klax.datahandler import dataloader
+        >>> from klax.datahandler import batch_data
         >>>
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
         >>> data = (x, {"a": 1.0, "b": y})
         >>> batch_mask = (0, {"a": None, "b": 0})
-        >>> iter_data = dataloader(
+        >>> iter_data = batch_data(
         ...     data,
         ...     32,
         ...     batch_mask,
