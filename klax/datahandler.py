@@ -3,8 +3,9 @@ This module implements methods for handling data, such as batching and splitting
 """
 
 from __future__ import annotations
+from collections.abc import Sequence
 import typing
-from typing import Generator, Protocol, Iterable, Any
+from typing import Generator, Protocol, Any
 import warnings
 
 import equinox as eqx
@@ -173,7 +174,7 @@ def batch_data(
 
 def split_data(
     data: PyTree[Any],
-    proportions: Iterable[float],
+    proportions: Sequence[int|float],
     batch_axis: PyTree[int | None] = 0,
     *,
     key: PRNGKeyArray,
@@ -195,7 +196,7 @@ def split_data(
         >>> batch_axis = (0, 1)
         >>> iter_data = split_data(
         ...     data,
-        ...     (0.5, 0.5),
+        ...     (1, 1),
         ...     batch_axis,
         ...     key=jax.random.key(0)
         ... )
@@ -203,9 +204,9 @@ def split_data(
 
     Args:
         data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
-        proportions: Iterable of floats, where each float is the proportion of the
-            corresponding partition, e.g., `(0.8, 0.2)` for a 80 to 20 split.
-            The proportions must be non-negative and sum to 1.
+        proportions: Sequence of int or floats, where each element is the proportion of the
+            corresponding partition, e.g., `(80, 20)` for a 80% to 20% split.
+            The proportions must be non-negative.
         batch_axis: PyTree of the batch axis indices. `None` is used to indicate
             that the corresponding leaf or subtree in data does not have a batch axis.
             `batch_axis` must have the same structure as `data` or have `data` as a prefix.
@@ -216,14 +217,13 @@ def split_data(
         Tuple of `PyTrees`.
     """
 
-    if any(p < 0.0 for p in proportions):
+    proportions = jnp.array(proportions, dtype=float)
+    if jnp.any(proportions<0.):
         raise ValueError("Proportions must be non-negative.")
-    if sum(proportions) - 1.0 > 1e-6:
-        raise ValueError("Proportions must sum to 1.")
+    proportions = proportions / jnp.sum(proportions)
 
     batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
-
-    # Make permutation
+    
     indices = jnp.arange(dataset_size)
     perm = jr.permutation(key, indices)
 

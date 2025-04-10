@@ -78,12 +78,12 @@ def test_split_data(getkey):
             None,
         ],
     )
-    proportions = (0.5, 0.25, 0.25)
+    proportions = (50, 25, 25)
     batch_axis = (0, 1)
 
     subsets = split_data(data, proportions, batch_axis, key=getkey())
 
-    for s, p in zip(subsets, proportions):
+    for s, p in zip(subsets, (0.5, 0.25, 0.25)):
         assert s[0].shape == (round(p*batch_size), 2)
         assert s[1][0].shape == (3, round(p*batch_size), 2)
         assert tree_equal(s[1][1:], data[1][1:])
