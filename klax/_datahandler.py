@@ -3,9 +3,8 @@ This module implements methods for handling data, such as batching and splitting
 """
 
 from __future__ import annotations
-from collections.abc import Sequence
 import typing
-from typing import Generator, Protocol, Any
+from typing import Any, Generator, Protocol, Sequence
 import warnings
 
 import equinox as eqx
@@ -174,7 +173,7 @@ def batch_data(
 
 def split_data(
     data: PyTree[Any],
-    proportions: Sequence[int|float],
+    proportions: Sequence[int | float],
     batch_axis: PyTree[int | None] = 0,
     *,
     key: PRNGKeyArray,
@@ -190,13 +189,13 @@ def split_data(
         >>> import jax
         >>> from klax.datahandler import split_data
         >>>
-        >>> x = jax.numpy.array([1., 2.])
-        >>> y = jax.numpy.array([[1., 2.]])
+        >>> x = jax.numpy.array([1., 2., 3.])
+        >>> y = jax.numpy.array([4., 5., 6.])
         >>> data = (x, {"a": 1.0, "b": y})
         >>> batch_axis = (0, 1)
         >>> iter_data = split_data(
         ...     data,
-        ...     (1, 1),
+        ...     (2, 1),
         ...     batch_axis,
         ...     key=jax.random.key(0)
         ... )
@@ -204,31 +203,30 @@ def split_data(
 
     Args:
         data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
-        proportions: Sequence of int or floats, where each element is the proportion of the
-            corresponding partition, e.g., `(80, 20)` for a 80% to 20% split.
-            The proportions must be non-negative.
+        proportions: Proportions of the split that will be applied to the data, e.g.,
+        `(80, 20)` for a 80% to 20% split. The proportions must be non-negative.
         batch_axis: PyTree of the batch axis indices. `None` is used to indicate
             that the corresponding leaf or subtree in data does not have a batch axis.
             `batch_axis` must have the same structure as `data` or have `data` as a prefix.
             (Defaults to 0)
-        key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
+        key: A `jax.random.PRNGKey` used to provide randomness to the split.
             (Keyword only argument.)
     Returns:
         Tuple of `PyTrees`.
     """
 
-    proportions = jnp.array(proportions, dtype=float)
-    if jnp.any(proportions<0.):
+    props = jnp.array(proportions, dtype=float).reshape(-1)
+    if jnp.any(props < 0.):
         raise ValueError("Proportions must be non-negative.")
-    proportions = proportions / jnp.sum(proportions)
+    props = props / jnp.sum(props)
 
     batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
-    
+
     indices = jnp.arange(dataset_size)
     perm = jr.permutation(key, indices)
 
     split_indices = jnp.round(
-        jnp.cumsum(jnp.array(proportions[:-1]) * dataset_size)
+        jnp.cumsum(jnp.array(props[:-1]) * dataset_size)
     ).astype(int)
     sections = jnp.split(perm, split_indices)
 

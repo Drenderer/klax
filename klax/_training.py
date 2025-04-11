@@ -16,8 +16,8 @@ from .callbacks import (
     CallbackArgs,
     HistoryCallback,
 )
-from .datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
-from .losses import Loss, mse
+from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
+from ._losses import Loss, mse
 
 
 def fit[T: eqx.Module](

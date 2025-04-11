@@ -1,9 +1,9 @@
+import equinox as eqx
 import jax.random as jrandom
 import numpy as np
 import pytest
-from equinox import tree_equal
 
-from klax.datahandler import batch_data, split_data
+from klax import batch_data, split_data
 
 def test_batch_data(getkey):
     # Sequence with one element
@@ -66,30 +66,29 @@ def test_batch_data(getkey):
 
 
 def test_split_data(getkey):
-
-    # Expected usage
+    # Nestes data structure with different batch axes
     batch_size = 20
     data = (
         jrandom.uniform(getkey(), (batch_size, 2)),
         [
-            jrandom.uniform(getkey(), (3, batch_size, 2)),
-            100.,
-            'test',
-            None,
+            jrandom.uniform(getkey(), (3, batch_size, 2)), 100., 'test', None,
         ],
     )
-    proportions = (50, 25, 25)
+    proportions = (2, 1, 1)
     batch_axis = (0, 1)
-
     subsets = split_data(data, proportions, batch_axis, key=getkey())
 
     for s, p in zip(subsets, (0.5, 0.25, 0.25)):
-        assert s[0].shape == (round(p*batch_size), 2)
-        assert s[1][0].shape == (3, round(p*batch_size), 2)
-        assert tree_equal(s[1][1:], data[1][1:])
+        assert s[0].shape == (round(p * batch_size), 2)
+        assert s[1][0].shape == (3, round(p * batch_size), 2)
+        assert eqx.tree_equal(s[1][1:], data[1][1:])
 
-    # Edge cases
+    # One-element data structure
     data = np.arange(10)
     s, = split_data(data, (1.,), key=getkey())
     assert np.array_equal(data, np.sort(s))
 
+    # Negative proportion
+    data = np.arange(10)
+    with pytest.raises(ValueError):
+        split_data(data, (-1.,), key=getkey())

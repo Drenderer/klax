@@ -67,9 +67,11 @@ def make_batched_xy_loss(loss_core: Callable[[Array, Array], Scalar]) -> Loss:
 
 @make_batched_xy_loss
 def mse(y_pred, y):
+    """Mean squared error for data of shape (x, y)."""
     return jnp.mean(jnp.square(y_pred - y))
 
 
 @make_batched_xy_loss
 def mae(y_pred, y):
+    "Mean absolute error for data of shape (x, y)."
     return jnp.mean(jnp.abs(y_pred - y))
