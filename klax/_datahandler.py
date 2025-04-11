@@ -93,15 +93,15 @@ def batch_data(
         have batch dimension along the first axis.
 
 
+        >>> import klax
         >>> import jax
         >>> import jax.numpy as jnp
-        >>> from klax.datahandler import batch_data
         >>>
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
         >>> data = (x, {"a": 1.0, "b": y})
         >>> batch_mask = (0, {"a": None, "b": 0})
-        >>> iter_data = batch_data(
+        >>> iter_data = klax.batch_data(
         ...     data,
         ...     32,
         ...     batch_mask,
@@ -186,20 +186,20 @@ def split_data(
         have batch dimension along different axes.
 
 
+        >>> import klax
         >>> import jax
-        >>> from klax.datahandler import split_data
         >>>
         >>> x = jax.numpy.array([1., 2., 3.])
-        >>> y = jax.numpy.array([4., 5., 6.])
-        >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_axis = (0, 1)
-        >>> iter_data = split_data(
+        >>> data = (x, {"a": 1.0, "b": x})
+        >>> s1, s2 = klax.split_data(
         ...     data,
         ...     (2, 1),
-        ...     batch_axis,
         ...     key=jax.random.key(0)
         ... )
-        >>>
+        >>> s1
+        (Array([1., 2.], dtype=float32), {'a': 1.0, 'b': Array([1., 2.], dtype=float32)})
+        >>> s2
+        (Array([3.], dtype=float32), {'a': 1.0, 'b': Array([3.], dtype=float32)})
 
     Args:
         data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
