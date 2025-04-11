@@ -28,7 +28,7 @@ def getwrap():
     import klax
 
     # Implementation of a dummy wrapper that sets all parameters to zero.
-    class Wrapper(klax.wrappers.ParameterWrapper):
+    class Wrapper(klax.ParameterWrapper):
         parameter: Array
 
         def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):

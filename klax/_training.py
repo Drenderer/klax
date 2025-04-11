@@ -11,7 +11,7 @@ from jaxtyping import PRNGKeyArray, PyTree
 import optax
 import paramax as px
 
-from .callbacks import (
+from ._callbacks import (
     Callback,
     CallbackArgs,
     HistoryCallback,
