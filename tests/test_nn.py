@@ -3,8 +3,8 @@ import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import paramax as px
-from klax.nn import Linear, InputSplitLinear, MLP
-from klax.wrappers import NonNegative
+from klax.nn import Linear, InputSplitLinear, MLP, FICNN
+from klax.wrappers import NonNegative, unwrap
 
 
 def test_linear(getkey, getwrap):
@@ -152,3 +152,12 @@ def test_mlp(getkey):
     assert mlp(x).shape == (3,)
     assert [mlp.layers[i].in_features for i in range(0, 3)] == [2, 4, 8]
     assert [mlp.layers[i].out_features for i in range(0, 3)] == [4, 8, 3]
+
+
+def test_ficnn(getkey):
+    for variant in ['default', 'no-passthrough', 'non-decreasing']:
+        ficnn = unwrap(FICNN(2, 3, 2 * [8], variant, key=getkey()))
+        x = jrandom.normal(getkey(), (2,))
+        assert ficnn(x).shape == (3,)
+
+    # TODO
