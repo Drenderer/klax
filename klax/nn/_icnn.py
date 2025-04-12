@@ -28,7 +28,7 @@ class FICNN(eqx.Module, strict=True):
     layers: tuple[Linear | InputSplitLinear, ...]
     activations: tuple[Callable, ...]
     final_activation: Callable
-    variant: Optional[Literal["no-passthrough", "non-decreasing"]] = eqx.field(
+    variant: Literal["default", "no-passthrough", "non-decreasing"] | None = eqx.field(
         static=True
     )
     use_bias: bool = eqx.field(static=True)
@@ -149,7 +149,7 @@ class FICNN(eqx.Module, strict=True):
         for i, (layer, activation) in enumerate(
             zip(self.layers[:-1], self.activations)
         ):
-            if i==0 or self.variant != "default":
+            if i == 0 or self.variant != "default":
                 y = layer(y)
             else:
                 y = layer(y, x)

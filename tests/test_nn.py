@@ -1,10 +1,10 @@
+from klax.nn import Linear, InputSplitLinear, MLP, FICNN
+from klax.wrappers import NonNegative, unwrap
 from jax.nn.initializers import uniform, he_normal
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import paramax as px
-from klax.nn import Linear, InputSplitLinear, MLP, FICNN
-from klax.wrappers import NonNegative, unwrap
 
 
 def test_linear(getkey, getwrap):
@@ -65,45 +65,62 @@ def test_linear(getkey, getwrap):
     assert linear(x).dtype == jnp.complex64
 
 
-def test_input_split_linear(getkey):
-    input_split_linear = InputSplitLinear([3, 2], 4, uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (3,))
-    z = jrandom.normal(getkey(), (2,))
-    assert input_split_linear(y, z).shape == (4,)
+def test_is_linear(getkey):
+    # Zero input length
+    is_linear = InputSplitLinear((0,), 4, uniform(), key=getkey())
+    x = jrandom.normal(getkey(), (0,))
+    assert is_linear(x).shape == (4,)
+
+    is_linear = InputSplitLinear((0, 0), 4, uniform(), key=getkey())
+    x = jrandom.normal(getkey(), (0,))
+    assert is_linear(x, x).shape == (4,)
+
+    # Zero length output
+    is_linear = InputSplitLinear((2,), 0, uniform(), key=getkey())
+    x = jrandom.normal(getkey(), (2,))
+    assert is_linear(x).shape == (0,)
+
+    # One non-zero input
+    is_linear = InputSplitLinear((3,), 4, uniform(), key=getkey())
+    x = jrandom.normal(getkey(), (3,))
+    assert is_linear(x).shape == (4,)
+
+    # Multiple non-zero inputs
+    is_linear = InputSplitLinear((3, 2, 5), 4, uniform(), key=getkey())
+    x0 = jrandom.normal(getkey(), (3,))
+    x1 = jrandom.normal(getkey(), (2,))
+    x2 = jrandom.normal(getkey(), (5,))
+    assert is_linear(x0, x1, x2).shape == (4,)
 
     # Scalar shapes
-    input_split_linear = InputSplitLinear(
-        ("scalar", 2), 3, (uniform(), uniform()), key=getkey()
-    )
+    is_linear = InputSplitLinear(("scalar", 2), 3, (uniform(), uniform()), key=getkey())
     y = jrandom.normal(getkey(), ())
     z = jrandom.normal(getkey(), (2,))
-    assert input_split_linear(y, z).shape == (3,)
+    assert is_linear(y, z).shape == (3,)
 
-    input_split_linear = InputSplitLinear(
-        [2, 3], "scalar", uniform(), key=getkey()
-    )
+    is_linear = InputSplitLinear((2, 3), "scalar", uniform(), key=getkey())
     y = jrandom.normal(getkey(), (2,))
     z = jrandom.normal(getkey(), (3,))
-    assert input_split_linear(y, z).shape == ()
+    assert is_linear(y, z).shape == ()
 
     # Weight wrappers
-    input_split_linear = InputSplitLinear(
-        [2, 3],
+    is_linear = InputSplitLinear(
+        (2, 3),
         "scalar",
         uniform(),
         weight_wraps=[NonNegative, None],
         key=getkey(),
     )
-    assert isinstance(input_split_linear.weights[0], NonNegative)
-    assert isinstance(input_split_linear.weights[1], jax.Array)
+    assert isinstance(is_linear.weights[0], NonNegative)
+    assert isinstance(is_linear.weights[1], jax.Array)
 
     # Data types
-    input_split_linear = InputSplitLinear(
+    is_linear = InputSplitLinear(
         (2, 3), "scalar", uniform(), key=getkey(), dtype=jnp.float16
     )
     y = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
     z = jrandom.normal(getkey(), (3,), dtype=jnp.float16)
-    assert input_split_linear(y, z).dtype == jnp.float16
+    assert is_linear(y, z).dtype == jnp.float16
 
 
 def test_mlp(getkey):
@@ -155,7 +172,7 @@ def test_mlp(getkey):
 
 
 def test_ficnn(getkey):
-    for variant in ['default', 'no-passthrough', 'non-decreasing']:
+    for variant in ["default", "no-passthrough", "non-decreasing"]:
         ficnn = unwrap(FICNN(2, 3, 2 * [8], variant, key=getkey()))
         x = jrandom.normal(getkey(), (2,))
         assert ficnn(x).shape == (3,)

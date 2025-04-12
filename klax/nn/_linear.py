@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import (
     Literal,
     Optional,
+    Tuple,
+    Type,
     Union,
 )
 from collections.abc import Sequence
@@ -19,7 +21,7 @@ from ..wrappers import ParameterWrapper
 class Linear(eqx.Module, strict=True):
     """Performs a linear transformation.
 
-    This class is modified from eqx.nn.Linear to allow for custom initialization.
+    This class is modified from `eqx.nn.Linear` to allow for custom initialization.
     """
 
     weight: Array | ParameterWrapper
@@ -35,8 +37,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: ParameterWrapper | None = None,
-        bias_wrap: ParameterWrapper | None = None,
+        weight_wrap: Type[ParameterWrapper] | None = None,
+        bias_wrap: Type[ParameterWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -139,19 +141,19 @@ class Linear(eqx.Module, strict=True):
 
 class InputSplitLinear(eqx.Module, strict=True):
     """Performs a linear transformation for multiple inputs `x_1, ..., x_n`:
-    `y = x_1@W_1 + x_2@W_2 + ... +x_n@W_n + b`
+    `y = x_1 @ W_1 + x_2 @ W_2 + ... +x_n @ W_n + b`
 
     This layer is useful for formulating transformations with multiple
     inputs where different inputs requre different weight constraints
     or initialization for the corresponding weight matrices.
     """
 
-    num_inputs: int
-    weights: list[Array]
-    bias: Optional[Array]
-    in_features: tuple[Union[int, Literal["scalar"]]] = eqx.field(static=True)
+    weights: Tuple[Array | ParameterWrapper, ...]
+    bias: Optional[Array | ParameterWrapper]
+    in_features: Tuple[Union[int, Literal["scalar"]], ...] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
+    _num_inputs: int
 
     def __init__(
         self,
@@ -160,8 +162,8 @@ class InputSplitLinear(eqx.Module, strict=True):
         weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wraps: Sequence[ParameterWrapper] | ParameterWrapper | None = None,
-        bias_wrap: ParameterWrapper | None = None,
+        weight_wraps: Sequence[Type[ParameterWrapper] | None] | Type[ParameterWrapper] | None = None,
+        bias_wrap: Type[ParameterWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -174,9 +176,10 @@ class InputSplitLinear(eqx.Module, strict=True):
                 vector of shape `(out_features,)`.
             weight_inits: Weight initializer or sequence of weight initializers
                 of type `jax.nn.initializers.Initializer`. By specifying a sequence
-                it is possible to apply a different inializer to each weight matrix.
+                it is possible to apply a different initializer to each weight matrix.
                 The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+            use_bias: Whether to add on a bias as well.
             weight_wraps: An optional `klax.wrappers.ParameterWrapper` or sequence of
                 `klax.wrappers.ParameterWrapper` that can be passed to enforce weight
                 constraints. By specifying a sequence it is possible to apply a
@@ -184,7 +187,6 @@ class InputSplitLinear(eqx.Module, strict=True):
                 same length as in_features.
             bias_wrap: An optional `klax.wrappers.ParameterWrapper` that can be passed
                to enforce bias constraints.
-            use_bias: Whether to add on a bias as well.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
@@ -209,43 +211,50 @@ class InputSplitLinear(eqx.Module, strict=True):
         dtype = default_floating_dtype() if dtype is None else dtype
 
         # Broadcast weight initializers and weight wrappers
-        num_inputs = len(in_features)
+        _num_inputs = len(in_features)
         if isinstance(weight_inits, Sequence):
-            assert len(weight_inits) == num_inputs, (
-                "The length of the weight_inits iterable must equal the length of in_features"
+            assert len(weight_inits) == _num_inputs, (
+                "The length of the weight_inits is unequal to the length of in_features. " \
+                f"Expected length {_num_inputs} but is {len(weight_inits)}."
             )
         else:
-            weight_inits = num_inputs * (weight_inits,)
+            weight_inits = _num_inputs * (weight_inits,)
+
         if isinstance(weight_wraps, Sequence):
-            assert len(weight_wraps) == num_inputs, (
-                "The length of the weight_wraps iterable must equal the length of in_features"
+            assert len(weight_wraps) == _num_inputs, (
+                "The length of the weight_wraps is unequal to the length of in_features. " \
+                f"Expected length {_num_inputs} but is {len(weight_wraps)}."
             )
         else:
-            weight_wraps = num_inputs * (weight_wraps,)
+            weight_wraps = _num_inputs * (weight_wraps,)
 
         key, bkey = jrandom.split(key, 2)
-        wkeys = jrandom.split(key, num_inputs)
+        wkeys = jrandom.split(key, _num_inputs)
 
         in_features_ = [1 if f == "scalar" else f for f in in_features]
         out_features_ = 1 if out_features == "scalar" else out_features
 
-        wshapes = [(i_f_, out_features_) for i_f_ in in_features_]
+        wshapes = ((i_f_, out_features_) for i_f_ in in_features_)
         weights = [
-            winit(wkey, wshape, dtype)
-            for winit, wkey, wshape in zip(weight_inits, wkeys, wshapes)
+            init(wkey, wshape, dtype)
+            for init, wkey, wshape in zip(weight_inits, wkeys, wshapes)
         ]
-        self.weights = [
-            w if wwrap is None else wwrap(w) for w, wwrap in zip(weights, weight_wraps)
+        weights = [
+            w if wrap is None else wrap(w) for w, wrap in zip(weights, weight_wraps)
         ]
+        self.weights = tuple(weights)
 
         bshape = (out_features_,)
-        bias = bias_init(bkey, bshape, dtype) if use_bias else None
-        self.bias = bias if bias_wrap is None else bias_wrap(bias)
+        if use_bias is None:
+            self.bias = None
+        else:
+            bias = bias_init(bkey, bshape, dtype)
+            self.bias = bias if bias_wrap is None else bias_wrap(bias)
 
-        self.in_features = in_features
+        self.in_features = tuple(in_features)
         self.out_features = out_features
         self.use_bias = use_bias
-        self.num_inputs = num_inputs
+        self._num_inputs = _num_inputs
 
     def __call__(self, *xs: Array, key: Optional[PRNGKeyArray] = None) -> Array:
         """
@@ -260,9 +269,9 @@ class InputSplitLinear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
-        if len(xs) != self.num_inputs:
+        if len(xs) != self._num_inputs:
             raise ValueError(
-                f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self.num_inputs})"
+                f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"
             )
 
         def mult(weight, in_feature, x):
