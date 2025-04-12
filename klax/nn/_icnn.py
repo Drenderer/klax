@@ -49,7 +49,6 @@ class FICNN(eqx.Module, strict=True):
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
-        final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
         dtype=None,
@@ -59,6 +58,10 @@ class FICNN(eqx.Module, strict=True):
         """
         TODO
         """
+
+        def final_activation(x):
+            return x
+
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
 
