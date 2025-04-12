@@ -23,16 +23,18 @@ from ._linear import Linear, InputSplitLinear
 
 
 class FICNN(eqx.Module, strict=True):
-    """TODO"""
+    """A fully input convex neural network.
+
+    It is convex in its first argument and arbitrary
+    in any following argument."""
 
     layers: tuple[Linear | InputSplitLinear, ...]
     activations: tuple[Callable, ...]
     final_activation: Callable
-    variant: Literal["default", "no-passthrough", "non-decreasing"] | None = eqx.field(
-        static=True
-    )
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
+    use_passthrough: bool = eqx.field(static=True)
+    non_decreasing: bool = eqx.field(static=True)
     in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
@@ -42,7 +44,8 @@ class FICNN(eqx.Module, strict=True):
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
         width_sizes: Sequence[int],
-        variant: Literal["default", "no-passthrough", "non-decreasing"] = "default",
+        use_passthrough: bool = True,
+        non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -62,9 +65,11 @@ class FICNN(eqx.Module, strict=True):
         self.in_size = in_size
         self.out_size = out_size
         self.width_sizes = width_sizes
-        self.variant = variant
+        # self.variant = variant
         self.use_bias = use_bias
         self.use_final_bias = use_final_bias
+        self.use_passthrough = use_passthrough
+        self.non_decreasing = non_decreasing
 
         layer_in_sizes = (in_size,) + width_sizes
         layer_out_sizes = width_sizes + (out_size,)
@@ -84,14 +89,14 @@ class FICNN(eqx.Module, strict=True):
                         bias_init=bias_init,
                         use_bias=layer_use_bias,
                         weight_wrap=NonNegative
-                        if variant == "non-decreasing"
+                        if non_decreasing == "non-decreasing"
                         else None,
                         dtype=dtype,
                         key=layer_key,
                     )
                 )
             else:
-                if variant == "default":
+                if use_passthrough:
                     layers.append(
                         InputSplitLinear(
                             in_features=(layer_in_size, in_size),
@@ -146,10 +151,11 @@ class FICNN(eqx.Module, strict=True):
             `out_size="scalar"`.)
         """
         y = jnp.copy(x)
+
         for i, (layer, activation) in enumerate(
             zip(self.layers[:-1], self.activations)
         ):
-            if i == 0 or self.variant != "default":
+            if i == 0 or not self.use_passthrough:
                 y = layer(y)
             else:
                 y = layer(y, x)
@@ -157,12 +163,15 @@ class FICNN(eqx.Module, strict=True):
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
             y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
-        if self.variant == "default":
+
+        if self.use_passthrough:
             y = self.layers[-1](y, x)
         else:
             y = self.layers[-1](y)
+
         if self.out_size == "scalar":
             y = self.final_activation(y)
         else:
             y = eqx.filter_vmap(lambda a, b: a(b))(self.final_activation, y)
+
         return y

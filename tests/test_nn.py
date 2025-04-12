@@ -172,9 +172,22 @@ def test_mlp(getkey):
 
 
 def test_ficnn(getkey):
-    for variant in ["default", "no-passthrough", "non-decreasing"]:
-        ficnn = unwrap(FICNN(2, 3, 2 * [8], variant, key=getkey()))
-        x = jrandom.normal(getkey(), (2,))
-        assert ficnn(x).shape == (3,)
+    ficnn = unwrap(FICNN(2, 3, 2 * [8], key=getkey()))
+    x = jrandom.normal(getkey(), (2,))
+    assert ficnn(x).shape == (3,)
+
+    ficnn = unwrap(FICNN(2, 3, 2 * [8], use_passthrough=False, key=getkey()))
+    x = jrandom.normal(getkey(), (2,))
+    assert ficnn(x).shape == (3,)
+
+    ficnn = unwrap(FICNN(2, 3, 2 * [8], non_decreasing=True, key=getkey()))
+    x = jrandom.normal(getkey(), (2,))
+    assert ficnn(x).shape == (3,)
+
+    ficnn = unwrap(
+        FICNN(2, 3, 2 * [8], use_passthrough=False, non_decreasing=True, key=getkey())
+    )
+    x = jrandom.normal(getkey(), (2,))
+    assert ficnn(x).shape == (3,)
 
     # TODO
