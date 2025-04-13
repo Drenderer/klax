@@ -3,7 +3,6 @@ from typing import (
     Literal,
     Optional,
     Tuple,
-    Type,
     Union,
 )
 from collections.abc import Sequence
@@ -37,8 +36,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: Type[ParameterWrapper] | None = None,
-        bias_wrap: Type[ParameterWrapper] | None = None,
+        weight_wrap: type[ParameterWrapper] | None = None,
+        bias_wrap: type[ParameterWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -125,7 +124,9 @@ class Linear(eqx.Module, strict=True):
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
         """
-
+        assert not isinstance(self.weight, ParameterWrapper), (
+            "Model must be unwrapped before calling."
+        )
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
@@ -162,8 +163,10 @@ class InputSplitLinear(eqx.Module, strict=True):
         weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wraps: Sequence[Type[ParameterWrapper] | None] | Type[ParameterWrapper] | None = None,
-        bias_wrap: Type[ParameterWrapper] | None = None,
+        weight_wraps: Sequence[type[ParameterWrapper] | None]
+        | type[ParameterWrapper]
+        | None = None,
+        bias_wrap: type[ParameterWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -214,7 +217,7 @@ class InputSplitLinear(eqx.Module, strict=True):
         _num_inputs = len(in_features)
         if isinstance(weight_inits, Sequence):
             assert len(weight_inits) == _num_inputs, (
-                "The length of the weight_inits is unequal to the length of in_features. " \
+                "The length of the weight_inits is unequal to the length of in_features. "
                 f"Expected length {_num_inputs} but is {len(weight_inits)}."
             )
         else:
@@ -222,7 +225,7 @@ class InputSplitLinear(eqx.Module, strict=True):
 
         if isinstance(weight_wraps, Sequence):
             assert len(weight_wraps) == _num_inputs, (
-                "The length of the weight_wraps is unequal to the length of in_features. " \
+                "The length of the weight_wraps is unequal to the length of in_features. "
                 f"Expected length {_num_inputs} but is {len(weight_wraps)}."
             )
         else:

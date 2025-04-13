@@ -34,7 +34,7 @@ class FICNN(eqx.Module, strict=True):
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
-    non_decreasing: bool = eqx.field(static=True)
+    non_decreasing_first_layer: bool = eqx.field(static=True)
     in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
@@ -45,7 +45,7 @@ class FICNN(eqx.Module, strict=True):
         out_size: Union[int, Literal["scalar"]],
         width_sizes: Sequence[int],
         use_passthrough: bool = True,
-        non_decreasing: bool = False,
+        non_decreasing_first_layer: bool = True,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -72,57 +72,55 @@ class FICNN(eqx.Module, strict=True):
         self.use_bias = use_bias
         self.use_final_bias = use_final_bias
         self.use_passthrough = use_passthrough
-        self.non_decreasing = non_decreasing
+        self.non_decreasing_first_layer = non_decreasing_first_layer
 
-        layer_in_sizes = (in_size,) + width_sizes
-        layer_out_sizes = width_sizes + (out_size,)
-        layer_use_bias_flags = len(width_sizes) * (use_bias,) + (use_final_bias,)
-        layer_keys = jrandom.split(key, len(layer_out_sizes))
+        in_sizes = (in_size,) + width_sizes
+        out_sizes = width_sizes + (out_size,)
+        use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
+        keys = jrandom.split(key, len(in_sizes))
 
         layers = []
-        for n, (layer_in_size, layer_out_size, layer_use_bias, layer_key) in enumerate(
-            zip(layer_in_sizes, layer_out_sizes, layer_use_bias_flags, layer_keys)
+        for n, (sin, sout, ub, key) in enumerate(
+            zip(in_sizes, out_sizes, use_biases, keys)
         ):
             if n == 0:
                 layers.append(
                     Linear(
-                        in_features=layer_in_size,
-                        out_features=layer_out_size,
-                        weight_init=weight_init,
-                        bias_init=bias_init,
-                        use_bias=layer_use_bias,
-                        weight_wrap=NonNegative
-                        if non_decreasing == "non-decreasing"
-                        else None,
+                        sin,
+                        sout,
+                        weight_init,
+                        bias_init,
+                        ub,
+                        NonNegative if non_decreasing_first_layer else None,
                         dtype=dtype,
-                        key=layer_key,
+                        key=key,
                     )
                 )
             else:
                 if use_passthrough:
                     layers.append(
                         InputSplitLinear(
-                            in_features=(layer_in_size, in_size),
-                            out_features=layer_out_size,
-                            weight_inits=weight_init,
-                            bias_init=bias_init,
-                            use_bias=layer_use_bias,
-                            weight_wraps=(NonNegative, None),
+                            (sin, in_size),
+                            sout,
+                            weight_init,
+                            bias_init,
+                            ub,
+                            (NonNegative, None),
                             dtype=dtype,
-                            key=layer_key,
+                            key=key,
                         )
                     )
                 else:
                     layers.append(
                         Linear(
-                            in_features=layer_in_size,
-                            out_features=layer_out_size,
-                            weight_init=weight_init,
-                            bias_init=bias_init,
-                            use_bias=layer_use_bias,
-                            weight_wrap=NonNegative,
+                            sin,
+                            sout,
+                            weight_init,
+                            bias_init,
+                            ub,
+                            NonNegative,
                             dtype=dtype,
-                            key=layer_key,
+                            key=key,
                         )
                     )
 
@@ -161,6 +159,7 @@ class FICNN(eqx.Module, strict=True):
             if i == 0 or not self.use_passthrough:
                 y = layer(y)
             else:
+                assert isinstance(layer, InputSplitLinear)
                 y = layer(y, x)
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
@@ -168,6 +167,7 @@ class FICNN(eqx.Module, strict=True):
             y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
 
         if self.use_passthrough:
+            assert isinstance(self.layers[-1], InputSplitLinear)
             y = self.layers[-1](y, x)
         else:
             y = self.layers[-1](y)

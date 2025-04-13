@@ -1,4 +1,4 @@
-from klax.nn import Linear, InputSplitLinear, MLP, FICNN
+from klax.nn import Linear, InputSplitLinear, MLP, FICNN, ISNN1
 from klax.wrappers import NonNegative, unwrap
 from jax.nn.initializers import uniform, he_normal
 import jax
@@ -180,14 +180,37 @@ def test_ficnn(getkey):
     x = jrandom.normal(getkey(), (2,))
     assert ficnn(x).shape == (3,)
 
-    ficnn = unwrap(FICNN(2, 3, 2 * [8], non_decreasing=True, key=getkey()))
+    ficnn = unwrap(FICNN(2, 3, 2 * [8], non_decreasing_first_layer=True, key=getkey()))
     x = jrandom.normal(getkey(), (2,))
     assert ficnn(x).shape == (3,)
 
     ficnn = unwrap(
-        FICNN(2, 3, 2 * [8], use_passthrough=False, non_decreasing=True, key=getkey())
+        FICNN(
+            2,
+            3,
+            2 * [8],
+            use_passthrough=False,
+            non_decreasing_first_layer=True,
+            key=getkey(),
+        )
     )
     x = jrandom.normal(getkey(), (2,))
     assert ficnn(x).shape == (3,)
 
     # TODO
+
+
+def test_isnn1(getkey):
+    isnn1 = unwrap(ISNN1((4, 1, 3, 2), (4,) * 4, (2,) * 4, key=getkey()))
+    x = jrandom.normal(getkey(), (4,))
+    y = jrandom.normal(getkey(), (1,))
+    t = jrandom.normal(getkey(), (3,))
+    z = jrandom.normal(getkey(), (2,))
+    assert isnn1(x, y, t, z).shape == ()
+
+    # isnn1 = unwrap(ISNN1((4, 0, 0, 0), (4,) * 4, (2,) * 4, key=getkey()))
+    # x = jrandom.normal(getkey(), (4,))
+    # y = jrandom.normal(getkey(), (0,))
+    # t = jrandom.normal(getkey(), (0,))
+    # z = jrandom.normal(getkey(), (0,))
+    # assert isnn1(x, y, t, z).shape == ()
