@@ -7,4 +7,7 @@ from . import (
 )
 from ._training import fit as fit
 
+import paramax as px
+unwrap = px.unwrap  # Alias to paramax unwrap
+
 __all__ = ["dataloader", "fit"]

@@ -135,7 +135,7 @@ class Linear(eqx.Module, strict=True):
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(x) == (1,)
+            assert jnp.shape(x) == (1,), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
             x = jnp.squeeze(x)
         return x
 
@@ -291,6 +291,6 @@ class InputSplitLinear(eqx.Module, strict=True):
         if self.bias is not None:
             y = y + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(y) == (1,)
+            assert jnp.shape(y) == (1,), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
             y = jnp.squeeze(y)
         return y
