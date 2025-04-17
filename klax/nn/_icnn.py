@@ -74,7 +74,7 @@ class FICNN(eqx.Module, strict=True):
                 Defaults to zeros.
             activation: The activation function of each hidden layer. To ensure 
                 convexity this function must be convex and non-decreasing. 
-                Defaults to jax.nn.softplus.
+                Defaults to `jax.nn.softplus`.
             final_activation: The activation function after the output layer. To ensure 
                 convexity this function must be convex and non-decreasing. 
                 Defaults to the identity.

@@ -37,7 +37,7 @@ class MLP(eqx.Module, strict=True):
         width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
-        activation: Callable = jax.nn.relu,
+        activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
@@ -57,7 +57,7 @@ class MLP(eqx.Module, strict=True):
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
                 Defaults to zeros.
             activation: The activation function after each hidden layer.
-                (Defaults to ReLU).
+                (Defaults to `jax.nn.softplus`).
             final_activation: The activation function after the output layer.
                 (Defaults to the identity.)
             use_bias: Whether to add on a bias to internal layers.
