@@ -23,7 +23,7 @@ from ._linear import Linear, InputSplitLinear
 
 class FICNN(eqx.Module, strict=True):
     """
-    A [Fully Input Convex Neural Network](https://arxiv.org/abs/1609.07152). 
+    A [Fully Input Convex Neural Network](https://arxiv.org/abs/1609.07152).
     Each element of the output is a convex function of the input.
     """
 
@@ -64,19 +64,19 @@ class FICNN(eqx.Module, strict=True):
             width_sizes: The sizes of each hidden layer in a list.
             use_passthrough: Whether to use passthrough layers. If true, the input
              is passed through to each hidden layer. Defaults to True.
-            non_decreasing: If true, the output is element-wise non-decreasing 
-                in each input. This is useful if the input `x` is a convex function 
-                of some other quantity `z`. If the FICNN `f(x(z))` is non-decreasing 
+            non_decreasing: If true, the output is element-wise non-decreasing
+                in each input. This is useful if the input `x` is a convex function
+                of some other quantity `z`. If the FICNN `f(x(z))` is non-decreasing
                 then f preserves the convexity with respect to `z`. Defaults to False.
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
                 Defaults to he_normal().
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
                 Defaults to zeros.
-            activation: The activation function of each hidden layer. To ensure 
-                convexity this function must be convex and non-decreasing. 
+            activation: The activation function of each hidden layer. To ensure
+                convexity this function must be convex and non-decreasing.
                 Defaults to `jax.nn.softplus`.
-            final_activation: The activation function after the output layer. To ensure 
-                convexity this function must be convex and non-decreasing. 
+            final_activation: The activation function after the output layer. To ensure
+                convexity this function must be convex and non-decreasing.
                 Defaults to the identity.
             use_bias: Whether to add on a bias in the hidden layers. Defaults to True.
             use_final_bias: Whether to add on a bias to the final layer. Defaults to True.
@@ -88,7 +88,7 @@ class FICNN(eqx.Module, strict=True):
         """
 
         # What's up with this? Why not let the user define a final activation?
-        # def final_activation(x):  
+        # def final_activation(x):
         #     return x
 
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -133,7 +133,9 @@ class FICNN(eqx.Module, strict=True):
                             weight_init,
                             bias_init,
                             ub,
-                            (NonNegative, NonNegative) if non_decreasing else (NonNegative, None),
+                            (NonNegative, NonNegative)
+                            if non_decreasing
+                            else (NonNegative, None),
                             dtype=dtype,
                             key=key,
                         )
@@ -182,16 +184,13 @@ class FICNN(eqx.Module, strict=True):
 
         y = self.layers[0](x)
 
-        for i, (layer, activation) in enumerate(
-            zip(self.layers[1:], self.activations)
-        ):
+        for i, (layer, activation) in enumerate(zip(self.layers[1:], self.activations)):
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
             y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
 
             if self.use_passthrough:
-                assert isinstance(layer, InputSplitLinear)
                 y = layer(y, x)
             else:
                 y = layer(y)

@@ -190,7 +190,7 @@ def test_ficnn(getkey):
                 key=getkey(),
             )
         )
-        assert ficnn(x[0]).shape == ()
+        assert ficnn(x[0]).shape == (), "Unexpected output shape"
         if non_decreasing:
             ficnn_x  = jax.vmap(jax.grad(ficnn))
             assert jnp.all(ficnn_x(x) >= 0), "FICNN(..., non_decreasing=True) is not non-decreasing."
