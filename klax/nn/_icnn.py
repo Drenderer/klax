@@ -12,7 +12,6 @@ from typing import (
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
@@ -23,10 +22,10 @@ from ._linear import Linear, InputSplitLinear
 
 
 class FICNN(eqx.Module, strict=True):
-    """A fully input convex neural network.
-
-    It is convex in its first argument and arbitrary
-    in any following argument."""
+    """
+    A [Fully Input Convex Neural Network](https://arxiv.org/abs/1609.07152). 
+    Each element of the output is a convex function of the input.
+    """
 
     layers: tuple[Linear | InputSplitLinear, ...]
     activations: tuple[Callable, ...]
@@ -34,7 +33,7 @@ class FICNN(eqx.Module, strict=True):
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
-    non_decreasing_first_layer: bool = eqx.field(static=True)
+    non_decreasing: bool = eqx.field(static=True)
     in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
@@ -45,10 +44,11 @@ class FICNN(eqx.Module, strict=True):
         out_size: Union[int, Literal["scalar"]],
         width_sizes: Sequence[int],
         use_passthrough: bool = True,
-        non_decreasing_first_layer: bool = True,
+        non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
+        final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
         dtype=None,
@@ -56,11 +56,40 @@ class FICNN(eqx.Module, strict=True):
         key: PRNGKeyArray,
     ):
         """
-        TODO
+        Args:
+            in_size: The input size. The input to the module should be a vector
+                of shape `(in_features,)`.
+            out_size: The output size. The output from the module will be a
+                vector of shape `(out_features,)`.
+            width_sizes: The sizes of each hidden layer in a list.
+            use_passthrough: Whether to use passthrough layers. If true, the input
+             is passed through to each hidden layer. Defaults to True.
+            non_decreasing: If true, the output is element-wise non-decreasing 
+                in each input. This is useful if the input `x` is a convex function 
+                of some other quantity `z`. If the FICNN `f(x(z))` is non-decreasing 
+                then f preserves the convexity with respect to `z`. Defaults to False.
+            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+                Defaults to he_normal().
+            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+                Defaults to zeros.
+            activation: The activation function of each hidden layer. To ensure 
+                convexity this function must be convex and non-decreasing. 
+                Defaults to jax.nn.softplus.
+            final_activation: The activation function after the output layer. To ensure 
+                convexity this function must be convex and non-decreasing. 
+                Defaults to the identity.
+            use_bias: Whether to add on a bias in the hidden layers. Defaults to True.
+            use_final_bias: Whether to add on a bias to the final layer. Defaults to True.
+            dtype: The dtype to use for all the weights and biases in this MLP.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+                initialisation. (Keyword only argument.)
         """
 
-        def final_activation(x):
-            return x
+        # What's up with this? Why not let the user define a final activation?
+        # def final_activation(x):  
+        #     return x
 
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
@@ -68,11 +97,10 @@ class FICNN(eqx.Module, strict=True):
         self.in_size = in_size
         self.out_size = out_size
         self.width_sizes = width_sizes
-        # self.variant = variant
         self.use_bias = use_bias
         self.use_final_bias = use_final_bias
         self.use_passthrough = use_passthrough
-        self.non_decreasing_first_layer = non_decreasing_first_layer
+        self.non_decreasing = non_decreasing
 
         in_sizes = (in_size,) + width_sizes
         out_sizes = width_sizes + (out_size,)
@@ -91,7 +119,7 @@ class FICNN(eqx.Module, strict=True):
                         weight_init,
                         bias_init,
                         ub,
-                        NonNegative if non_decreasing_first_layer else None,
+                        NonNegative if non_decreasing else None,
                         dtype=dtype,
                         key=key,
                     )
@@ -105,7 +133,7 @@ class FICNN(eqx.Module, strict=True):
                             weight_init,
                             bias_init,
                             ub,
-                            (NonNegative, None),
+                            (NonNegative, NonNegative) if non_decreasing else (NonNegative, None),
                             dtype=dtype,
                             key=key,
                         )
@@ -151,26 +179,22 @@ class FICNN(eqx.Module, strict=True):
             A JAX array with shape `(out_size,)`. (Or shape `()` if
             `out_size="scalar"`.)
         """
-        y = jnp.copy(x)
+
+        y = self.layers[0](x)
 
         for i, (layer, activation) in enumerate(
-            zip(self.layers[:-1], self.activations)
+            zip(self.layers[1:], self.activations)
         ):
-            if i == 0 or not self.use_passthrough:
-                y = layer(y)
-            else:
-                assert isinstance(layer, InputSplitLinear)
-                y = layer(y, x)
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
             y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
 
-        if self.use_passthrough:
-            assert isinstance(self.layers[-1], InputSplitLinear)
-            y = self.layers[-1](y, x)
-        else:
-            y = self.layers[-1](y)
+            if self.use_passthrough:
+                assert isinstance(layer, InputSplitLinear)
+                y = layer(y, x)
+            else:
+                y = layer(y)
 
         if self.out_size == "scalar":
             y = self.final_activation(y)

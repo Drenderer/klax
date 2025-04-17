@@ -115,12 +115,13 @@ def test_is_linear(getkey):
     assert isinstance(is_linear.weights[1], jax.Array)
 
     # Data types
-    is_linear = InputSplitLinear(
-        (2, 3), "scalar", uniform(), key=getkey(), dtype=jnp.float16
-    )
-    y = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
-    z = jrandom.normal(getkey(), (3,), dtype=jnp.float16)
-    assert is_linear(y, z).dtype == jnp.float16
+    for dtype in [jnp.float16, jnp.float32, jnp.complex64]:
+        is_linear = InputSplitLinear(
+            (2, 3), "scalar", he_normal(), key=getkey(), dtype=dtype
+        )
+        y = jrandom.normal(getkey(), (2,), dtype=dtype)
+        z = jrandom.normal(getkey(), (3,), dtype=dtype)
+        assert is_linear(y, z).dtype == dtype
 
 
 def test_mlp(getkey):
@@ -172,32 +173,29 @@ def test_mlp(getkey):
 
 
 def test_ficnn(getkey):
-    ficnn = unwrap(FICNN(2, 3, 2 * [8], key=getkey()))
-    x = jrandom.normal(getkey(), (2,))
-    assert ficnn(x).shape == (3,)
-
-    ficnn = unwrap(FICNN(2, 3, 2 * [8], use_passthrough=False, key=getkey()))
-    x = jrandom.normal(getkey(), (2,))
-    assert ficnn(x).shape == (3,)
-
-    ficnn = unwrap(FICNN(2, 3, 2 * [8], non_decreasing_first_layer=True, key=getkey()))
-    x = jrandom.normal(getkey(), (2,))
-    assert ficnn(x).shape == (3,)
-
-    ficnn = unwrap(
-        FICNN(
-            2,
-            3,
-            2 * [8],
-            use_passthrough=False,
-            non_decreasing_first_layer=True,
-            key=getkey(),
+    x = jrandom.normal(getkey(), (100, 2))  # Sample 100 random evaluation points
+    for use_passthrough, non_decreasing in [
+        (False, False),
+        (True, False),
+        (False, True),
+        (True, True),
+    ]:
+        ficnn = unwrap(
+            FICNN(
+                2,
+                "scalar",
+                1 * [8],
+                use_passthrough=use_passthrough,
+                non_decreasing=non_decreasing,
+                key=getkey(),
+            )
         )
-    )
-    x = jrandom.normal(getkey(), (2,))
-    assert ficnn(x).shape == (3,)
-
-    # TODO
+        assert ficnn(x[0]).shape == ()
+        if non_decreasing:
+            ficnn_x  = jax.vmap(jax.grad(ficnn))
+            assert jnp.all(ficnn_x(x) >= 0), "FICNN(..., non_decreasing=True) is not non-decreasing."
+        ficnn_xx = jax.vmap(jax.hessian(ficnn))
+        assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), "FICNN(...) is not convex."
 
 
 def test_isnn1(getkey):

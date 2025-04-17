@@ -48,12 +48,14 @@ class MLP(eqx.Module, strict=True):
         """
         Args:
             in_size: The input size. The input to the module should be a vector
-                of shape `(in_features,)`
+                of shape `(in_features,)`.
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+                Defaults to he_normal().
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+                Defaults to zeros.
             activation: The activation function after each hidden layer.
                 (Defaults to ReLU).
             final_activation: The activation function after the output layer.
