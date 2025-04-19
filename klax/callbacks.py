@@ -183,7 +183,7 @@ class HistoryCallback(Callback):
                 dict(label="Validation loss", ls="--", c="red") | val_loss_options
             )
             ax.plot(self.steps, self.loss, **loss_options)
-            if self.val_loss is not None:
+            if any(x is not None for x in self.val_loss):
                 ax.plot(self.steps, self.val_loss, **val_loss_options)
 
         except ImportError as e:
