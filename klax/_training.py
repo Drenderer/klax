@@ -20,7 +20,7 @@ from .datahandler import dataloader, Dataloader, broadcast_and_get_batch_size
 from .losses import Loss, mse
 
 
-def fit[T: eqx.Module](
+def fit[T: eqx.Module, H: Callback](
     model: T,
     data: PyTree[Any],
     *,
@@ -31,10 +31,10 @@ def fit[T: eqx.Module](
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     dataloader: Dataloader = dataloader,
-    history: Optional[HistoryCallback] = None,
+    history: Optional[H] = None,
     callbacks: Optional[Iterable[Callback]] = None,
     key: PRNGKeyArray,
-) -> tuple[T, HistoryCallback]:
+) -> tuple[T, HistoryCallback|H]:
     """Trains a model using an optimizer from optax.
 
     Args:
