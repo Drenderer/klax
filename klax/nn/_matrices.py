@@ -6,7 +6,7 @@ A: R^n |-> R^(N, M, ...)
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, he_normal, zeros
+from jax.nn.initializers import Initializer, he_normal, zeros, normal
 
 from typing import Literal, Sequence, Any, Callable, Optional
 from jaxtyping import PRNGKeyArray, Array
@@ -45,7 +45,7 @@ class Matrix(eqx.Module):
         """
         Args:
             in_size: The input size. The input to the module should be a vector
-                of shape `(in_features,)`
+                of shape `(in_size,)`
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
@@ -75,7 +75,13 @@ class Matrix(eqx.Module):
             value. In this case the input to the module should be of shape `()`.
         """
         shape = in_size if shape is None else shape
-        width_sizes = [in_size,] if width_sizes is None else width_sizes
+        width_sizes = (
+            [
+                in_size,
+            ]
+            if width_sizes is None
+            else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else 2 * (shape,)
         out_size = int(jnp.prod(jnp.array(shape)))
 
@@ -94,7 +100,7 @@ class Matrix(eqx.Module):
             key=key,
         )
 
-    def __call__(self, x: Array):
+    def __call__(self, x: Array) -> Array:
         elements = self.func(x)
         return jnp.reshape(elements, self.shape)
 
@@ -132,7 +138,7 @@ class ConstantMatrix(eqx.Module):
         self.shape = shape if isinstance(shape, tuple) else 2 * (shape,)
         self.array = init(key, self.shape, dtype)
 
-    def __call__(self, x: Array):
+    def __call__(self, x: Array) -> Array:
         return self.array
 
 
@@ -163,7 +169,7 @@ class SkewSymmetricMatrix(eqx.Module):
         """
         Args:
             in_size: The input size. The input to the module should be a vector
-                of shape `(in_features,)`
+                of shape `(in_size,)`
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
@@ -193,14 +199,21 @@ class SkewSymmetricMatrix(eqx.Module):
             value. In this case the input to the module should be of shape `()`.
         """
         shape = in_size if shape is None else shape
-        width_sizes = [in_size,] if width_sizes is None else width_sizes
+        width_sizes = (
+            [
+                in_size,
+            ]
+            if width_sizes is None
+            else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else 2 * (shape,)
         if shape[-1] != shape[-2]:
-            raise ValueError("The last two dimensions in shape must be equal for skew-symmetric matrices.")
-        
-        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
+            raise ValueError(
+                "The last two dimensions in shape must be equal for skew-symmetric matrices."
+            )
 
         # Construct the tensor
+        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
         n = shape[-1]
         num_elements = num_batches * n * (n - 1) // 2
         tensor = jnp.zeros((num_batches, n, n, num_elements), dtype="int32")
@@ -228,14 +241,14 @@ class SkewSymmetricMatrix(eqx.Module):
             key=key,
         )
 
-    def __call__(self, x: Array):
+    def __call__(self, x: Array) -> Array:
         elements = self.func(x)
         return jax.lax.stop_gradient(self._tensor) @ elements
 
 
 class ConstantSkewSymmetricMatrix(eqx.Module):
     """*Constant skew-symmetric matrix.*
-    Wrapper around a constant skew-symmetry-constrained array with the 
+    Wrapper around a constant skew-symmetry-constrained array with the
     matrix-valued funciton interfrace.
     """
 
@@ -267,5 +280,184 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         array = init(key, self.shape, dtype)
         self.array = SkewSymmetric(array)
 
-    def __call__(self, x: Array):
+    def __call__(self, x: Array) -> Array:
         return self.array
+
+
+class SPSDMatrix(eqx.Module):
+    """*Symmetric positive semi-definite matrix-valued function.*
+    Wrapper around a `MLP` that maps the input to a vector of elements that
+    are transformed to a symmetric postive semi-definite matrix
+    via the Cholesky decomposition."""
+
+    func: MLP
+    shape: AtLeast2DTuple[int]
+    _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of lower triangular matrices
+    _diag_mask: Array  # Not learnable mask on the L-matrix elements vector, marking which elements are on the diagonal
+
+    def __init__(
+        self,
+        in_size: int | Literal["scalar"],
+        shape: Optional[int | AtLeast2DTuple[int]] = None,
+        width_sizes: Optional[Sequence[int]] = None,
+        weight_init: Initializer = he_normal(),
+        bias_init: Initializer = zeros,
+        activation: Callable = jax.nn.softplus,
+        final_activation: Callable = lambda x: x,
+        use_bias: bool = True,
+        use_final_bias: bool = True,
+        dtype: Any | None = None,
+        *,
+        key: PRNGKeyArray,
+    ):
+        """
+        *Symmetric positive semi-definite matrix-valued function.*
+        Args:
+            in_size: The input size. The input to the module should be a vector
+                of shape `(in_size,)`
+            shape: The matrix shape. The output from the module will be a
+                Array with sthe specified `shape`. For square matrices a single
+                integer N can be used as a shorthand for (N, N).
+                (Defaults to `(in_size, in_size)`)
+            width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
+                (Defaults to `[in_size,]`)
+            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+                (Defaults to `he_normal()`)
+            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+                (Defaults to `zeros`)
+            activation: The activation function after each hidden layer.
+                (Defaults to `softplus`).
+            final_activation: The activation function after the output layer.
+                (Defaults to the identity.)
+            use_bias: Whether to add on a bias to internal layers.
+                (Defaults to `True`.)
+            use_final_bias: Whether to add on a bias to the final layer.
+                (Defaults to `True`.)
+            dtype: The dtype to use for all the weights and biases in this MLP.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+                initialisation. (Keyword only argument.)
+
+        Note:
+            Note that `in_size` also supports the string `"scalar"` as a special
+            value. In this case the input to the module should be of shape `()`.
+        """
+        shape = in_size if shape is None else shape
+        width_sizes = (
+            [
+                in_size,
+            ]
+            if width_sizes is None
+            else width_sizes
+        )
+        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        if shape[-1] != shape[-2]:
+            raise ValueError(
+                "The last two dimensions in shape must be equal for symmetric matrices."
+            )
+
+        # Construct the tensor
+        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
+        n = shape[-1]
+        num_elements = num_batches * n * (n + 1) // 2
+        tensor = jnp.zeros((num_batches, n, n, num_elements), dtype="int32")
+        diag_mask = jnp.full((num_elements,), False, dtype="bool")
+        e: int = 0
+        for b in range(num_batches):
+            for i, j in zip(*jnp.tril_indices(n)):
+                tensor = tensor.at[b, i, j, e].set(1)
+                if i == j:
+                    diag_mask = diag_mask.at[e].set(True)
+                e += 1
+        tensor = jnp.reshape(tensor, shape + (num_elements,))
+
+        self._tensor = tensor
+        self._diag_mask = diag_mask
+        self.shape = shape
+        self.func = MLP(
+            in_size,
+            num_elements,
+            width_sizes,
+            weight_init,
+            bias_init,
+            activation,
+            final_activation,
+            use_bias,
+            use_final_bias,
+            dtype,
+            key=key,
+        )
+
+    def __call__(self, x: Array) -> Array:
+        elements = self.func(x)
+        elements = jnp.where(
+            jax.lax.stop_gradient(self._diag_mask), jnp.abs(elements), elements
+        )
+        L = jax.lax.stop_gradient(self._tensor) @ elements
+        return L @ jnp.conjugate(L.mT)
+
+
+class ConstantSPSDMatrix(eqx.Module):
+    """*Constant symmetric positive semi-definite matrix-valued function.*
+    Wrapper around a constant symmetric postive semi-definite matrix with the
+    matrix-valued funciton interfrace.
+    """
+
+    elements: Array
+    shape: AtLeast2DTuple[int]
+    _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of lower triangular matrices
+    _diag_mask: Array  # Not learnable mask on the L-matrix elements vector, marking which elements are on the diagonal
+
+    def __init__(
+        self,
+        shape: Optional[int | AtLeast2DTuple[int]] = None,
+        init: Initializer = normal(),
+        dtype: Any | None = None,
+        *,
+        key: PRNGKeyArray,
+    ):
+        """
+        *Constant symmetric positive semi-definite matrix-valued function.*
+        Args:
+            shape: The matrix shape. The output from the module will be a
+                Array with sthe specified `shape`. For square matrices a single
+                integer N can be used as a shorthand for (N, N).
+                (Defaults to `(in_size, in_size)`)
+            init: The element initializer of type `jax.nn.initializers.Initializer`.
+                (Defaults to `normal()`)
+            dtype: The dtype to use for all the weights and biases in this MLP.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+                initialisation. (Keyword only argument.)
+        """
+        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        if shape[-1] != shape[-2]:
+            raise ValueError(
+                "The last two dimensions in shape must be equal for symmetric matrices."
+            )
+
+        # Construct the tensor
+        n = shape[-1]
+        num_elements = n * (n + 1) // 2
+        tensor = jnp.zeros((n, n, num_elements), dtype="int32")
+        diag_mask = jnp.full((num_elements,), False, dtype="bool")
+        for e, (i, j) in enumerate(zip(*jnp.tril_indices(n))):
+            tensor = tensor.at[i, j, e].set(1)
+            if i == j:
+                diag_mask = diag_mask.at[e].set(True)
+
+        self._tensor = tensor
+        self._diag_mask = diag_mask
+        self.shape = shape
+        self.elements = init(key, shape[:-2] + (num_elements,), dtype)
+
+    def __call__(self, x: Array) -> Array:
+        elements = jnp.where(
+            jax.lax.stop_gradient(self._diag_mask),
+            jnp.abs(self.elements),
+            self.elements,
+        )
+        L = jnp.einsum("...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
+        return L @ jnp.conjugate(L.mT)

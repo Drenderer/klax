@@ -4,7 +4,14 @@ import jax.random as jrandom
 import klax
 import paramax as px
 
-from klax.nn import Matrix, ConstantMatrix, SkewSymmetricMatrix, ConstantSkewSymmetricMatrix
+from klax.nn import (
+    Matrix,
+    ConstantMatrix,
+    SkewSymmetricMatrix,
+    ConstantSkewSymmetricMatrix,
+    SPSDMatrix,
+    ConstantSPSDMatrix,
+)
 
 
 def test_linear(getkey, getwrap):
@@ -200,32 +207,55 @@ def test_mlp(getkey):
     assert [mlp.layers[i].in_features for i in range(0, 3)] == [2, 4, 8]
     assert [mlp.layers[i].out_features for i in range(0, 3)] == [4, 8, 3]
 
+
 def test_matrices(getkey):
     x = jrandom.normal(getkey(), (4,))
     m = Matrix(4, key=getkey())
-    assert klax.wrappers.unwrap(m)(x).shape == (4,4)
-    m = Matrix(4, (1,2,3,4), key=getkey())
-    assert klax.wrappers.unwrap(m)(x).shape == (1,2,3,4)
+    assert klax.wrappers.unwrap(m)(x).shape == (4, 4)
+    m = Matrix(4, (1, 2, 3, 4), key=getkey())
+    assert klax.wrappers.unwrap(m)(x).shape == (1, 2, 3, 4)
 
     m = ConstantMatrix(4, key=getkey())
-    assert klax.wrappers.unwrap(m)(x).shape == (4,4)
-    m = ConstantMatrix((1,2,3,4), key=getkey())
-    assert klax.wrappers.unwrap(m)(x).shape == (1,2,3,4)
+    assert klax.wrappers.unwrap(m)(x).shape == (4, 4)
+    m = ConstantMatrix((1, 2, 3, 4), key=getkey())
+    assert klax.wrappers.unwrap(m)(x).shape == (1, 2, 3, 4)
 
     m = SkewSymmetricMatrix(4, key=getkey())
     output = klax.wrappers.unwrap(m)(x)
-    assert output.shape == (4,4)
+    assert output.shape == (4, 4)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
-    m = SkewSymmetricMatrix(4, (1,2,4,4), key=getkey())
+    m = SkewSymmetricMatrix(4, (1, 2, 4, 4), key=getkey())
     output = klax.wrappers.unwrap(m)(x)
-    assert output.shape == (1,2,4,4)
+    assert output.shape == (1, 2, 4, 4)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
 
     m = ConstantSkewSymmetricMatrix(4, key=getkey())
     output = klax.wrappers.unwrap(m)(x)
-    assert output.shape == (4,4)
+    assert output.shape == (4, 4)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
-    m = ConstantSkewSymmetricMatrix((1,2,4,4), key=getkey())
+    m = ConstantSkewSymmetricMatrix((1, 2, 4, 4), key=getkey())
     output = klax.wrappers.unwrap(m)(x)
-    assert output.shape == (1,2,4,4)
+    assert output.shape == (1, 2, 4, 4)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
+
+    m = SPSDMatrix(4, key=getkey())
+    output = klax.wrappers.unwrap(m)(x)
+    assert output.shape == (4, 4)
+    assert jnp.allclose(output, jnp.conjugate(output.mT))
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
+    m = SPSDMatrix(4, (1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
+    output = klax.wrappers.unwrap(m)(x)
+    assert output.shape == (1, 2, 4, 4)
+    assert jnp.allclose(output, jnp.conjugate(output.mT))
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
+
+    m = ConstantSPSDMatrix(4, key=getkey())
+    output = klax.wrappers.unwrap(m)(x)
+    assert output.shape == (4, 4)
+    assert jnp.allclose(output, jnp.conjugate(output.mT))
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
+    m = ConstantSPSDMatrix((1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
+    output = klax.wrappers.unwrap(m)(x)
+    assert output.shape == (1, 2, 4, 4)
+    assert jnp.allclose(output, jnp.conjugate(output.mT))
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
