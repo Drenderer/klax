@@ -358,26 +358,22 @@ class SPSDMatrix(eqx.Module):
             )
 
         # Construct the tensor
-        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
         n = shape[-1]
-        num_elements = num_batches * n * (n + 1) // 2
-        tensor = jnp.zeros((num_batches, n, n, num_elements), dtype="int32")
+        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
+        num_elements = n * (n + 1) // 2
+        tensor = jnp.zeros((n, n, num_elements), dtype="int32")
         diag_mask = jnp.full((num_elements,), False, dtype="bool")
-        e: int = 0
-        for b in range(num_batches):
-            for i, j in zip(*jnp.tril_indices(n)):
-                tensor = tensor.at[b, i, j, e].set(1)
-                if i == j:
-                    diag_mask = diag_mask.at[e].set(True)
-                e += 1
-        tensor = jnp.reshape(tensor, shape + (num_elements,))
+        for e, (i, j) in enumerate(zip(*jnp.tril_indices(n))):
+            tensor = tensor.at[i, j, e].set(1)
+            if i == j:
+                diag_mask = diag_mask.at[e].set(True)
 
         self._tensor = tensor
         self._diag_mask = diag_mask
         self.shape = shape
         self.func = MLP(
             in_size,
-            num_elements,
+            num_elements * num_batches,
             width_sizes,
             weight_init,
             bias_init,
@@ -390,11 +386,11 @@ class SPSDMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        elements = self.func(x)
+        elements = self.func(x).reshape(self.shape[:-2] + (-1,))
         elements = jnp.where(
             jax.lax.stop_gradient(self._diag_mask), jnp.abs(elements), elements
         )
-        L = jax.lax.stop_gradient(self._tensor) @ elements
+        L = jnp.einsum("...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
         return L @ jnp.conjugate(L.mT)
 
 
