@@ -74,10 +74,11 @@ class Matrix(eqx.Module):
             Note that `in_size` also supports the string `"scalar"` as a special
             value. In this case the input to the module should be of shape `()`.
         """
-        shape = in_size if shape is None else shape
+        in_size_ = 1 if in_size == "scalar" else in_size
+        shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                in_size,
+                in_size_,
             ]
             if width_sizes is None
             else width_sizes
@@ -198,10 +199,11 @@ class SkewSymmetricMatrix(eqx.Module):
             Note that `in_size` also supports the string `"scalar"` as a special
             value. In this case the input to the module should be of shape `()`.
         """
-        shape = in_size if shape is None else shape
+        in_size_ = 1 if in_size == "scalar" else in_size
+        shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                in_size,
+                in_size_,
             ]
             if width_sizes is None
             else width_sizes
@@ -213,23 +215,19 @@ class SkewSymmetricMatrix(eqx.Module):
             )
 
         # Construct the tensor
-        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
         n = shape[-1]
-        num_elements = num_batches * n * (n - 1) // 2
-        tensor = jnp.zeros((num_batches, n, n, num_elements), dtype="int32")
-        e: int = 0
-        for b in range(num_batches):
-            for i, j in zip(*jnp.tril_indices(n, k=-1)):
-                tensor = tensor.at[b, i, j, e].set(1)
-                tensor = tensor.at[b, j, i, e].set(-1)
-                e += 1
-        tensor = jnp.reshape(tensor, shape + (num_elements,))
+        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
+        num_elements = n * (n + 1) // 2
+        tensor = jnp.zeros((n, n, num_elements), dtype="int32")
+        for e, (i, j) in enumerate(zip(*jnp.tril_indices(n, k=-1))):
+            tensor = tensor.at[i, j, e].set(1)
+            tensor = tensor.at[j, i, e].set(-1)
 
         self._tensor = tensor
         self.shape = shape
         self.func = MLP(
             in_size,
-            num_elements,
+            num_elements * num_batches,
             width_sizes,
             weight_init,
             bias_init,
@@ -242,8 +240,10 @@ class SkewSymmetricMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        elements = self.func(x)
-        return jax.lax.stop_gradient(self._tensor) @ elements
+        elements = self.func(x).reshape(*self.shape[:-2], -1)
+        return jnp.einsum(
+            "...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
+        )
 
 
 class ConstantSkewSymmetricMatrix(eqx.Module):
@@ -343,10 +343,11 @@ class SPSDMatrix(eqx.Module):
             Note that `in_size` also supports the string `"scalar"` as a special
             value. In this case the input to the module should be of shape `()`.
         """
-        shape = in_size if shape is None else shape
+        in_size_ = 1 if in_size == "scalar" else in_size
+        shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                in_size,
+                in_size_,
             ]
             if width_sizes is None
             else width_sizes
@@ -386,11 +387,13 @@ class SPSDMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        elements = self.func(x).reshape(self.shape[:-2] + (-1,))
+        elements = self.func(x).reshape(*self.shape[:-2], -1)
         elements = jnp.where(
             jax.lax.stop_gradient(self._diag_mask), jnp.abs(elements), elements
         )
-        L = jnp.einsum("...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
+        L = jnp.einsum(
+            "...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
+        )
         return L @ jnp.conjugate(L.mT)
 
 
@@ -455,5 +458,7 @@ class ConstantSPSDMatrix(eqx.Module):
             jnp.abs(self.elements),
             self.elements,
         )
-        L = jnp.einsum("...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
+        L = jnp.einsum(
+            "...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
+        )
         return L @ jnp.conjugate(L.mT)
