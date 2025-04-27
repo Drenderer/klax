@@ -291,15 +291,11 @@ class SPDMatrix(eqx.Module):
     Wrapper around a `MLP` that maps the input to a symmetric 
     positive definite matrix.
     The output vector `v` of the MLP is mapped to 
-    a lower triangular matrix `L` via a linear transformation
-    `L=Pv`. The module's output is then computed via `A=L@L*`.
-    A lower triangular matrix is used to reduce the output dimension
-    of the MLP, without restricting the space of posible `A`s."""
+    a matrix `B`. The module's output is then computed via `A=B@B*`."""
 
     func: MLP
     shape: AtLeast2DTuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
-    _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of lower triangular matrices
 
     def __init__(
         self,
@@ -370,20 +366,12 @@ class SPDMatrix(eqx.Module):
                 "The last two dimensions in shape must be equal for symmetric matrices."
             )
 
-        # Construct the tensor
-        n = shape[-1]
-        num_batches = int(jnp.prod(jnp.array(shape[:-2])))
-        num_elements = n * (n + 1) // 2
-        tensor = jnp.zeros((n, n, num_elements), dtype="int32")
-        for e, (i, j) in enumerate(zip(*jnp.tril_indices(n))):
-            tensor = tensor.at[i, j, e].set(1)
-
-        self._tensor = tensor
+        num_elements = int(jnp.prod(jnp.array(shape)))
         self.shape = shape
         self.epsilon = epsilon
         self.func = MLP(
             in_size,
-            num_elements * num_batches,
+            num_elements,
             width_sizes,
             weight_init,
             bias_init,
@@ -396,8 +384,7 @@ class SPDMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        elements = self.func(x).reshape(*self.shape[:-2], -1)
-        L = jnp.einsum("ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
+        L = self.func(x).reshape(self.shape)
         A = L @ jnp.conjugate(L.mT)
         identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
         return A + self.epsilon * identity
