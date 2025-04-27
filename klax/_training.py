@@ -52,7 +52,8 @@ def fit[T: eqx.Module](
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
         steps: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
-        loss_fn: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
+        loss_fn: The loss function with call signature 
+            `(model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any]) -> float`.
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
