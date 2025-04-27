@@ -1,6 +1,6 @@
 """
-Implementation on matrix-valued functions with constraints:
-A: R^n |-> R^(N, M, ...)
+Implementation on (constrained) matrix-valued functions:
+A: R^n |-> R^(..., N, M)
 """
 
 import equinox as eqx
@@ -51,7 +51,8 @@ class Matrix(eqx.Module):
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[in_size,]`)
+                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or 
+                equal to `in_size`.)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
                 (Defaults to `he_normal()`)
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
@@ -78,7 +79,7 @@ class Matrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                in_size_,
+                int(2**(jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
@@ -176,7 +177,8 @@ class SkewSymmetricMatrix(eqx.Module):
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[in_size,]`)
+                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or 
+                equal to `in_size`.)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
                 (Defaults to `he_normal()`)
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
@@ -203,7 +205,7 @@ class SkewSymmetricMatrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                in_size_,
+                int(2**(jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
@@ -325,7 +327,8 @@ class SPDMatrix(eqx.Module):
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[in_size,]`)
+                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or 
+                equal to `in_size`.)
             epsilon: Small value that is added to the diagonal of the output matrix
                 to ensure positive definiteness. If only positive semi-definiteness is
                 required set `epsilon = 0.`
@@ -356,7 +359,7 @@ class SPDMatrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                in_size_,
+                int(2**(jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
