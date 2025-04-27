@@ -9,8 +9,8 @@ from klax.nn import (
     ConstantMatrix,
     SkewSymmetricMatrix,
     ConstantSkewSymmetricMatrix,
-    SPSDMatrix,
-    ConstantSPSDMatrix,
+    SPDMatrix,
+    ConstantSPDMatrix,
 )
 
 
@@ -244,26 +244,26 @@ def test_matrices(getkey):
     assert output.shape == (1, 2, 4, 4)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
 
-    m = SPSDMatrix(4, key=getkey())
+    m = SPDMatrix(4, key=getkey())
     output = klax.wrappers.unwrap(m)(x)
     assert output.shape == (4, 4)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
     assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
-    m = SPSDMatrix(4, (1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
+    m = SPDMatrix(4, (1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
     output = klax.wrappers.unwrap(m)(x)
     assert output.shape == (1, 2, 4, 4)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
     assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
-    m = SPSDMatrix('scalar', (5, 3, 3), key=getkey())
+    m = SPDMatrix('scalar', (5, 3, 3), key=getkey())
     assert klax.wrappers.unwrap(m)(0.).shape == (5, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
 
-    m = ConstantSPSDMatrix(4, key=getkey())
+    m = ConstantSPDMatrix(4, key=getkey())
     output = klax.wrappers.unwrap(m)(x)
     assert output.shape == (4, 4)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
     assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
-    m = ConstantSPSDMatrix((1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
+    m = ConstantSPDMatrix((1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
     output = klax.wrappers.unwrap(m)(x)
     assert output.shape == (1, 2, 4, 4)
     assert jnp.allclose(output, jnp.conjugate(output.mT))

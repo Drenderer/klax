@@ -5,8 +5,8 @@ from ._matrices import (
     ConstantMatrix as ConstantMatrix,
     SkewSymmetricMatrix as SkewSymmetricMatrix,
     ConstantSkewSymmetricMatrix as ConstantSkewSymmetricMatrix,
-    SPSDMatrix as SPSDMatrix,
-    ConstantSPSDMatrix as ConstantSPSDMatrix,
+    SPDMatrix as SPDMatrix,
+    ConstantSPDMatrix as ConstantSPDMatrix,
 )
 
 __all__ = [
@@ -17,6 +17,6 @@ __all__ = [
     "ConstantMatrix",
     "SkewSymmetricMatrix",
     "ConstantSkewSymmetricMatrix",
-    "SPSDMatrix",
-    "ConstantSPSDMatrix"
+    "SPDMatrix",
+    "ConstantSPDMatrix"
 ]

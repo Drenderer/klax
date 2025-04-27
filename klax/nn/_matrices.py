@@ -6,7 +6,7 @@ A: R^n |-> R^(N, M, ...)
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, he_normal, zeros, normal
+from jax.nn.initializers import Initializer, he_normal, zeros, variance_scaling
 
 from typing import Literal, Sequence, Any, Callable, Optional
 from jaxtyping import PRNGKeyArray, Array
@@ -25,7 +25,7 @@ class Matrix(eqx.Module):
     """
 
     func: MLP
-    shape: AtLeast2DTuple[int]
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -113,7 +113,7 @@ class ConstantMatrix(eqx.Module):
     """
 
     array: Array
-    shape: AtLeast2DTuple[int]
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -149,7 +149,7 @@ class SkewSymmetricMatrix(eqx.Module):
     are transformed to a skew-symmetric matrix."""
 
     func: MLP
-    shape: AtLeast2DTuple[int]
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
     _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of skew-symmetric matrices
 
     def __init__(
@@ -253,7 +253,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
     """
 
     array: Array
-    shape: AtLeast2DTuple[int]
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -284,21 +284,26 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         return self.array
 
 
-class SPSDMatrix(eqx.Module):
-    """*Symmetric positive semi-definite matrix-valued function.*
-    Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a symmetric postive semi-definite matrix
-    via the Cholesky decomposition."""
+class SPDMatrix(eqx.Module):
+    """*Symmetric positive definite matrix-valued function.*
+    Wrapper around a `MLP` that maps the input to a symmetric 
+    positive definite matrix.
+    The output vector `v` of the MLP is mapped to 
+    a lower triangular matrix `L` via a linear transformation
+    `L=Pv`. The module's output is then computed via `A=L@L*`.
+    A lower triangular matrix is used to reduce the output dimension
+    of the MLP, without restricting the space of posible `A`s."""
 
     func: MLP
-    shape: AtLeast2DTuple[int]
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
+    epsilon: float = eqx.field(static=True)
     _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of lower triangular matrices
-    _diag_mask: Array  # Not learnable mask on the L-matrix elements vector, marking which elements are on the diagonal
 
     def __init__(
         self,
         in_size: int | Literal["scalar"],
         shape: Optional[int | AtLeast2DTuple[int]] = None,
+        epsilon: float = 1e-6,
         width_sizes: Optional[Sequence[int]] = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
@@ -311,7 +316,7 @@ class SPSDMatrix(eqx.Module):
         key: PRNGKeyArray,
     ):
         """
-        *Symmetric positive semi-definite matrix-valued function.*
+        *Symmetric positive definite matrix-valued function.*
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
@@ -321,12 +326,16 @@ class SPSDMatrix(eqx.Module):
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
                 (Defaults to `[in_size,]`)
+            epsilon: Small value that is added to the diagonal of the output matrix
+                to ensure positive definiteness. If only positive semi-definiteness is
+                required set `epsilon = 0.`
+                (Defaults to `1e-6`)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
                 (Defaults to `he_normal()`)
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
                 (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
-                (Defaults to `softplus`).
+                (Defaults to `softplus`)
             final_activation: The activation function after the output layer.
                 (Defaults to the identity.)
             use_bias: Whether to add on a bias to internal layers.
@@ -363,15 +372,12 @@ class SPSDMatrix(eqx.Module):
         num_batches = int(jnp.prod(jnp.array(shape[:-2])))
         num_elements = n * (n + 1) // 2
         tensor = jnp.zeros((n, n, num_elements), dtype="int32")
-        diag_mask = jnp.full((num_elements,), False, dtype="bool")
         for e, (i, j) in enumerate(zip(*jnp.tril_indices(n))):
             tensor = tensor.at[i, j, e].set(1)
-            if i == j:
-                diag_mask = diag_mask.at[e].set(True)
 
         self._tensor = tensor
-        self._diag_mask = diag_mask
         self.shape = shape
+        self.epsilon = epsilon
         self.func = MLP(
             in_size,
             num_elements * num_batches,
@@ -388,30 +394,29 @@ class SPSDMatrix(eqx.Module):
 
     def __call__(self, x: Array) -> Array:
         elements = self.func(x).reshape(*self.shape[:-2], -1)
-        elements = jnp.where(
-            jax.lax.stop_gradient(self._diag_mask), jnp.abs(elements), elements
-        )
-        L = jnp.einsum(
-            "...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
-        )
-        return L @ jnp.conjugate(L.mT)
+        L = jnp.einsum("ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
+        A = L @ jnp.conjugate(L.mT)
+        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
+        return A + self.epsilon * identity
 
 
-class ConstantSPSDMatrix(eqx.Module):
-    """*Constant symmetric positive semi-definite matrix-valued function.*
+class ConstantSPDMatrix(eqx.Module):
+    """*Constant symmetric positive definite matrix-valued function.*
     Wrapper around a constant symmetric postive semi-definite matrix with the
     matrix-valued funciton interfrace.
     """
 
-    elements: Array
-    shape: AtLeast2DTuple[int]
-    _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of lower triangular matrices
-    _diag_mask: Array  # Not learnable mask on the L-matrix elements vector, marking which elements are on the diagonal
+    B_matrix: Array
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
+    epsilon: float = eqx.field(static=True)
 
     def __init__(
         self,
         shape: Optional[int | AtLeast2DTuple[int]] = None,
-        init: Initializer = normal(),
+        epsilon: float = 1e-6,
+        init: Initializer = variance_scaling(
+            scale=1, mode="fan_avg", distribution="normal"
+        ),
         dtype: Any | None = None,
         *,
         key: PRNGKeyArray,
@@ -423,7 +428,12 @@ class ConstantSPSDMatrix(eqx.Module):
                 Array with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
-            init: The element initializer of type `jax.nn.initializers.Initializer`.
+            epsilon: Small value that is added to the diagonal of the output matrix
+                to ensure positive definiteness. If only positive semi-definiteness is
+                required set `epsilon = 0.`
+                (Defaults to `1e-6`)
+            init: The initializer of type `jax.nn.initializers.Initializer` for the
+                constant matrix `B` that produces the module's output via `A = B@B*`.
                 (Defaults to `normal()`)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
@@ -437,28 +447,11 @@ class ConstantSPSDMatrix(eqx.Module):
                 "The last two dimensions in shape must be equal for symmetric matrices."
             )
 
-        # Construct the tensor
-        n = shape[-1]
-        num_elements = n * (n + 1) // 2
-        tensor = jnp.zeros((n, n, num_elements), dtype="int32")
-        diag_mask = jnp.full((num_elements,), False, dtype="bool")
-        for e, (i, j) in enumerate(zip(*jnp.tril_indices(n))):
-            tensor = tensor.at[i, j, e].set(1)
-            if i == j:
-                diag_mask = diag_mask.at[e].set(True)
-
-        self._tensor = tensor
-        self._diag_mask = diag_mask
         self.shape = shape
-        self.elements = init(key, shape[:-2] + (num_elements,), dtype)
+        self.epsilon = epsilon
+        self.B_matrix = init(key, shape, dtype)
 
     def __call__(self, x: Array) -> Array:
-        elements = jnp.where(
-            jax.lax.stop_gradient(self._diag_mask),
-            jnp.abs(self.elements),
-            self.elements,
-        )
-        L = jnp.einsum(
-            "...ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
-        )
-        return L @ jnp.conjugate(L.mT)
+        A = self.B_matrix @ jnp.conjugate(self.B_matrix.mT)
+        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
+        return A + self.epsilon * identity
