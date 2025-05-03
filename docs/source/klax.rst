@@ -10,7 +10,6 @@ Subpackages
     klax.callbacks
     klax.losses
     klax.nn
-    klax.typing
     klax.wrappers
 
 

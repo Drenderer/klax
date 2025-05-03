@@ -293,7 +293,6 @@ class SPDMatrix(eqx.Module):
         key: PRNGKeyArray,
     ):
         """
-        *Symmetric positive definite matrix-valued function.*
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
@@ -384,7 +383,6 @@ class ConstantSPDMatrix(eqx.Module):
         key: PRNGKeyArray,
     ):
         """
-        *Constant symmetric positive semi-definite matrix-valued function.*
         Args:
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single
