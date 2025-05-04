@@ -215,7 +215,7 @@ def split_data(
         Tuple of `PyTrees`.
     """
 
-    props = jnp.array(proportions, dtype=float).reshape(-1)
+    props = jnp.array(proportions, dtype=float)
     if jnp.any(props < 0.):
         raise ValueError("Proportions must be non-negative.")
     props = props / jnp.sum(props)
