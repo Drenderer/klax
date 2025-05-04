@@ -30,6 +30,7 @@ def fit[T: eqx.Module, H: Callback](
     steps: int = 1000,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
+    init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
     history: Optional[H] = None,
     callbacks: Optional[Iterable[Callback]] = None,
@@ -57,8 +58,12 @@ def fit[T: eqx.Module, H: Callback](
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
+        init_opt_state: The initial state of the optimizer. If `None`, the optimizer is initialized
+            from scratch. By providing a value for `init_opt_state`, the user can resume training from a
+            previous state (e.g., obtained from the `HistoryCallback.last_opt_state`). 
+            (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
-            (Defaults to `batch_data`)
+            (Defaults to `batch_data`.)
         History: A callback of type `HistoryCallback` that stores the training metric in every n-th
             load step. By default the logging interval is set to 100 steps. To change the logging
             increment, the user may pass a modified `HistoryCallback` object to this argument, e.g.,
@@ -125,9 +130,12 @@ def fit[T: eqx.Module, H: Callback](
 
         return flat_model, flat_opt_state
 
-    # Initialize the optimizer and 'tell it' to optimize with respect to all
-    # inexact arrays in the model
-    opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    if init_opt_state is None:
+        # Initialize the optimizer and 'tell it' to optimize with respect to all
+        # inexact arrays in the model. This is done by passing the model to the optimizer.
+        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    else:
+        opt_state = init_opt_state
 
     # Use the unflatten trick to speed up training,
     # see https://docs.kidger.site/equinox/tricks/

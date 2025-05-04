@@ -178,6 +178,14 @@ class HistoryCallback(Callback):
                     title="Training History",
                 )
                 ax.grid(True)
+
+            # Rename the color option to "c", if it exists. Otherwise "c" and "color" are
+            # both passed to plot, which causes an error.
+            if "color" in loss_options:
+                loss_options["c"] = loss_options.pop("color")
+            if "color" in val_loss_options:
+                val_loss_options["c"] = val_loss_options.pop("color")
+
             loss_options = dict(label="Loss", ls="-", c="black") | loss_options
             val_loss_options = (
                 dict(label="Validation loss", ls="--", c="red") | val_loss_options
