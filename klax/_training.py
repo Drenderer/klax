@@ -64,10 +64,12 @@ def fit[T: eqx.Module, H: Callback](
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        History: A callback of type `HistoryCallback` that stores the training metric in every n-th
-            load step. By default the logging interval is set to 100 steps. To change the logging
-            increment, the user may pass a modified `HistoryCallback` object to this argument, e.g.,
-            `history=HistoryCallback(10)` for logging on every 10-th step.
+        History: A callback intended for tracking the training process. 
+            If no custom callback is passed the :obj:`klax.HistoryCallback` with a logging interval of 
+            100 steps is used. To change the logging increment or verbosity of this default callback, 
+            pass a `HistoryCallback` object to this argument, e.g., 
+            `history=HistoryCallback(log_every=10, verbose=False)` for logging on every 10-th step 
+            without printing the loss. 
         callbacks: Callback functions that are evaluated after every training step. They can
             be used to implement early stopping, custom history logging and more. The argument to the
             callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
