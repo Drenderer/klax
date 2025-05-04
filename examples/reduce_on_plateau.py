@@ -17,7 +17,7 @@ from optax import contrib
 from matplotlib import pyplot as plt
 
 import klax
-from klax.callbacks import HistoryCallback
+from klax import HistoryCallback
 
 
 key = jr.key(0)
