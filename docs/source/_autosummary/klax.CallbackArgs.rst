@@ -26,6 +26,7 @@
    
       ~CallbackArgs.loss
       ~CallbackArgs.model
+      ~CallbackArgs.opt_state
       ~CallbackArgs.val_loss
       ~CallbackArgs.step
       ~CallbackArgs.time_on_last_update

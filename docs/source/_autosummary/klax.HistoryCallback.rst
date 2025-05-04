@@ -28,6 +28,7 @@
 
    .. autosummary::
    
+      ~HistoryCallback.last_opt_state
       ~HistoryCallback.step_offset
       ~HistoryCallback.training_time
       ~HistoryCallback.log_every
