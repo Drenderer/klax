@@ -13,7 +13,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from ..wrappers import ParameterWrapper
+from .._wrappers import ParameterWrapper
 
 
 class Linear(eqx.Module, strict=True):
@@ -227,7 +227,7 @@ class FullyLinear(eqx.Module, strict=True):
                 (Keyword only argument.)
 
         Note:
-            If you want to use higher order tensors as inputs (for example featuring 
+            If you want to use higher order tensors as inputs (for example featuring
             batch dimensions) then use `jax.vmap`. For example, for inputs `y` and
             `z` of shape `(batch, in_features_y)` and `(batch, in_features_z)`,
             respectively, using

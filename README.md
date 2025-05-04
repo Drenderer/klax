@@ -1,7 +1,7 @@
 klax
 ====
-Collection of semi-common machine learning architectures and tools build on JAX + Equinox + Paramax
----------------------------------------------------------------------------------------------------
+A lightweight machine learning package for computational mechanics.
+-------------------------------------------------------------------
 
 ## Documentation
 

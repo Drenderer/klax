@@ -4,7 +4,7 @@ This module implements methods for handling data, such as batching and splitting
 
 from __future__ import annotations
 import typing
-from typing import Generator, Protocol, Iterable, Any
+from typing import Any, Generator, Protocol, Sequence
 import warnings
 
 import equinox as eqx
@@ -63,7 +63,7 @@ def broadcast_and_get_batch_size(
 
 
 @typing.runtime_checkable
-class Dataloader(Protocol):
+class BatchGenerator(Protocol):
     def __call__(
         self,
         data: PyTree[Any],
@@ -75,7 +75,7 @@ class Dataloader(Protocol):
         raise NotImplementedError
 
 
-def dataloader(
+def batch_data(
     data: PyTree[Any],
     batch_size: int = 32,
     batch_axis: PyTree[int | None] = 0,
@@ -93,19 +93,19 @@ def dataloader(
         have batch dimension along the first axis.
 
 
+        >>> import klax
         >>> import jax
         >>> import jax.numpy as jnp
-        >>> from klax.datahandler import dataloader
         >>>
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
         >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_mask = (True, {"a": False, "b": True})
-        >>> iter_data = dataloader(
+        >>> batch_mask = (0, {"a": None, "b": 0})
+        >>> iter_data = klax.batch_data(
         ...     data,
         ...     32,
         ...     batch_mask,
-        ...     key=jax.random.PRNGKey(0)
+        ...     key=jax.random.key(0)
         ... )
         >>>
 
@@ -173,7 +173,7 @@ def dataloader(
 
 def split_data(
     data: PyTree[Any],
-    proportions: Iterable[float],
+    proportions: Sequence[int | float],
     batch_axis: PyTree[int | None] = 0,
     *,
     key: PRNGKeyArray,
@@ -186,49 +186,49 @@ def split_data(
         have batch dimension along different axes.
 
 
+        >>> import klax
         >>> import jax
-        >>> from klax.datahandler import split_data
         >>>
-        >>> x = jax.numpy.array([1., 2.])
-        >>> y = jax.numpy.array([[1., 2.]])
-        >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_axis = (0, 1)
-        >>> iter_data = dataloader(
+        >>> x = jax.numpy.array([1., 2., 3.])
+        >>> data = (x, {"a": 1.0, "b": x})
+        >>> s1, s2 = klax.split_data(
         ...     data,
-        ...     (0.5, 0.5),
-        ...     batch_axis,
+        ...     (2, 1),
         ...     key=jax.random.key(0)
         ... )
-        >>>
+        >>> s1
+        (Array([1., 2.], dtype=float32), {'a': 1.0, 'b': Array([1., 2.], dtype=float32)})
+        >>> s2
+        (Array([3.], dtype=float32), {'a': 1.0, 'b': Array([3.], dtype=float32)})
 
     Args:
         data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
-        proportions: Iterable of floats, where each float is the proportion of the
-            corresponding partition, e.g., `(0.8, 0.2)` for a 80 to 20 split.
-            The proportions must be non-negative and sum to 1.
+        proportions: Proportions of the split that will be applied to the data, e.g.,
+        `(80, 20)` for a 80% to 20% split. The proportions must be non-negative.
         batch_axis: PyTree of the batch axis indices. `None` is used to indicate
             that the corresponding leaf or subtree in data does not have a batch axis.
             `batch_axis` must have the same structure as `data` or have `data` as a prefix.
             (Defaults to 0)
-        key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
+        key: A `jax.random.PRNGKey` used to provide randomness to the split.
             (Keyword only argument.)
     Returns:
         Tuple of `PyTrees`.
     """
 
-    if any(p < 0.0 for p in proportions):
+    props = jnp.array(proportions, dtype=float)
+    if props.ndim != 1:
+        raise ValueError("Proportions must be a 1D Sequence.")
+    if jnp.any(props < 0.):
         raise ValueError("Proportions must be non-negative.")
-    if sum(proportions) - 1.0 > 1e-6:
-        raise ValueError("Proportions must sum to 1.")
+    props = props / jnp.sum(props)
 
     batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
 
-    # Make permutation
     indices = jnp.arange(dataset_size)
     perm = jr.permutation(key, indices)
 
     split_indices = jnp.round(
-        jnp.cumsum(jnp.array(proportions[:-1]) * dataset_size)
+        jnp.cumsum(jnp.array(props[:-1]) * dataset_size)
     ).astype(int)
     sections = jnp.split(perm, split_indices)
 
