@@ -216,6 +216,8 @@ def split_data(
     """
 
     props = jnp.array(proportions, dtype=float)
+    if props.ndim != 1:
+        raise ValueError("Proportions must be a 1D Sequence.")
     if jnp.any(props < 0.):
         raise ValueError("Proportions must be non-negative.")
     props = props / jnp.sum(props)
