@@ -131,8 +131,8 @@ def fit[T: eqx.Module, H: Callback](
 
     # Use the unflatten trick to speed up training,
     # see https://docs.kidger.site/equinox/tricks/
-    flat_model, treedef_model = jax.tree_util.tree_flatten(model)
-    flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
+    flat_model, treedef_model = jax.tree.flatten(model)
+    flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
 
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
