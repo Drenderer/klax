@@ -11,13 +11,13 @@ from jaxtyping import PRNGKeyArray, PyTree
 import optax
 import paramax as px
 
-from .callbacks import (
+from ._callbacks import (
     Callback,
     CallbackArgs,
     HistoryCallback,
 )
-from .datahandler import dataloader, Dataloader, broadcast_and_get_batch_size
-from .losses import Loss, mse
+from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
+from ._losses import Loss, mse
 
 
 def fit[T: eqx.Module, H: Callback](
@@ -30,7 +30,7 @@ def fit[T: eqx.Module, H: Callback](
     steps: int = 1000,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
-    dataloader: Dataloader = dataloader,
+    batcher: BatchGenerator = batch_data,
     history: Optional[H] = None,
     callbacks: Optional[Iterable[Callback]] = None,
     key: PRNGKeyArray,
@@ -52,12 +52,13 @@ def fit[T: eqx.Module, H: Callback](
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
         steps: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
-        loss_fn: The loss function with call signature `(model, prediction, target, in_axes) -> float`.
+        loss_fn: The loss function with call signature 
+            `(model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any]) -> float`.
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
-        dataloader: The data loader that splits inputs and targets into batches.
-            (Defaults to `dataloader`)
+        batcher: The data loader that splits inputs and targets into batches.
+            (Defaults to `batch_data`)
         History: A callback of type `HistoryCallback` that stores the training metric in every n-th
             load step. By default the logging interval is set to 100 steps. To change the logging
             increment, the user may pass a modified `HistoryCallback` object to this argument, e.g.,
@@ -76,7 +77,7 @@ def fit[T: eqx.Module, H: Callback](
         A tuple of the trained model and a history dictionary containing the loss history.
     """
 
-    # Braodcast the batch_axis to the data. While this happens again in the dataloader,
+    # Braodcast the batch_axis to the data. While this happens again in the batch_data,
     # doing it here allows the use of the broadcasted batch_axis in the loss function.
     # If `batch_axis` is a prefix of `data`, this ensures that only leafs of
     # type ArrayLike are vmapped. Thus it is possible to have data like `(str, array)`
@@ -151,7 +152,7 @@ def fit[T: eqx.Module, H: Callback](
     # Loop over all training steps
     for step, batch in zip(
         range(1, steps + 1),
-        dataloader(data, batch_size, batch_axis, key=key),
+        batcher(data, batch_size, batch_axis, key=key),
     ):
         flat_model, flat_opt_state = make_step(
             batch, flat_model, optimizer, flat_opt_state
