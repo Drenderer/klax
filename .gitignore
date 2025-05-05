@@ -1,7 +1,6 @@
 # VS Code
 .vscode/
 
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -74,6 +73,8 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/build/
+docs/_autosummary/
 
 # PyBuilder
 .pybuilder/
