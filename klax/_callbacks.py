@@ -8,6 +8,8 @@ from typing import Optional
 
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
+import pickle
+from pathlib import Path
 
 
 class CallbackArgs:
@@ -129,7 +131,8 @@ class CallbackArgs:
 
 
 class Callback(ABC):
-    """An abstract callback."""
+    """An abstract callback. Inherit from this class to create a custom
+    callback."""
 
     def __call__(self, cbargs: CallbackArgs) -> bool | None:
         """Called after each step during training."""
@@ -145,6 +148,10 @@ class Callback(ABC):
 
 
 class HistoryCallback(Callback):
+    """Default callback for logging a training process.
+    Records training and validation loss histories, as well as the
+    trainin time and the last optimizer state."""
+
     log_every: int
     steps: list
     loss: list
@@ -157,13 +164,28 @@ class HistoryCallback(Callback):
     last_opt_state: PyTree | None = None
 
     def __init__(self, log_every: int = 100, verbose: bool = True):
+        """Initializes the history callback.
+
+        Args:
+            log_every: Amount of steps after which the training
+                and validation losses are logged.
+                (Defaults to 100.)
+            verbose: If true prints the training progress and losses.
+                (Defaults to True.)
+        """
         self.log_every = log_every
         self.verbose = verbose
         self.steps = []
         self.loss = []
         self.val_loss = []
 
+    def __repr__(self):
+        """Returns a string representation of the HistoryCallback."""
+        return f"HistoryCallback(log_every={self.log_every}, verbose={self.verbose})"
+
     def __call__(self, cbargs: CallbackArgs):
+        """Called at each step during training.
+        Records the training and validation loss, as well as the step count."""
         if cbargs.step % self.log_every == 0:
             self.steps.append(self.step_offset + cbargs.step)
             self.loss.append(cbargs.loss)
@@ -177,13 +199,18 @@ class HistoryCallback(Callback):
                 print(message)
 
     def on_training_start(self, cbargs: CallbackArgs):
+        """Called at beginning of training.
+        Initializes the training start time.
+        """
         self.last_start_time = cbargs.time_on_last_update
-        if self.steps:
+        if self.steps:  # If there are already steps, we assume that this is a continuation of a training.
             self.step_offset = self.steps[-1]
         else:
             self(cbargs)
 
     def on_training_end(self, cbargs: CallbackArgs):
+        """Called at end of training.
+        Records the training end time and the last optimizer state."""
         self.last_end_time = cbargs.time_on_last_update
         self.training_time += self.last_end_time - self.last_start_time
         self.last_opt_state = cbargs.opt_state
@@ -191,6 +218,23 @@ class HistoryCallback(Callback):
             print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
 
     def plot(self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}):
+        """Plot the recorded training and validation losses.
+        This method uses matplotlib.
+
+        Args:
+            ax: Matplotlib axes to plot into. If ``None`` then a new
+                axis is created.
+                (Defaults to None.)
+            loss_options: Dictionary of keyword arguments passed to
+                matplotlibs ``plot`` for the training loss.
+                (Defaults to {}.)
+            val_loss_options: Dictionary of keyword arguments passed to
+                matplotlibs ``plot`` for the validation loss.
+                (Defaults to {}.)
+
+        Raises:
+            ImportError: _description_
+        """
         module_name = "matplotlib.pyplot"
         try:
             plt = importlib.import_module(module_name)
@@ -226,8 +270,61 @@ class HistoryCallback(Callback):
                 f"Original error: {str(e)}"
             )
 
-    def save(self):
-        raise NotImplementedError
+    def save(
+        self, filename: str | Path, overwrite: bool = False, create_dir: bool = True
+    ) -> None:
+        """Save the HistoryCallback instance to a file using pickle.
 
-    def load(self):
-        raise NotImplementedError
+        Args:
+            filename: The file path where the instance should be saved.
+            overwrite: If True, overwrite the file if it already exists.
+                If False, raise a FileExistsError if the file exists.
+                (Defaults to False.)
+            create_dir: If True, create the parent directory if it does not exist.
+                (Defaults to True.)
+
+        Raises:
+            FileExistsError: If the file already exists and overwrite is False.
+            ValueError: If the provided path is not a valid file path.
+        """
+        filename = Path(filename)
+
+        if filename.exists() and not overwrite:
+            raise FileExistsError(
+                f"The file '{filename}' already exists. Use overwrite=True to overwrite it."
+            )
+
+        if create_dir:
+            filename.parent.mkdir(parents=True, exist_ok=True)
+
+        if filename.suffix == "":
+            filename = filename.with_suffix(".pkl")
+        assert filename.suffix == ".pkl", "File must have a .pkl suffix."
+
+        with filename.open("wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename: str | Path) -> HistoryCallback:
+        """Load a HistoryCallback instance from a file.
+
+        Args:
+            filename: The file path from which the instance should be loaded.
+
+        Returns:
+            The loaded HistoryCallback instance.
+
+        Raises:
+            ValueError: If the file is not a valid pickle file or does not contain a HistoryCallback instance.
+        """
+        filename = Path(filename)
+
+        with filename.open("rb") as f:
+            obj = pickle.load(f)
+
+        if not isinstance(obj, HistoryCallback):
+            raise ValueError(
+                f"The file '{filename}' does not contain a valid HistoryCallback instance."
+            )
+
+        return obj

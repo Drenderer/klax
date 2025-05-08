@@ -100,6 +100,11 @@ history.plot(
 )
 
 
-ax.set(yscale="log", title="Comparison of training loss histories")
+ax.set(
+    title="Comparison of training loss histories",
+    yscale="log", 
+    xlabel="Training steps",
+    ylabel="Loss"
+)
 ax.legend()
 plt.show()
