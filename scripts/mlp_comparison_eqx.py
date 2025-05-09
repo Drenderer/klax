@@ -13,7 +13,7 @@ from equinox.nn import MLP as EqxMLP
 
 from klax.nn import MLP as KlaxMLP
 from klax import fit, unwrap
-from klax.callbacks import HistoryCallback
+from klax import HistoryCallback
 
 from matplotlib import pyplot as plt
 from jaxtyping import Array

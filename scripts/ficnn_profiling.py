@@ -28,8 +28,8 @@ import klax
 from klax._misc import default_floating_dtype
 from klax.nn import FICNN, MLP, Linear
 from klax import fit
-from klax.callbacks import HistoryCallback
-from klax.wrappers import ParameterWrapper, NonNegative
+from klax import HistoryCallback
+from klax import ParameterWrapper, NonNegative
 
 
 # %% Custom code for timeing code

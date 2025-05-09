@@ -17,7 +17,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from ..wrappers import NonNegative
+from .._wrappers import NonNegative
 from ._linear import Linear, InputSplitLinear
 
 

@@ -14,7 +14,7 @@ from jaxtyping import Array, PRNGKeyArray
 
 from ._linear import Linear, InputSplitLinear
 from .._misc import default_floating_dtype
-from ..wrappers import NonNegative
+from .._wrappers import NonNegative
 
 
 class ISNN1(eqx.Module, strict=True):
