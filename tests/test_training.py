@@ -38,7 +38,7 @@ def test_training(getkey):
     y_pred = jax.vmap(model, in_axes=((None, 0),))((b, x))
     assert jnp.allclose(y_pred, y)
 
-    # History shape
+    # Continued training with history and solver state
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     history = klax.HistoryCallback(log_every=100)
@@ -46,7 +46,14 @@ def test_training(getkey):
     assert len(history.steps) == 11
     assert len(history.loss) == 11
     time_1 = history.training_time
-    model, history = klax.fit(model, (x, x), steps=500, history=history, key=getkey())
+    model, history = klax.fit(
+        model,
+        (x, x),
+        steps=500,
+        history=history,
+        init_opt_state=history.last_opt_state,
+        key=getkey(),
+    )
     assert len(history.steps) == 16
     assert len(history.loss) == 16
     assert history.steps[-1] == 1500
@@ -73,7 +80,7 @@ def test_training(getkey):
         (x, x),
         history=klax.HistoryCallback(1),
         callbacks=(MyCallback(),),
-        key=getkey()
+        key=getkey(),
     )
     print(history.log_every)
     assert history.steps[-1] == 123

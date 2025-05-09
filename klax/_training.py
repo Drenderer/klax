@@ -20,7 +20,7 @@ from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_si
 from ._losses import Loss, mse
 
 
-def fit[T: eqx.Module](
+def fit[T: eqx.Module, H: Callback](
     model: T,
     data: PyTree[Any],
     *,
@@ -30,11 +30,12 @@ def fit[T: eqx.Module](
     steps: int = 1000,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
+    init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    history: Optional[HistoryCallback] = None,
+    history: Optional[H] = None,
     callbacks: Optional[Iterable[Callback]] = None,
     key: PRNGKeyArray,
-) -> tuple[T, HistoryCallback]:
+) -> tuple[T, HistoryCallback|H]:
     """Trains a model using an optimizer from optax.
 
     Args:
@@ -57,12 +58,18 @@ def fit[T: eqx.Module](
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
+        init_opt_state: The initial state of the optimizer. If `None`, the optimizer is initialized
+            from scratch. By providing a value for `init_opt_state`, the user can resume training from a
+            previous state (e.g., obtained from the `HistoryCallback.last_opt_state`). 
+            (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
-            (Defaults to `batch_data`)
-        History: A callback of type `HistoryCallback` that stores the training metric in every n-th
-            load step. By default the logging interval is set to 100 steps. To change the logging
-            increment, the user may pass a modified `HistoryCallback` object to this argument, e.g.,
-            `history=HistoryCallback(10)` for logging on every 10-th step.
+            (Defaults to `batch_data`.)
+        History: A callback intended for tracking the training process. 
+            If no custom callback is passed the :obj:`klax.HistoryCallback` with a logging interval of 
+            100 steps is used. To change the logging increment or verbosity of this default callback, 
+            pass a `HistoryCallback` object to this argument, e.g., 
+            `history=HistoryCallback(log_every=10, verbose=False)` for logging on every 10-th step 
+            without printing the loss. 
         callbacks: Callback functions that are evaluated after every training step. They can
             be used to implement early stopping, custom history logging and more. The argument to the
             callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
@@ -125,14 +132,17 @@ def fit[T: eqx.Module](
 
         return flat_model, flat_opt_state
 
-    # Initialize the optimizer and 'tell it' to optimize with respect to all
-    # inexact arrays in the model
-    opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    if init_opt_state is None:
+        # Initialize the optimizer and 'tell it' to optimize with respect to all
+        # inexact arrays in the model. This is done by passing the model to the optimizer.
+        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    else:
+        opt_state = init_opt_state
 
     # Use the unflatten trick to speed up training,
     # see https://docs.kidger.site/equinox/tricks/
-    flat_model, treedef_model = jax.tree_util.tree_flatten(model)
-    flat_opt_state, treedef_opt_state = jax.tree_util.tree_flatten(opt_state)
+    flat_model, treedef_model = jax.tree.flatten(model)
+    flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
 
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
@@ -142,10 +152,10 @@ def fit[T: eqx.Module](
         history = HistoryCallback(log_every=100)
     callbacks.append(history)
 
-    cbargs = CallbackArgs(get_loss, treedef_model, data, validation_data)
+    cbargs = CallbackArgs(get_loss, treedef_model, treedef_opt_state, data, validation_data)
 
     # Call callbacks after training
-    cbargs.update(flat_model, 0)
+    cbargs.update(flat_model, flat_opt_state, 0)
     for callback in callbacks:
         callback.on_training_start(cbargs)
 
@@ -159,7 +169,7 @@ def fit[T: eqx.Module](
         )
 
         # Update callbacks arguments with the current state of the model
-        cbargs.update(flat_model, step)
+        cbargs.update(flat_model, flat_opt_state, step)
 
         # Run all callbacks and break if any of them request termination of
         # the training loop.
@@ -172,7 +182,7 @@ def fit[T: eqx.Module](
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
     # Call callbacks after training
-    cbargs.update(flat_model, -1)
+    cbargs.update(flat_model, flat_opt_state, -1)
     for callback in callbacks:
         callback.on_training_end(cbargs)
 
