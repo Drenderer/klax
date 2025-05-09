@@ -14,7 +14,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from ..wrappers import ParameterWrapper
+from .._wrappers import ParameterWrapper
 
 
 class Linear(eqx.Module, strict=True):
