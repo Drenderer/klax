@@ -54,10 +54,12 @@ def broadcast_and_get_batch_size(
     )
     dataset_sizes = jax.tree.leaves(dataset_sizes)
     if len(dataset_sizes) == 0:
-        raise ValueError("At least one leaf must have a batch dimension.")
-    dataset_size = dataset_sizes[0]
-    if not all(b == dataset_size for b in dataset_sizes):
-        raise ValueError("All batched arrays must have equal batch dimension.")
+        # No leaf in data has a batch dimension -> singelton data set
+        dataset_size = 1
+    else:
+        if not all(b == dataset_sizes[0] for b in dataset_sizes[1:]):
+            raise ValueError("All batched arrays must have equal batch axis dimension.")
+        dataset_size = dataset_sizes[0]
 
     return batch_axis, dataset_size
 
