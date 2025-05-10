@@ -1,22 +1,22 @@
+import equinox as eqx
 import jax.random as jrandom
 import numpy as np
 import pytest
-from equinox import tree_equal
 
-from klax.datahandler import dataloader, split_data
+from klax import batch_data, split_data
 
-def test_dataloader(getkey):
+def test_batch_data(getkey):
     # Sequence with one element
     x = jrandom.uniform(getkey(), (10,))
     data = (x,)
-    generator = dataloader(data, key=getkey())
+    generator = batch_data(data, key=getkey())
     assert isinstance(next(generator), tuple)
     assert len(next(generator)) == 1
 
     # Nested PyTree
     x = jrandom.uniform(getkey(), (10,))
     data = [x, (x, {"a": x, "b": x})]
-    generator = dataloader(data, key=getkey())
+    generator = batch_data(data, key=getkey())
     assert isinstance(next(generator), list)
     assert len(next(generator)) == 2
     assert isinstance(next(generator)[1], tuple)
@@ -27,14 +27,14 @@ def test_dataloader(getkey):
     # Default batch size
     x = jrandom.uniform(getkey(), (33,))
     data = (x,)
-    generator = dataloader(data, key=getkey())
+    generator = batch_data(data, key=getkey())
     assert next(generator)[0].shape[0] == 32
 
     # Batch mask
     x = jrandom.uniform(getkey(), (10,))
     data = (x, (x, x))
     batch_axis = (0, (None, 0))
-    generator = dataloader(data, 2, batch_axis, key=getkey())
+    generator = batch_data(data, 2, batch_axis, key=getkey())
     assert next(generator)[0].shape[0] == 2
     assert next(generator)[1][0].shape[0] == 10
     assert next(generator)[1][1].shape[0] == 2
@@ -46,7 +46,7 @@ def test_dataloader(getkey):
     with pytest.raises(
         ValueError, match="At least one leaf must have a batch dimension."
     ):
-        generator = dataloader(data, batch_axis=batch_axis, key=getkey())
+        generator = batch_data(data, batch_axis=batch_axis, key=getkey())
         next(generator)
 
     # Different batch dimensions
@@ -56,40 +56,39 @@ def test_dataloader(getkey):
     with pytest.raises(
         ValueError, match="All batched arrays must have equal batch dimension."
     ):
-        generator = dataloader(data, key=getkey())
+        generator = batch_data(data, key=getkey())
         next(generator)
 
     # Smaller data than batch dimension
     x = jrandom.uniform(getkey(), (10,))
-    generator = dataloader(x, batch_size=128, key=getkey())
+    generator = batch_data(x, batch_size=128, key=getkey())
     assert next(generator).shape == (10,)
 
 
 def test_split_data(getkey):
-
-    # Expected usage
+    # Nestes data structure with different batch axes
     batch_size = 20
     data = (
         jrandom.uniform(getkey(), (batch_size, 2)),
         [
-            jrandom.uniform(getkey(), (3, batch_size, 2)),
-            100.,
-            'test',
-            None,
+            jrandom.uniform(getkey(), (3, batch_size, 2)), 100., 'test', None,
         ],
     )
-    proportions = (0.5, 0.25, 0.25)
+    proportions = (2, 1, 1)
     batch_axis = (0, 1)
-
     subsets = split_data(data, proportions, batch_axis, key=getkey())
 
-    for s, p in zip(subsets, proportions):
-        assert s[0].shape == (round(p*batch_size), 2)
-        assert s[1][0].shape == (3, round(p*batch_size), 2)
-        assert tree_equal(s[1][1:], data[1][1:])
+    for s, p in zip(subsets, (0.5, 0.25, 0.25)):
+        assert s[0].shape == (round(p * batch_size), 2)
+        assert s[1][0].shape == (3, round(p * batch_size), 2)
+        assert eqx.tree_equal(s[1][1:], data[1][1:])
 
-    # Edge cases
+    # One-element data structure
     data = np.arange(10)
     s, = split_data(data, (1.,), key=getkey())
     assert np.array_equal(data, np.sort(s))
 
+    # Negative proportion
+    data = np.arange(10)
+    with pytest.raises(ValueError):
+        split_data(data, (-1.,), key=getkey())
