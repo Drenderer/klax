@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import jax.random as jr
 
 from klax import fit
-from klax.wrappers import NonNegative, unwrap
+from klax import NonNegative, unwrap
 
 
 # %% Define a simple model
