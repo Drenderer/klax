@@ -18,14 +18,16 @@ class SimpleModel(eqx.Module):
     weight: jax.Array
 
     def __init__(self):
-        self.weight = NonNegative(jnp.array(-1.))
+        self.weight = NonNegative(jnp.array(-1.0))
 
     def __call__(self, x):
         return self.weight * x
-    
+
+
 # %% Generate data
 def fun(x):
-    return 2*x
+    return -2 * x
+
 
 x = jnp.linspace(-1, 1, 100)
 y = jax.vmap(fun)(x)
@@ -33,20 +35,20 @@ y = jax.vmap(fun)(x)
 # %% Train the model
 model = SimpleModel()
 
-# Do model surgery to make the wrapped array negative
-# model = eqx.tree_at(
-#     lambda m: m.weight.parameter, model, jnp.array(-1e-10)
-# )
-
+# Let the optimizer run the parameter into the negatives
 print("Initial weight:", unwrap(model).weight)
 
-model, hist = fit(
-    model,
-    (x, y),
-    steps=10000,
-    key = jr.key(0)
-)
+model, hist = fit(model, (x, y), steps=10000, key=jr.key(0))
+
+
+# Redefine the data
+def fun(x):
+    return 2 * x
+
+
+y = jax.vmap(fun)(x)
+
+# Train the model to test recovery
+model, hist = fit(model, (x, y), steps=10000, key=jr.key(0))
 
 print("Final weight:", unwrap(model).weight)
-
-
