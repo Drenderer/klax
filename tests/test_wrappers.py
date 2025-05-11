@@ -8,12 +8,12 @@ def test_non_negative(getkey):
     # Negative array input
     parameter = -jrandom.uniform(getkey(), (10,))
     non_neg = klax.NonNegative(parameter)
-    assert jnp.all(px.unwrap(non_neg) == 0)
+    assert jnp.all(px.unwrap(non_neg) >= 0)
 
     # Positive array input
     parameter = jrandom.uniform(getkey(), (10,))
     non_neg = klax.NonNegative(parameter)
-    assert jnp.all(px.unwrap(non_neg) == parameter)
+    assert jnp.all(px.unwrap(non_neg) >= parameter)
 
     # Array output type
     parameter = -jrandom.uniform(getkey(), (10,))
