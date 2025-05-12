@@ -49,6 +49,6 @@ Callbacks
 .. autosummary::
     :toctree: _autosummary
 
-    CallbackArgs
+    TrainingState
     Callback
     HistoryCallback

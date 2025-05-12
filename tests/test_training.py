@@ -71,7 +71,7 @@ def test_training(getkey):
     model = eqx.nn.Linear(1, 1, key=getkey())
 
     class MyCallback(klax.Callback):
-        def __call__(self, cbargs: klax.CallbackArgs):
+        def __call__(self, cbargs: klax.TrainingState):
             if cbargs.step == 123:
                 return True
 

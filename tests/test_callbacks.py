@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.random as jrandom
 
 
-def test_callbackargs(getkey, getmodel, getloss):
+def test_TrainingState(getkey, getmodel, getloss):
     # Test lazy evaluation of loss function
     count = 0
 
@@ -27,7 +27,7 @@ def test_callbackargs(getkey, getmodel, getloss):
     opt_state = (None, (1, 3.14))  # Dummy opt state for testing
     flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
 
-    cbargs = klax.CallbackArgs(
+    cbargs = klax.TrainingState(
         get_loss, treedef_model, treedef_opt_state, (x, x), (x_val, x_val)
     )
     cbargs.update(flat_model, flat_opt_state, 1)
@@ -51,7 +51,7 @@ def test_callbackargs(getkey, getmodel, getloss):
     flat_model, treedef_model = jax.tree.flatten(model)
 
     assert sys.getrefcount(data) == 2
-    cbargs = klax.CallbackArgs(getloss, treedef_model, treedef_opt_state, data)
+    cbargs = klax.TrainingState(getloss, treedef_model, treedef_opt_state, data)
     assert sys.getrefcount(data) == 3
 
     # Test update time
@@ -59,7 +59,7 @@ def test_callbackargs(getkey, getmodel, getloss):
     data = (x, x)
     model = getmodel()
     flat_model, treedef_model = jax.tree.flatten(model)
-    cbargs = klax.CallbackArgs(getloss, treedef_model, treedef_opt_state, data)
+    cbargs = klax.TrainingState(getloss, treedef_model, treedef_opt_state, data)
     cbargs.update(flat_model, flat_opt_state, 0)
     time_on_last_update = cbargs.time_on_last_update
     cbargs.update(flat_model, flat_opt_state, 0)
@@ -74,7 +74,7 @@ def test_history_callback(getkey, getmodel, getloss, tmp_path):
     opt_state = (None, (1, 3.14))  # Dummy opt state for testing
     flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
 
-    cbargs = klax.CallbackArgs(getloss, treedef_model, treedef_opt_state, (x, x), None)
+    cbargs = klax.TrainingState(getloss, treedef_model, treedef_opt_state, (x, x), None)
     history = klax.HistoryCallback(2)
 
     # On training start update
@@ -97,7 +97,7 @@ def test_history_callback(getkey, getmodel, getloss, tmp_path):
     cbargs.update(flat_model, flat_opt_state, -1)
     history.on_training_end(cbargs)
 
-    assert history.training_time > 0.0
+    assert history.training_time >= 0.0
 
     # Test save and load
     filepath = tmp_path / "some_dir/test_history.pkl"

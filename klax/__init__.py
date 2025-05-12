@@ -1,7 +1,6 @@
 from . import nn as nn
 from ._callbacks import (
     Callback as Callback,
-    CallbackArgs as CallbackArgs,
     HistoryCallback as HistoryCallback,
 )
 from ._datahandler import (
@@ -14,7 +13,10 @@ from ._losses import (
     mse as mse, 
     mae as mae
 )
-from ._training import fit as fit
+from ._training import (
+    fit as fit,
+)
+from ._trainstate import TrainingState as TrainingState
 from ._wrappers import (
     ParameterWrapper as ParameterWrapper,
     NonNegative as NonNegative

@@ -11,9 +11,9 @@ from jaxtyping import PRNGKeyArray, PyTree
 import optax
 import paramax as px
 
+from ._trainstate import TrainingState
 from ._callbacks import (
     Callback,
-    CallbackArgs,
     HistoryCallback,
 )
 from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
@@ -35,7 +35,7 @@ def fit[T: eqx.Module, H: Callback](
     history: Optional[H] = None,
     callbacks: Optional[Iterable[Callback]] = None,
     key: PRNGKeyArray,
-) -> tuple[T, HistoryCallback|H]:
+) -> tuple[T, HistoryCallback | H]:
     """Trains a model using an optimizer from optax.
 
     Args:
@@ -53,26 +53,26 @@ def fit[T: eqx.Module, H: Callback](
             Must have the same tree structure as `data`.
             (Defaults to None. Keyword only argument)
         steps: Number of gradient updates to apply. (Defaults to 1000. Keyword only argument)
-        loss_fn: The loss function with call signature 
+        loss_fn: The loss function with call signature
             `(model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any]) -> float`.
             (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate the updates for
             the model. (Defaults to optax.adam(1e-3).)
         init_opt_state: The initial state of the optimizer. If `None`, the optimizer is initialized
             from scratch. By providing a value for `init_opt_state`, the user can resume training from a
-            previous state (e.g., obtained from the `HistoryCallback.last_opt_state`). 
+            previous state (e.g., obtained from the `HistoryCallback.last_opt_state`).
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        History: A callback intended for tracking the training process. 
-            If no custom callback is passed the :obj:`klax.HistoryCallback` with a logging interval of 
-            100 steps is used. To change the logging increment or verbosity of this default callback, 
-            pass a `HistoryCallback` object to this argument, e.g., 
-            `history=HistoryCallback(log_every=10, verbose=False)` for logging on every 10-th step 
-            without printing the loss. 
+        History: A callback intended for tracking the training process.
+            If no custom callback is passed the :obj:`klax.HistoryCallback` with a logging interval of
+            100 steps is used. To change the logging increment or verbosity of this default callback,
+            pass a `HistoryCallback` object to this argument, e.g.,
+            `history=HistoryCallback(log_every=10, verbose=False)` for logging on every 10-th step
+            without printing the loss.
         callbacks: Callback functions that are evaluated after every training step. They can
             be used to implement early stopping, custom history logging and more. The argument to the
-            callback function is a CallbackArgs object. (Defaults to `None`. Keyword only Argument)
+            callback function is a TrainingState object. (Defaults to `None`. Keyword only Argument)
         key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
             (Keyword only argument.)
 
@@ -152,12 +152,14 @@ def fit[T: eqx.Module, H: Callback](
         history = HistoryCallback(log_every=100)
     callbacks.append(history)
 
-    cbargs = CallbackArgs(get_loss, treedef_model, treedef_opt_state, data, validation_data)
+    train_state = TrainingState(
+        get_loss, treedef_model, treedef_opt_state, data, validation_data
+    )
 
     # Call callbacks after training
-    cbargs.update(flat_model, flat_opt_state, 0)
+    train_state.update(flat_model, flat_opt_state, 0)
     for callback in callbacks:
-        callback.on_training_start(cbargs)
+        callback.on_training_start(train_state)
 
     # Loop over all training steps
     for step, batch in zip(
@@ -165,25 +167,25 @@ def fit[T: eqx.Module, H: Callback](
         batcher(data, batch_size, batch_axis, key=key),
     ):
         flat_model, flat_opt_state = make_step(
-            batch, flat_model, optimizer, flat_opt_state
+            batch, train_state._flat_model, optimizer, train_state._flat_opt_state
         )
 
         # Update callbacks arguments with the current state of the model
-        cbargs.update(flat_model, flat_opt_state, step)
+        train_state.update(flat_model, flat_opt_state, step)
 
         # Run all callbacks and break if any of them request termination of
         # the training loop.
         # Note! The square brackets are important. Otherwise the loop is
         # terminated with the first callback that returns true. But we want
         # to run all callbacks first and then decide, whether to terminate.
-        if any([callback(cbargs) for callback in callbacks]):
+        if any([callback(train_state) for callback in callbacks]):
             break
 
     model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
 
     # Call callbacks after training
-    cbargs.update(flat_model, flat_opt_state, -1)
+    train_state.update(flat_model, flat_opt_state, -1)
     for callback in callbacks:
-        callback.on_training_end(cbargs)
+        callback.on_training_end(train_state)
 
     return model, history
