@@ -1,32 +1,22 @@
 """This module implements parameter constraints based on paramax."""
 
 from __future__ import annotations
-from abc import abstractmethod
 
-import jax.numpy as jnp
+import jax
 from jaxtyping import Array
-import paramax as px
+from paramax import AbstractUnwrappable
 
 
-# Alias to px.unwrap
-unwrap = px.unwrap
+# Define a ParameterWrapper as a AbstractUnwrappable wrapping an array or
+# an arbitrary depth composition of AbstractUnwrappables around an array.
+from typing import Union
 
-class ParameterWrapper(px.AbstractUnwrappable[Array]):
-    """An abstract class representing parameter wrappers.
-
-    ParameterWrappers replace PyTree leafs, applying custom behaviour upon
-    unwrapping"""
-
-    def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
-        raise NotImplementedError("To be implemented by derived classes")
-
-    @abstractmethod
-    def unwrap(self) -> Array:
-        pass
+ParameterWrapper = AbstractUnwrappable[Union[Array, "ParameterWrapper"]]
 
 
 class NonNegative(ParameterWrapper):
-    """Applies a non-negative constraint.
+    """Applies a non-negative constraint by passing the weight
+    trough softplus.
 
     Args:
         parameter: The parameter that is to be made non-negative. It can either
@@ -36,12 +26,5 @@ class NonNegative(ParameterWrapper):
 
     parameter: Array
 
-    def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
-        # Ensure that the parameter fulfills the constraint initially
-        self.parameter = self._non_neg(px.unwrap(parameter))
-
-    def _non_neg(self, x: Array) -> Array:
-        return jnp.maximum(x, 0)
-
     def unwrap(self) -> Array:
-        return self._non_neg(self.parameter)
+        return jax.nn.softplus(self.parameter)
