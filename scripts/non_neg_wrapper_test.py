@@ -1,9 +1,9 @@
 """
 This  script shows that the old NonNegative wrapper does not work as expected
-when the optimizer drives the wrapped parameter into the negative region. Then 
+when the optimizer drives the wrapped parameter into the negative region. Then
 the gradients for the parameter are stopped by ReLU and the parameter will never
 recieve and updates again.
-The new NonNegative wrapper uses softplus to ensure non-negativity, eliviating 
+The new NonNegative wrapper uses softplus to ensure non-negativity, eliviating
 this issue.
 """
 
@@ -16,8 +16,7 @@ from jaxtyping import Array
 
 from matplotlib import pyplot as plt
 
-from klax import fit, ParameterWrapper, NonNegative, unwrap, HistoryCallback
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+from klax import fit, ParameterWrapper, NonNegative, Positive, unwrap, HistoryCallback
 
 
 # %% Define old NonNegative Wrapper
@@ -44,15 +43,18 @@ class OldNonNegative(ParameterWrapper):
 
 class ParameterHistory(HistoryCallback):
     parameters: list
+    weights: list
 
     def __init__(self, log_every=100, verbose=False):
         super().__init__(log_every, verbose)
         self.parameters = []
+        self.weights = []
 
     def __call__(self, cbargs):
         super().__call__(cbargs)
         if cbargs.step % self.log_every == 0:
             self.parameters.append(cbargs.model.weight.parameter)
+            self.weights.append(unwrap(cbargs.model).weight)
 
 
 # %% Define a simple model
@@ -60,63 +62,44 @@ class SimpleModel(eqx.Module):
     weight: jax.Array
 
     def __init__(self, wrapper: type[ParameterWrapper]):
-        self.weight = wrapper(jnp.array(-1.0))
+        self.weight = wrapper(jnp.array(1.0))
 
     def __call__(self, x):
         return self.weight * x
 
 
 # %% Generate data which requires the parameter to be negative
-x = jnp.linspace(-1, 1, 100)
-y = jax.vmap(lambda x: -2 * x)(x)
-
-# Define the models
-model_old = SimpleModel(wrapper=OldNonNegative)
-model = SimpleModel(wrapper=NonNegative)
-
 key = jr.key(0)
 
-# Let the optimizer run the parameter into the negatives
-print(
-    f"Initial weights: \nOld wrapper: unwrapped weight: {unwrap(model_old).weight}, parameter: {model_old.weight.parameter}\nNew wrapper: weight: {unwrap(model).weight}, parameter: {model.weight.parameter}"
-)
-model_old, hist_old = fit(
-    model_old, (x, y), steps=500, history=ParameterHistory(), key=key
-)
-model, hist = fit(model, (x, y), steps=500, history=ParameterHistory(), key=key)
+x = jnp.linspace(-1, 1, 100)
+y1 = jax.vmap(lambda x: -2 * x)(x)
+y2 = jax.vmap(lambda x: 2 * x)(x)
 
-# Redefine the data so the parameter should be positive
-y = jax.vmap(lambda x: 2 * x)(x)
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+for wrapper in [OldNonNegative, NonNegative, Positive]:
+    model = SimpleModel(wrapper)
 
-# Train the models to test recovery
-model_old, hist_old = fit(model_old, (x, y), steps=5000, history=hist_old, key=key)
-model, hist = fit(model, (x, y), steps=5000, history=hist, key=key)
-print(
-    f"Final weights: \nOld wrapper: unwrapped weight: {unwrap(model_old).weight}, parameter: {model_old.weight.parameter}\nNew wrapper: weight: {unwrap(model).weight}, parameter: {model.weight.parameter}"
-)
+    print(
+        f"{wrapper.__name__}: Initial weights\nunwrapped weight: {unwrap(model).weight}, parameter: {model.weight.parameter}"
+    )
 
+    model, hist = fit(model, (x, y1), steps=5000, history=ParameterHistory(), key=key)
+    model, hist = fit(model, (x, y2), steps=5000, history=hist, key=key)
 
-# %% Plot the parameters over the steps
-fig, ax = plt.subplots()
-ax.axhline(0.0, xmin=0.0, ls="--", c="grey")
-ax.plot(hist.steps, hist.parameters, label="New")
-ax.plot(hist_old.steps, hist_old.parameters, label="Old")
-ax.set(title="Parameter Hisotry", xlabel="steps", ylabel="weight.parameter")
+    print(
+        f"{wrapper.__name__}: Final weights\nunwrapped weight: {unwrap(model).weight}, parameter: {model.weight.parameter}"
+    )
 
-# Add a zoom-in lens to focus on the origin
+    axes[0].plot(hist.steps, hist.parameters, label=wrapper.__name__)
+    axes[1].plot(hist.steps, hist.weights, label=wrapper.__name__)
 
-# Create an inset axis
-ax_inset = inset_axes(ax, width="30%", height="30%", loc="upper left")
-ax_inset.plot(hist.steps, hist.parameters, label="New")
-ax_inset.plot(hist_old.steps, hist_old.parameters, label="Old")
-ax_inset.axhline(0.0, xmin=0.0, ls="--", c="grey")
-ax_inset.set_xlim(-100, 300)  # Adjust limits to zoom into the origin
-ax_inset.set_ylim(-0.1, 0.1)  # Adjust limits to zoom into the origin
-ax_inset.set_xticks([])
-ax_inset.set_yticks([])
+# Plot the parameters over the steps
+for ax in axes:
+    ax.axhline(0.0, xmin=0.0, ls="--", c="grey")
+    ax.legend()
 
-# Mark the inset on the main plot
-mark_inset(ax, ax_inset, loc1=2, loc2=4, fc="none", ec="0.5")
+axes[0].set(title="Parameter Hisotry", xlabel="steps", ylabel="weight.parameter")
+axes[1].set(title="Weight Hisotry", xlabel="steps", ylabel="weight")
 
-ax.legend(loc="lower right")
+plt.tight_layout()
 plt.show()

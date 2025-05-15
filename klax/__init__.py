@@ -17,7 +17,9 @@ from ._losses import (
 from ._training import fit as fit
 from ._wrappers import (
     ParameterWrapper as ParameterWrapper,
-    NonNegative as NonNegative
+    apply as apply,
+    Positive as Positive,
+    NonNegative as NonNegative,
 )
 
 import paramax as px
