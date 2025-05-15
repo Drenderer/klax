@@ -4,6 +4,5 @@ from ._linear import (
 )
 from ._mlp import MLP as MLP
 from ._icnn import FICNN as FICNN
-from ._isnn import ISNN1 as ISNN1
 
-__all__ = ["Linear", "FullyLinear", "MLP"]
+__all__ = ["Linear", "InputSplitLinear", "MLP", "FICNN"]

@@ -1,10 +1,10 @@
-from klax.nn import Linear, InputSplitLinear, MLP, FICNN, ISNN1
-from klax.wrappers import NonNegative, unwrap
+import klax
+from klax.nn import Linear, InputSplitLinear, MLP, FICNN
 from jax.nn.initializers import uniform, he_normal
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
-import paramax as px
+import pytest
 
 
 def test_linear(getkey, getwrap):
@@ -47,7 +47,7 @@ def test_linear(getkey, getwrap):
         3, 4, uniform(), weight_wrap=getwrap, bias_wrap=getwrap, key=getkey()
     )
     x = jrandom.normal(getkey(), (3,))
-    assert jnp.all(px.unwrap(linear)(x) == 0.0)
+    assert jnp.all(klax.unwrap(linear)(x) == 0.0)
 
     # Data type
     linear = Linear(2, "scalar", uniform(), key=getkey(), dtype=jnp.float16)
@@ -108,10 +108,10 @@ def test_is_linear(getkey):
         (2, 3),
         "scalar",
         uniform(),
-        weight_wraps=[NonNegative, None],
+        weight_wraps=[klax.NonNegative, None],
         key=getkey(),
     )
-    assert isinstance(is_linear.weights[0], NonNegative)
+    assert isinstance(is_linear.weights[0], klax.NonNegative)
     assert isinstance(is_linear.weights[1], jax.Array)
 
     # Data types
@@ -172,43 +172,27 @@ def test_mlp(getkey):
     assert [mlp.layers[i].out_features for i in range(0, 3)] == [4, 8, 3]
 
 
-def test_ficnn(getkey):
+@pytest.mark.parametrize("use_passthrough", [True, False])
+@pytest.mark.parametrize("non_decreasing", [True, False])
+def test_ficnn(getkey, use_passthrough, non_decreasing):
     x = jrandom.normal(getkey(), (100, 2))  # Sample 100 random evaluation points
-    for use_passthrough, non_decreasing in [
-        (False, False),
-        (True, False),
-        (False, True),
-        (True, True),
-    ]:
-        ficnn = unwrap(
-            FICNN(
-                2,
-                "scalar",
-                1 * [8],
-                use_passthrough=use_passthrough,
-                non_decreasing=non_decreasing,
-                key=getkey(),
-            )
+    ficnn = klax.unwrap(
+        FICNN(
+            2,
+            "scalar",
+            1 * [8],
+            use_passthrough=use_passthrough,
+            non_decreasing=non_decreasing,
+            key=getkey(),
         )
-        assert ficnn(x[0]).shape == (), "Unexpected output shape"
-        if non_decreasing:
-            ficnn_x  = jax.vmap(jax.grad(ficnn))
-            assert jnp.all(ficnn_x(x) >= 0), "FICNN(..., non_decreasing=True) is not non-decreasing."
-        ficnn_xx = jax.vmap(jax.hessian(ficnn))
-        assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), "FICNN(...) is not convex."
+    )
 
-
-def test_isnn1(getkey):
-    isnn1 = unwrap(ISNN1((4, 1, 3, 2), (4,) * 4, (2,) * 4, key=getkey()))
-    x = jrandom.normal(getkey(), (4,))
-    y = jrandom.normal(getkey(), (1,))
-    t = jrandom.normal(getkey(), (3,))
-    z = jrandom.normal(getkey(), (2,))
-    assert isnn1(x, y, t, z).shape == ()
-
-    # isnn1 = unwrap(ISNN1((4, 0, 0, 0), (4,) * 4, (2,) * 4, key=getkey()))
-    # x = jrandom.normal(getkey(), (4,))
-    # y = jrandom.normal(getkey(), (0,))
-    # t = jrandom.normal(getkey(), (0,))
-    # z = jrandom.normal(getkey(), (0,))
-    # assert isnn1(x, y, t, z).shape == ()
+    # Assert expected output shape
+    assert ficnn(x[0]).shape == ()
+    # Assert the non-decreasing property
+    if non_decreasing:
+        grad_fun = jax.vmap(jax.grad(ficnn))
+        assert jnp.all(grad_fun(x) >= 0)
+    # Assert convexity
+    hessian_fun = jax.vmap(jax.hessian(ficnn))
+    assert jnp.all(jnp.linalg.eigvals(hessian_fun(x)) >= 0)
