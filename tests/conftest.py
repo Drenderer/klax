@@ -3,7 +3,6 @@ import typing
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
-import paramax as px
 import pytest
 
 
@@ -30,9 +29,6 @@ def getwrap():
     # Implementation of a dummy wrapper that sets all parameters to zero.
     class Wrapper(klax.ParameterWrapper):
         parameter: Array
-
-        def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
-            self.parameter = jnp.zeros_like(px.unwrap(parameter))
 
         def unwrap(self) -> Array:
             return jnp.zeros_like(self.parameter)
