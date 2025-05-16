@@ -16,8 +16,9 @@ from ._losses import (
 )
 from ._training import fit as fit
 from ._wrappers import (
+    AbstractUpdatable as AbstractUpdatable,
     ParameterWrapper as ParameterWrapper,
-    apply as apply,
+    update_wrapper as update_wrapper,
     Positive as Positive,
     NonNegative as NonNegative,
 )

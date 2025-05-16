@@ -18,7 +18,7 @@ from ._callbacks import (
 )
 from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
 from ._losses import Loss, mse
-from ._wrappers import apply
+from ._wrappers import update_wrapper
 
 
 def fit[T: eqx.Module, H: Callback](
@@ -127,8 +127,8 @@ def fit[T: eqx.Module, H: Callback](
         params = optax.apply_updates(params, updates)
         model = eqx.combine(params, static)
 
-        # Apply all wrappers
-        model = apply(model)
+        # Update all updatables
+        model = update_wrapper(model)
 
         flat_model = jax.tree_util.tree_leaves(model)
         flat_opt_state = jax.tree_util.tree_leaves(opt_state)
@@ -142,8 +142,8 @@ def fit[T: eqx.Module, H: Callback](
     else:
         opt_state = init_opt_state
 
-    # Initially apply all wrappers
-    model = apply(model)
+    # Initially update all updatables
+    model = update_wrapper(model)
 
     # Use the unflatten trick to speed up training,
     # see https://docs.kidger.site/equinox/tricks/
