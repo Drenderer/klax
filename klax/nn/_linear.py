@@ -12,6 +12,7 @@ from jax.nn.initializers import Initializer, zeros
 import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
+from paramax import contains_unwrappables
 
 from .._misc import default_floating_dtype
 from .._wrappers import ParameterWrapper
@@ -124,7 +125,7 @@ class Linear(eqx.Module, strict=True):
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
         """
-        assert not isinstance(self.weight, ParameterWrapper), (
+        assert not contains_unwrappables(self), (
             "Model must be unwrapped before calling."
         )
         if self.in_features == "scalar":
