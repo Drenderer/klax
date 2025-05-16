@@ -23,7 +23,8 @@ from ._linear import Linear, InputSplitLinear
 
 class FICNN(eqx.Module, strict=True):
     """
-    A [Fully Input Convex Neural Network](https://arxiv.org/abs/1609.07152).
+    A fully input convex neural network (https://arxiv.org/abs/1609.07152).
+
     Each element of the output is a convex function of the input.
     """
 
@@ -87,9 +88,12 @@ class FICNN(eqx.Module, strict=True):
                 initialisation. (Keyword only argument.)
         """
 
+        #TODO:
         # What's up with this? Why not let the user define a final activation?
         # def final_activation(x):
         #     return x
+        # Response jaosch: Changing the output activation could break convexity without
+        # notice.
 
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
