@@ -1,9 +1,27 @@
 ``klax.nn`` module
-=========================
+==================
+
+.. currentmodule:: klax.nn
+
+.. autosummary::
+    :toctree: _autosummary
+
+    Linear
+    InputSplitLinear
+    FICNN
+
+Linear
+~~~~~~
+
+.. autoclass:: Linear
 
 
-.. automodule:: klax.nn
-    :members:
-    :undoc-members:
-    :special-members: __init__, __call__
-    :member-order: bysource
+InputSplitLinear
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: InputSplitLinear
+
+FICNN
+~~~~~
+
+.. autoclass:: FICNN

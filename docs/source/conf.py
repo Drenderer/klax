@@ -35,14 +35,6 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = []
 
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "jax": ("https://jax.readthedocs.io/en/latest/", None),
-    "jaxtyping": ("https://docs.kidger.site/jaxtyping", None),
-    "equinox": ("https://docs.kidger.site/equinox", None),
-    "optax": ("https://optax.readthedocs.io/en/latest/", None),
-    "paramax": ("https://danielward27.github.io/paramax/", None),
-}
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -58,10 +50,35 @@ html_theme_options = {
 
 html_title = "Klax Docs"
 
+html_logo = "_static/dummy_logo.png"
+
+
+# -- Autodoc configuration  -------------------------------------------------
 autodoc_typehints_description_target = "all"
+
+# Aliases for some lengthy type annotations
 autodoc_type_aliases = {
     "ArrayLike": "jaxtyping.ArrayLike",
     "PRNGKeyArray": "PRNGKeyArray",
     "DataTree": "DataTree",
     "MaskTree": "MaskTree"
+}
+
+autodoc_default_options = {
+    "members": True,
+    "member-order": "bysource",
+    "special-members": True,
+    "exclude-members": "__weakref__, __delattr__, __setattr__",
+}
+
+
+# -- Intershinx configuration -------------------------------------------------
+# InterSphinx configuration
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "jax": ("https://jax.readthedocs.io/en/latest/", None),
+    "jaxtyping": ("https://docs.kidger.site/jaxtyping", None),
+    "equinox": ("https://docs.kidger.site/equinox", None),
+    "optax": ("https://optax.readthedocs.io/en/latest/", None),
+    "paramax": ("https://danielward27.github.io/paramax/", None),
 }

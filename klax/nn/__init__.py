@@ -1,4 +1,8 @@
-from ._linear import Linear as Linear, FullyLinear as FullyLinear
+from ._linear import (
+    Linear as Linear,
+    InputSplitLinear as InputSplitLinear,
+)
 from ._mlp import MLP as MLP
+from ._icnn import FICNN as FICNN
 
-__all__ = ["Linear", "FullyLinear", "MLP"]
+__all__ = ["Linear", "InputSplitLinear", "MLP", "FICNN"]

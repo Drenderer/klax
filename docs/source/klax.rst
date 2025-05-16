@@ -1,7 +1,7 @@
-.. currentmodule:: klax
 
 ``klax``
 ========
+
 
 Subpackages
 -----------
@@ -10,6 +10,11 @@ Subpackages
     :maxdepth: 1
 
     klax.nn
+
+
+.. currentmodule:: klax
+
+.. automodule:: klax
 
 
 Calibration and data handling
@@ -52,3 +57,6 @@ Callbacks
     CallbackArgs
     Callback
     HistoryCallback
+
+
+
