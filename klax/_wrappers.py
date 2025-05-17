@@ -6,7 +6,7 @@ from abc import abstractmethod
 import equinox as eqx
 import jax
 from jaxtyping import Array, PyTree
-from paramax import AbstractUnwrappable
+from paramax import AbstractUnwrappable, unwrap
 
 from typing import Union, TypeVar, Generic, final, TypeAlias
 
@@ -92,6 +92,20 @@ def update_wrapper(tree: PyTree):
     return _update_wrapper(tree, include_self=True)
 
 
+def finalize(tree: PyTree) -> PyTree:
+    """Finalize model pytree by updateing all updatable wrappers
+    and unwrapping.
+
+    Args:
+        tree: Model pytree potentially containing :class:`AbstractUnwrappable`
+        or :class:`AbstractUpdatable` leafs.
+
+    Returns:
+        Updated and unwrapped pytree.
+    """
+    return unwrap(update_wrapper(tree))
+
+
 class Positive(AbstractUnwrappable[Array]):
     """Wrapper that applies a non-negative constraint by passing the weight
     trough softplus.
@@ -132,8 +146,8 @@ class NonNegative(AbstractUpdatable[Array]):
     parameter: Array
 
     def __init__(self, parameter: Array):
-        # FIXME: This is just a quick fix of the issue that unwrap will 
-        # no longer make this positive and thus freshly created FICNN will not be 
+        # FIXME: This is just a quick fix of the issue that unwrap will
+        # no longer make this positive and thus freshly created FICNN will not be
         # convex after unwraping. I suggest creating a new klax wide function:
         # klax.finalize = klax.unwrap(klax.update_wrappers).
         self.parameter = jax.nn.relu(parameter)

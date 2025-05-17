@@ -26,23 +26,23 @@ def test_updatables():
     assert jnp.all(klax.unwrap(param_) == value + 2.0)
 
 
-def test_positive_unwrappable(getkey):
+def test_positive_finalizepable(getkey):
     # Negative array input
     parameter = -jrandom.uniform(getkey(), (10,))
     non_neg = klax.Positive(parameter)
-    assert isinstance(px.unwrap(non_neg), Array)
-    assert jnp.all(px.unwrap(non_neg) > 0)
+    assert isinstance(klax.finalize(non_neg), Array)
+    assert jnp.all(klax.finalize(non_neg) > 0)
 
     # Positive array input
     parameter = jrandom.uniform(getkey(), (10,))
     non_neg = klax.Positive(parameter)
-    assert jnp.all(px.unwrap(non_neg) > parameter)
+    assert jnp.all(klax.finalize(non_neg) > parameter)
 
     # Wrapper composition
     parameter = -jrandom.uniform(getkey(), (10,))
     parameter = px.Parameterize(lambda x: x, parameter)
     non_neg = klax.Positive(parameter)
-    assert isinstance(px.unwrap(non_neg), Array)
+    assert isinstance(klax.finalize(non_neg), Array)
 
 
 def test_non_negative_updatable(getkey):
@@ -50,11 +50,11 @@ def test_non_negative_updatable(getkey):
     parameter = -jrandom.uniform(getkey(), (10,))
     non_neg = klax.NonNegative(parameter)
     non_neg = klax.update_wrapper(non_neg)
-    assert isinstance(px.unwrap(non_neg), Array)
-    assert jnp.all(px.unwrap(non_neg) >= 0)
+    assert isinstance(klax.finalize(non_neg), Array)
+    assert jnp.all(klax.finalize(non_neg) >= 0)
 
     # NonNegative array input
     parameter = jrandom.uniform(getkey(), (10,))
     non_neg = klax.NonNegative(parameter)
     non_neg = klax.update_wrapper(non_neg)
-    assert jnp.all(px.unwrap(non_neg) >= parameter)
+    assert jnp.all(klax.finalize(non_neg) >= parameter)

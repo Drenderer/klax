@@ -47,7 +47,7 @@ def test_linear(getkey, getwrap):
         3, 4, uniform(), weight_wrap=getwrap, bias_wrap=getwrap, key=getkey()
     )
     x = jrandom.normal(getkey(), (3,))
-    assert jnp.all(klax.unwrap(linear)(x) == 0.0)
+    assert jnp.all(klax.finalize(linear)(x) == 0.0)
 
     # Data type
     linear = Linear(2, "scalar", uniform(), key=getkey(), dtype=jnp.float16)

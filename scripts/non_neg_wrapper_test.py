@@ -16,7 +16,7 @@ from jaxtyping import Array
 
 from matplotlib import pyplot as plt
 
-from klax import fit, ParameterWrapper, NonNegative, Positive, unwrap, HistoryCallback
+from klax import fit, ParameterWrapper, NonNegative, Positive, finalize, HistoryCallback
 
 
 # %% Define old NonNegative Wrapper
@@ -32,7 +32,7 @@ class OldNonNegative(ParameterWrapper):
 
     def __init__(self, parameter: Array | ParameterWrapper):
         # Ensure that the parameter fulfills the constraint initially
-        self.parameter = self._non_neg(unwrap(parameter))
+        self.parameter = self._non_neg(finalize(parameter))
 
     def _non_neg(self, x: Array) -> Array:
         return jnp.maximum(x, 0)
@@ -54,7 +54,7 @@ class ParameterHistory(HistoryCallback):
         super().__call__(cbargs)
         if cbargs.step % self.log_every == 0:
             self.parameters.append(cbargs.model.weight.parameter)
-            self.weights.append(unwrap(cbargs.model).weight)
+            self.weights.append(finalize(cbargs.model).weight)
 
 
 # %% Define a simple model
@@ -80,14 +80,14 @@ for wrapper in [OldNonNegative, NonNegative, Positive]:
     model = SimpleModel(wrapper)
 
     print(
-        f"{wrapper.__name__}: Initial weights\nunwrapped weight: {unwrap(model).weight}, parameter: {model.weight.parameter}"
+        f"{wrapper.__name__}: Initial weights\nfinalized weight: {finalize(model).weight}, parameter: {model.weight.parameter}"
     )
 
     model, hist = fit(model, (x, y1), steps=5000, history=ParameterHistory(), key=key)
     model, hist = fit(model, (x, y2), steps=5000, history=hist, key=key)
 
     print(
-        f"{wrapper.__name__}: Final weights\nunwrapped weight: {unwrap(model).weight}, parameter: {model.weight.parameter}"
+        f"{wrapper.__name__}: Final weights\nfinalized weight: {finalize(model).weight}, parameter: {model.weight.parameter}"
     )
 
     axes[0].plot(hist.steps, hist.parameters, label=wrapper.__name__)
