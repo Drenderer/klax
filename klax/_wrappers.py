@@ -21,10 +21,12 @@ class AbstractUpdatable(
 ):
     """An abstract class representing an updatable and unwrappable object.
 
-    Updatables replace PyTree nodes, applying custom behavior upon updating.
+    Updatables wrap pytree nodes and implement custom behavior applied
+    to the `parameter` attribute upon updating.
 
     Inherrit from this class and define an :meth:`update` behavior to implement
-    custom updatables.
+    custom updatables. The :meth:`update` method should return the updated value
+    of the parameter attribute.
     """
 
     parameter: Union[T, AbstractUpdatable[T]]
