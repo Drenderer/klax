@@ -2,7 +2,7 @@
 #
 #     https://github.com/patrick-kidger/equinox
 #
-# licensed under Apache 2.0. Changed we made to class `Linear`.
+# licensed under Apache 2.0. Changes were made to class `Linear`.
 #
 # Modifications copyright 2025 The Klax Authors.
 #

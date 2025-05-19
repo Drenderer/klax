@@ -2,7 +2,7 @@
 #
 #     https://github.com/patrick-kidger/equinox
 #
-# licensed under Apache 2.0. Changed were made to class `MLP`.
+# licensed under Apache 2.0. Changes were made to class `MLP`.
 #
 # Modifications copyright 2025 The Klax Authors.
 #
