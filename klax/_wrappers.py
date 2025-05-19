@@ -131,12 +131,5 @@ class NonNegative(AbstractUpdatable[Array]):
 
     parameter: Array
 
-    def __init__(self, parameter: Array):
-        # FIXME: This is just a quick fix of the issue that unwrap will 
-        # no longer make this positive and thus freshly created FICNN will not be 
-        # convex after unwraping. I suggest creating a new klax wide function:
-        # klax.finalize = klax.unwrap(klax.update_wrappers).
-        self.parameter = jax.nn.relu(parameter)
-
     def update(self) -> Array:
         return jax.nn.relu(self.parameter)
