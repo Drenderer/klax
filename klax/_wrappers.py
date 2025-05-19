@@ -39,13 +39,11 @@ def unwrap(tree: PyTree):
     Example:
         Enforcing positivity.
 
-        .. doctest::
-
-            >>> import paramax
-            >>> import jax.numpy as jnp
-            >>> params = paramax.Parameterize(jnp.exp, jnp.zeros(3))
-            >>> paramax.unwrap(("abc", 1, params))
-            ('abc', 1, Array([1., 1., 1.], dtype=float32))
+        >>> import klax
+        >>> import jax.numpy as jnp
+        >>> params = klax.Parameterize(jnp.exp, jnp.zeros(3))
+        >>> klax.unwrap(("abc", 1, params))
+        ('abc', 1, Array([1., 1., 1.], dtype=float32))
     """
 
     def _unwrap(tree, *, include_self: bool):
@@ -70,20 +68,19 @@ class Parameterize(AbstractUnwrappable[T]):
 
     All of fn, args and kwargs may contain trainable parameters.
 
-    .. note::
+    Note:
 
         Unwrapping typically occurs after model initialization. Therefore, if the
         ``Parameterize`` object may be created in a vectorized context, we recommend
         ensuring that ``fn`` still unwraps correctly, e.g. by supporting broadcasting.
 
     Example:
-        .. doctest::
 
-            >>> from paramax.wrappers import Parameterize, unwrap
-            >>> import jax.numpy as jnp
-            >>> positive = Parameterize(jnp.exp, jnp.zeros(3))
-            >>> unwrap(positive)  # Aplies exp on unwrapping
-            Array([1., 1., 1.], dtype=float32)
+        >>> from klax import Parameterize, unwrap
+        >>> import jax.numpy as jnp
+        >>> positive = Parameterize(jnp.exp, jnp.zeros(3))
+        >>> unwrap(positive)  # Aplies exp on unwrapping
+        Array([1., 1., 1.], dtype=float32)
 
     Args:
         fn: Callable to call with args, and kwargs.
@@ -172,13 +169,6 @@ class ArrayWrapper(AbstractUnwrappable[Array]):
     cannot be nested but is fully compatible with paramax's unwrapping functionality.
     """
 
-    def __init__(self, parameter: Array):
-        raise NotImplementedError("To be implemented by derived classes")
-
-    @abstractmethod
-    def unwrap(self) -> Array:
-        pass
-
     @abstractmethod
     def apply(self) -> Self:
         pass
@@ -229,18 +219,18 @@ class NonNegative(ArrayWrapper):
 
     parameter: Array
 
-    def __init__(self, parameter: Array):
-        # Ensure that the parameter fulfills the constraint initially
-        self.parameter = self._non_neg(parameter)
-
     def _non_neg(self, x: Array) -> Array:
         return jnp.maximum(x, 0)
 
     def unwrap(self) -> Array:
         return self._non_neg(self.parameter)
 
-    def apply(self) -> "NonNegative":
-        return NonNegative(self._non_neg(self.parameter))
+    def apply(self) -> Self:
+        return eqx.tree_at(
+            lambda x: x.parameter,
+            self,
+            replace_fn=lambda x: self._non_neg(x),
+        )
 
 
 # ===-----------------------------------------------------------------------===#
@@ -249,7 +239,7 @@ class NonNegative(ArrayWrapper):
 
 
 def contains_unwrappables(pytree):
-    """Check if a pytree contains unwrappables."""
+    """Check if a ``PyTree`` contains unwrappables."""
 
     def _is_unwrappable(leaf):
         return isinstance(leaf, AbstractUnwrappable)
