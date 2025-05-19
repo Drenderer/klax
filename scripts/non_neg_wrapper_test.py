@@ -8,9 +8,10 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from paramax import unwrap
 
-from klax import fit
-from klax.wrappers import NonNegative, unwrap
+from klax import fit, NonNegative, apply
+
 
 
 # %% Define a simple model
@@ -39,6 +40,11 @@ model = SimpleModel()
 # )
 
 print("Initial weight:", unwrap(model).weight)
+print("Initial parameter:", model.weight.parameter)
+
+model = apply(model)
+
+print("Parameter after applying wrapper:", model.weight.parameter)
 
 model, hist = fit(
     model,
@@ -48,5 +54,6 @@ model, hist = fit(
 )
 
 print("Final weight:", unwrap(model).weight)
+print("Final parameter:", model.weight.parameter)
 
 
