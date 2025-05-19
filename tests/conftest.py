@@ -3,7 +3,6 @@ import typing
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
-import paramax as px
 import pytest
 
 

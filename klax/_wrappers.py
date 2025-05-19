@@ -164,6 +164,7 @@ class NonTrainable(AbstractUnwrappable[T]):
 #  ArrayWrapper
 # ===-----------------------------------------------------------------------===#
 
+
 class ArrayWrapper(AbstractUnwrappable[Array]):
     """An abstract class representing array wrappers.
 
