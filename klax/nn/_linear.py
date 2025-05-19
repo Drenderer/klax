@@ -13,7 +13,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from .._wrappers import ParameterWrapper
+from .._wrappers import ArrayWrapper
 
 
 class Linear(eqx.Module, strict=True):
@@ -22,8 +22,8 @@ class Linear(eqx.Module, strict=True):
     This class is modified from eqx.nn.Linear to allow for custom initialization.
     """
 
-    weight: Array | ParameterWrapper
-    bias: Optional[Array | ParameterWrapper]
+    weight: Array | ArrayWrapper
+    bias: Optional[Array | ArrayWrapper]
     in_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -35,8 +35,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: Type[ParameterWrapper] | None = None,
-        bias_wrap: Type[ParameterWrapper] | None = None,
+        weight_wrap: Type[ArrayWrapper] | None = None,
+        bias_wrap: Type[ArrayWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -50,9 +50,9 @@ class Linear(eqx.Module, strict=True):
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_warp: An optional `klax.wrappers.ParameterWrapper` that can be passed
+            weight_warp: An optional `klax.wrappers.ArrayWrapper` that can be passed
                to enforce weight constraints.
-            bias_warp: An optional `klax.wrappers.ParameterWrapper` that can be passed
+            bias_warp: An optional `klax.wrappers.ArrayWrapper` that can be passed
                to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending

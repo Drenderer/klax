@@ -28,14 +28,17 @@ def getwrap():
     import klax
 
     # Implementation of a dummy wrapper that sets all parameters to zero.
-    class Wrapper(klax.ParameterWrapper):
+    class Wrapper(klax.ArrayWrapper):
         parameter: Array
 
-        def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):
-            self.parameter = jnp.zeros_like(px.unwrap(parameter))
+        def __init__(self, parameter: Array):
+            self.parameter = jnp.zeros_like(parameter)
 
         def unwrap(self) -> Array:
             return jnp.zeros_like(self.parameter)
+
+        def apply(self) -> "Wrapper":
+            return Wrapper(self.parameter)
 
     return Wrapper
 
