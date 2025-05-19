@@ -7,7 +7,6 @@ import equinox as eqx
 import jax
 from jax import lax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 
@@ -255,5 +254,5 @@ def contains_unwrappables(pytree):
     def _is_unwrappable(leaf):
         return isinstance(leaf, AbstractUnwrappable)
 
-    leaves = jtu.tree_leaves(pytree, is_leaf=_is_unwrappable)
+    leaves = jax.tree.leaves(pytree, is_leaf=_is_unwrappable)
     return any(_is_unwrappable(leaf) for leaf in leaves)
