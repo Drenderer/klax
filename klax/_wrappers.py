@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+
 from abc import abstractmethod
 import equinox as eqx
 import jax
 from jaxtyping import Array, PyTree
-from paramax import AbstractUnwrappable
+from paramax import AbstractUnwrappable, unwrap
 
 from typing import Union, TypeVar, Generic, final, TypeAlias
 
@@ -21,10 +22,12 @@ class AbstractUpdatable(
 ):
     """An abstract class representing an updatable and unwrappable object.
 
-    Updatables replace PyTree nodes, applying custom behavior upon updating.
+    Updatables wrap pytree nodes and implement custom behavior applied
+    to the `parameter` attribute upon updating.
 
     Inherrit from this class and define an :meth:`update` behavior to implement
-    custom updatables.
+    custom updatables. The :meth:`update` method should return the updated value
+    of the parameter attribute.
     """
 
     parameter: Union[T, AbstractUpdatable[T]]
@@ -90,6 +93,20 @@ def update_wrapper(tree: PyTree):
         return jax.tree_util.tree_map(f=_map_fn, tree=tree, is_leaf=is_leaf)
 
     return _update_wrapper(tree, include_self=True)
+
+
+def finalize(tree: PyTree) -> PyTree:
+    """Finalize model pytree by updateing all updatable wrappers
+    and unwrapping.
+
+    Args:
+        tree: Model pytree potentially containing :class:`AbstractUnwrappable`
+        or :class:`AbstractUpdatable` leafs.
+
+    Returns:
+        Updated and unwrapped pytree.
+    """
+    return unwrap(update_wrapper(tree))
 
 
 class Positive(AbstractUnwrappable[Array]):
