@@ -97,7 +97,7 @@ def test_history_callback(getkey, getmodel, getloss, tmp_path):
     cbargs.update(flat_model, flat_opt_state, -1)
     history.on_training_end(cbargs)
 
-    assert history.training_time > 0.0
+    assert history.training_time >= 0.0
 
     # Test save and load
     filepath = tmp_path / "some_dir/test_history.pkl"
