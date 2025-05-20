@@ -1,3 +1,17 @@
+# Copyright 2025 The Klax Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 from abc import ABC
 from collections.abc import Callable
@@ -14,14 +28,15 @@ from pathlib import Path
 
 class CallbackArgs:
     """
-    Callback arguments object, designed to work in conjunction with :py:func:`klax.fit`.
+    A callback argument designed to work in conjunction with :py:func:`klax.fit`.
+
     This class should not be instantiated directly.
     An instance of this class is passed to every callback object in the fit function.
     When writing a custom callback, use the properties of this class to access the
     current model, optimizer state, training data, and validation data during training.
 
     This class implements cached and lazy-evaluated values via property
-    methods. This means that properties like training_loss are only calculated
+    methods. This means that properties like ``loss`` are only calculated
     if they are used and are stored such that they are not calculated multiple
     times.
     """
@@ -46,8 +61,7 @@ class CallbackArgs:
         data: PyTree,
         val_data: Optional[PyTree] = None,
     ):
-        """Initializes the callback arguments object for one run of the fit :py:func:`klax.fit`.
-
+        """
         Args:
             get_loss: Function that takes a model and a batch of data and returns the loss.
             treedef_model: ``PyTreeDef`` of the model.
@@ -63,7 +77,9 @@ class CallbackArgs:
         self._treedef_opt_state = treedef_opt_state
 
     def update(self, flat_model: PyTree, flat_opt_state: PyTree, step: int):
-        """Updates the callback arguments object with the current model and optimizer state.
+        """
+        Updates the callback arguments object with the current model and optimizer state.
+
         This method is called repeatedly in :py:func:`klax.fit`.
 
         Args:
@@ -81,7 +97,7 @@ class CallbackArgs:
 
     @staticmethod
     def _lazy_evaluated_and_cached(fun: Callable) -> property:
-        """Turns a public method into a property
+        """Turns a public method into a property.
 
         The return value of `fun`is stored in the `_cache` dictionary of the
         current object using the function name as key. If the name is already in
@@ -149,8 +165,9 @@ class Callback(ABC):
 
 class HistoryCallback(Callback):
     """Default callback for logging a training process.
-    Records training and validation loss histories, as well as the
-    trainin time and the last optimizer state."""
+
+    Records loss histories, training time, and the last optimizer state.
+    """
 
     log_every: int
     steps: list
@@ -164,8 +181,7 @@ class HistoryCallback(Callback):
     last_opt_state: PyTree | None = None
 
     def __init__(self, log_every: int = 100, verbose: bool = True):
-        """Initializes the history callback.
-
+        """
         Args:
             log_every: Amount of steps after which the training
                 and validation losses are logged.
@@ -184,8 +200,10 @@ class HistoryCallback(Callback):
         return f"HistoryCallback(log_every={self.log_every}, verbose={self.verbose})"
 
     def __call__(self, cbargs: CallbackArgs):
-        """Called at each step during training.
-        Records the training and validation loss, as well as the step count."""
+        """Records the losses and step count.
+        
+        Called at each step during training.
+        """
         if cbargs.step % self.log_every == 0:
             self.steps.append(self.step_offset + cbargs.step)
             self.loss.append(cbargs.loss)
@@ -199,8 +217,9 @@ class HistoryCallback(Callback):
                 print(message)
 
     def on_training_start(self, cbargs: CallbackArgs):
-        """Called at beginning of training.
-        Initializes the training start time.
+        """Initializes the training start time.
+        
+        Called at beginning of training.
         """
         self.last_start_time = cbargs.time_on_last_update
         if self.steps:  # If there are already steps, we assume that this is a continuation of a training.
@@ -209,8 +228,10 @@ class HistoryCallback(Callback):
             self(cbargs)
 
     def on_training_end(self, cbargs: CallbackArgs):
-        """Called at end of training.
-        Records the training end time and the last optimizer state."""
+        """Records the training end time and the last optimizer state.
+
+        Called at end of training.
+        """
         self.last_end_time = cbargs.time_on_last_update
         self.training_time += self.last_end_time - self.last_start_time
         self.last_opt_state = cbargs.opt_state
@@ -218,8 +239,10 @@ class HistoryCallback(Callback):
             print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
 
     def plot(self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}):
-        """Plot the recorded training and validation losses.
-        This method uses matplotlib.
+        """Plots the recorded training and validation losses.
+
+        Note:
+            This method requires matplotlib.
 
         Args:
             ax: Matplotlib axes to plot into. If ``None`` then a new
