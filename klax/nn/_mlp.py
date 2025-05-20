@@ -20,12 +20,7 @@
 
 from __future__ import annotations
 from collections.abc import Callable
-from typing import (
-    Literal,
-    Optional,
-    Union,
-    Iterable,
-)
+from typing import Literal, Optional, Sequence, Union
 
 import equinox as eqx
 import jax
@@ -59,10 +54,10 @@ class MLP(eqx.Module, strict=True):
         self,
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
-        width_sizes: Iterable[int],
-        weight_init: Initializer = he_normal(in_axis=-1, out_axis=-2),
+        width_sizes: Sequence[int],
+        weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
-        activation: Callable = jax.nn.relu,
+        activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
@@ -73,14 +68,16 @@ class MLP(eqx.Module, strict=True):
         """
         Args:
             in_size: The input size. The input to the module should be a vector
-                of shape `(in_features,)`
+                of shape `(in_features,)`.
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
+                Defaults to he_normal().
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+                Defaults to zeros.
             activation: The activation function after each hidden layer.
-                (Defaults to ReLU).
+                (Defaults to `jax.nn.softplus`).
             final_activation: The activation function after the output layer.
                 (Defaults to the identity.)
             use_bias: Whether to add on a bias to internal layers.
@@ -109,23 +106,21 @@ class MLP(eqx.Module, strict=True):
         self.use_bias = use_bias
         self.use_final_bias = use_final_bias
 
-        layer_in_sizes = (in_size,) + width_sizes
-        layer_out_sizes = width_sizes + (out_size,)
-        layer_use_bias_flags = len(width_sizes) * (use_bias,) + (use_final_bias,)
-        layer_keys = jrandom.split(key, len(layer_out_sizes))
+        in_sizes = (in_size,) + width_sizes
+        out_sizes = width_sizes + (out_size,)
+        use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
+        keys = jrandom.split(key, len(out_sizes))
         self.layers = tuple(
             Linear(
-                layer_in_size,
-                layer_out_size,
+                sin,
+                sout,
                 weight_init,
                 bias_init,
-                layer_use_bias,
+                ub,
                 dtype=dtype,
-                key=layer_key,
+                key=key,
             )
-            for layer_in_size, layer_out_size, layer_use_bias, layer_key in zip(
-                layer_in_sizes, layer_out_sizes, layer_use_bias_flags, layer_keys
-            )
+            for sin, sout, ub, key in zip(in_sizes, out_sizes, use_biases, keys)
         )
 
         # In case `activation` or `final_activation` are learnt, then make a separate

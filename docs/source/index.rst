@@ -6,7 +6,7 @@
 Klax
 ====
 
-A package for building and calibrating semi-common machine learning architectures in JAX.
+A lightweight machine learning pacakge for computational mechanics.
 
 The package is build on top of Equinox, Optax, and Paramax. It is aimed at
 providing access to implementations of specialized machine learning models, such
@@ -25,8 +25,20 @@ ecosystem. All parameters constraints are derived from
 
 
 .. toctree::
+   :hidden:
+
+   examples
+
+
+.. toctree::
+   :hidden:
    :maxdepth: 1
-   :caption: API Reference
+   :caption: 📖 Reference
 
    klax
+
+
+License
+-------
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
