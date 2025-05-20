@@ -13,7 +13,7 @@ from jaxtyping import PRNGKeyArray, Array
 
 from . import MLP
 from .._misc import default_floating_dtype
-from ..wrappers import SkewSymmetric
+from .._wrappers import SkewSymmetric
 
 type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
 

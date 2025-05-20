@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import klax
 import jax.random as jr
 import jax.numpy as jnp
 from jaxtyping import Array
@@ -24,22 +23,22 @@ def test_non_negative(getkey):
     # Negative array input
     parameter = -jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert jnp.all(px.unwrap(non_neg) == 0)
+    assert jnp.all(unwrap(non_neg) == 0)
 
     # Positive array input
     parameter = jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert jnp.all(px.unwrap(non_neg) == parameter)
+    assert jnp.all(unwrap(non_neg) == parameter)
 
     # Array output type
     parameter = -jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert isinstance(px.unwrap(non_neg), Array)
+    assert isinstance(unwrap(non_neg), Array)
 
     parameter = -jr.uniform(getkey(), (10,))
     parameter = px.Parameterize(lambda x: x, parameter)
     non_neg = NonNegative(parameter)
-    assert isinstance(px.unwrap(non_neg), Array)
+    assert isinstance(unwrap(non_neg), Array)
 
 def test_symmetric(getkey):
     # Constraint
