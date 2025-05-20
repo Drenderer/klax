@@ -144,7 +144,7 @@ class Linear(eqx.Module, strict=True):
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
         """
-        assert not isinstance(self.weight, ParameterWrapper), (
+        assert not isinstance(self.weight, ArrayWrapper), (
             "Model must be unwrapped before calling."
         )
         if self.in_features == "scalar":
@@ -169,8 +169,8 @@ class InputSplitLinear(eqx.Module, strict=True):
     or initialization for the corresponding weight matrices.
     """
 
-    weights: Tuple[Array | ParameterWrapper, ...]
-    bias: Optional[Array | ParameterWrapper]
+    weights: Tuple[Array | ArrayWrapper, ...]
+    bias: Optional[Array | ArrayWrapper]
     in_features: Tuple[Union[int, Literal["scalar"]], ...] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -183,10 +183,10 @@ class InputSplitLinear(eqx.Module, strict=True):
         weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wraps: Sequence[type[ParameterWrapper] | None]
-        | type[ParameterWrapper]
+        weight_wraps: Sequence[type[ArrayWrapper] | None]
+        | type[ArrayWrapper]
         | None = None,
-        bias_wrap: type[ParameterWrapper] | None = None,
+        bias_wrap: type[ArrayWrapper] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -203,12 +203,12 @@ class InputSplitLinear(eqx.Module, strict=True):
                 The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wraps: An optional `klax.wrappers.ParameterWrapper` or sequence of
-                `klax.wrappers.ParameterWrapper` that can be passed to enforce weight
+            weight_wraps: An optional `klax.wrappers.ArrayWrapper` or sequence of
+                `klax.wrappers.ArrayWrapper` that can be passed to enforce weight
                 constraints. By specifying a sequence it is possible to apply a
                 different wrapper to each weight matrix. The sequence must have the
                 same length as in_features.
-            bias_wrap: An optional `klax.wrappers.ParameterWrapper` that can be passed
+            bias_wrap: An optional `klax.wrappers.ArrayWrapper` that can be passed
                to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
