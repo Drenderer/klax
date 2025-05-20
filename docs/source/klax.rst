@@ -1,5 +1,7 @@
+
 ``klax``
 ========
+
 
 Subpackages
 -----------
@@ -7,17 +9,54 @@ Subpackages
 .. toctree::
     :maxdepth: 1
 
-    klax.callbacks
-    klax.losses
     klax.nn
-    klax.wrappers
 
 
-Module contents
----------------
+.. currentmodule:: klax
 
 .. automodule:: klax
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    :member-order: bysource
+
+
+Calibration and data handling
+-----------------------------
+
+.. autosummary::
+    :toctree: _autosummary
+
+    batch_data
+    split_data
+    fit
+
+
+Wrappers and constraints
+----------------------------------
+
+.. autosummary::
+    :toctree: _autosummary
+
+    ParameterWrapper
+    NonNegative
+
+
+Loss functions
+---------------
+
+.. autosummary::
+    :toctree: _autosummary
+
+    Loss
+    mse
+
+
+Callbacks
+---------
+
+.. autosummary::
+    :toctree: _autosummary
+
+    CallbackArgs
+    Callback
+    HistoryCallback
+
+
+

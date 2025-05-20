@@ -1,15 +1,30 @@
 ``klax.nn`` module
-=========================
+==================
 
-Basic neural network components
--------------------------------
+.. currentmodule:: klax.nn
 
 .. autosummary::
-   :toctree: _autosummary
-   :nosignatures:
+    :toctree: _autosummary
 
-   klax.nn.Linear
-   klax.nn.MLP
+    Linear
+    InputSplitLinear
+    FICNN
+
+Linear
+~~~~~~
+
+.. autoclass:: Linear
+
+
+InputSplitLinear
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: InputSplitLinear
+
+FICNN
+~~~~~
+
+.. autoclass:: FICNN
 
 Matrix-valued neural network functions
 --------------------------------------

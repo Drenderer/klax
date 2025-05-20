@@ -10,7 +10,7 @@ import pytest
 typing.TESTING = True  # pyright: ignore
 
 
-# jax.config.update("jax_numpy_dtype_promotion", "strict")  # Causes issues because implicit data type promotion is used in klax.fit since the default dataloader works with numpy arrays
+# jax.config.update("jax_numpy_dtype_promotion", "strict")  # Causes issues because implicit data type promotion is used in klax.fit since the default batch_data works with numpy arrays
 jax.config.update("jax_numpy_rank_promotion", "raise")
 
 
@@ -28,7 +28,7 @@ def getwrap():
     import klax
 
     # Implementation of a dummy wrapper that sets all parameters to zero.
-    class Wrapper(klax.wrappers.ParameterWrapper):
+    class Wrapper(klax.ParameterWrapper):
         parameter: Array
 
         def __init__(self, parameter: Array | px.AbstractUnwrappable[Array]):

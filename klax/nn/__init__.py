@@ -1,5 +1,9 @@
-from ._linear import Linear as Linear, FullyLinear as FullyLinear
+from ._linear import (
+    Linear as Linear,
+    InputSplitLinear as InputSplitLinear,
+)
 from ._mlp import MLP as MLP
+from ._icnn import FICNN as FICNN
 from ._matrices import (
     Matrix as Matrix,
     ConstantMatrix as ConstantMatrix,
@@ -11,8 +15,9 @@ from ._matrices import (
 
 __all__ = [
     "Linear",
-    "FullyLinear",
-    "MLP",
+    "InputSplitLinear",
+    "MLP", 
+    "FICNN",
     "Matrix",
     "ConstantMatrix",
     "SkewSymmetricMatrix",
