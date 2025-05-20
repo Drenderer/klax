@@ -148,7 +148,7 @@ def non_trainable(tree: PyTree):
     return jax.tree.map(
         f=_map_fn,
         tree=tree,
-        is_leaf=lambda x: isinstance(x, NonTrainable),
+        is_leaf=lambda x: isinstance(x, (NonTrainable, ArrayWrapper)),
     )
 
 

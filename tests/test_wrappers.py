@@ -37,13 +37,20 @@ def test_parameterize():
     assert jnp.allclose(jnp.eye(3), unwrap(diag))
 
 
-def test_non_trainable():
+def test_non_trainable(getwrap):
+    # Array model
     model = non_trainable((jnp.ones(3), 1))
     def loss(model):
         model = unwrap(model)
         return model[0].sum()
 
     grad = eqx.filter_grad(loss)(model)[0].tree
+    assert grad.shape == (3,)
+    assert jnp.all(grad == 0.0)
+
+    # ArrayWrapper model
+    model = non_trainable((getwrap(jnp.ones(3)), 1))
+    grad = eqx.filter_grad(loss)(model)[0].tree.parameter
     assert grad.shape == (3,)
     assert jnp.all(grad == 0.0)
 

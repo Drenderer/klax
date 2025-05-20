@@ -37,17 +37,14 @@ def getkey():
 
 
 @pytest.fixture
-def getwrap():
+def getzerowrap():
     import equinox as eqx
     import klax
     from typing import Self
 
-    # Implementation of a dummy wrapper that sets all parameters to zero.
-    class Wrapper(klax.ArrayWrapper):
+    class ZeroWrapper(klax.ArrayWrapper):
+        """A dummy wrapper that sets all parameters to zero."""
         parameter: Array
-
-        def __init__(self, parameter: Array):
-            self.parameter = jnp.zeros_like(parameter)
 
         def unwrap(self) -> Array:
             return jnp.zeros_like(self.parameter)
@@ -57,6 +54,28 @@ def getwrap():
                 lambda x: x.parameter,
                 self,
                 replace_fn=lambda x: jnp.zeros_like(x),
+            )
+
+    return ZeroWrapper
+
+@pytest.fixture
+def getwrap():
+    import equinox as eqx
+    import klax
+    from typing import Self
+
+    class Wrapper(klax.ArrayWrapper):
+        """A dummy wrapper that multiplies the parameter by 2."""
+        parameter: Array
+
+        def unwrap(self) -> Array:
+            return 2 * self.parameter
+
+        def apply(self) -> Self:
+            return eqx.tree_at(
+                lambda x: x.parameter,
+                self,
+                replace_fn=lambda x: 2 * x,
             )
 
     return Wrapper

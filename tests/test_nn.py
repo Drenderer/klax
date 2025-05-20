@@ -21,7 +21,7 @@ import jax.random as jrandom
 import pytest
 
 
-def test_linear(getkey, getwrap):
+def test_linear(getkey, getzerowrap):
     # Zero input shape
     linear = Linear(0, 4, uniform(), key=getkey())
     x = jrandom.normal(getkey(), (0,))
@@ -58,7 +58,7 @@ def test_linear(getkey, getwrap):
 
     # Wrappers
     linear = Linear(
-        3, 4, uniform(), weight_wrap=getwrap, bias_wrap=getwrap, key=getkey()
+        3, 4, uniform(), weight_wrap=getzerowrap, bias_wrap=getzerowrap, key=getkey()
     )
     x = jrandom.normal(getkey(), (3,))
     assert jnp.all(klax.unwrap(linear)(x) == 0.0)
