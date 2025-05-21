@@ -30,7 +30,7 @@ from klax._misc import default_floating_dtype
 from klax.nn import FICNN, MLP, Linear
 from klax import fit
 from klax import HistoryCallback
-from klax import ArrayWrapper, NonNegative
+from klax import Constraint, NonNegative
 
 
 # %% Custom code for timeing code
@@ -69,7 +69,7 @@ def time_code(func, msg=""):
 # %% Define alternative FICNN implementations
 
 
-class PartialInputNonNegative(ArrayWrapper):
+class PartialInputNonNegative(Constraint):
     parameter: Array
     n: int
 

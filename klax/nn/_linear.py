@@ -34,7 +34,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from .._wrappers import ArrayWrapper
+from .._wrappers import Constraint, Unwrappable, contains_unwrappables
 
 
 class Linear(eqx.Module, strict=True):
@@ -43,8 +43,8 @@ class Linear(eqx.Module, strict=True):
     This class is modified from `eqx.nn.Linear` to allow for custom initialization.
     """
 
-    weight: Array | ArrayWrapper
-    bias: Optional[Array | ArrayWrapper]
+    weight: Array | Unwrappable[Array]
+    bias: Optional[Array | Unwrappable[Array]]
     in_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -56,8 +56,8 @@ class Linear(eqx.Module, strict=True):
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: type[ArrayWrapper] | None = None,
-        bias_wrap: type[ArrayWrapper] | None = None,
+        weight_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
+        bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -65,21 +65,21 @@ class Linear(eqx.Module, strict=True):
         """
         Args:
             in_features: The input size. The input to the layer should be a vector of
-               shape `(in_features,)`
+                shape `(in_features,)`
             out_features: The output size. The output from the layer will be a vector
-               of shape `(out_features,)`.
+                of shape `(out_features,)`.
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_warp: An optional `klax.ArrayWrapper` that can be passed
-               to enforce weight constraints.
-            bias_warp: An optional `klax.ArrayWrapper` that can be passed
-               to enforce bias constraints.
+            weight_warp: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce weight constraints.
+            bias_warp: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
-               Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
-               on whether JAX is in 64-bit mode.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
+                on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for parameter
-               initialisation. (Keyword only argument.)
+                initialisation. (Keyword only argument.)
 
         Note:
             Note that `in_features` also supports the string `"scalar"` as a
@@ -144,8 +144,9 @@ class Linear(eqx.Module, strict=True):
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
         """
-        assert not isinstance(self.weight, ArrayWrapper), (
-            "Model must be unwrapped before calling."
+
+        assert not contains_unwrappables(self), (
+            "Model must be finalized before calling, see `klax.finalize`."
         )
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
@@ -155,7 +156,9 @@ class Linear(eqx.Module, strict=True):
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(x) == (1,), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            assert jnp.shape(x) == (1,), (
+                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            )
             x = jnp.squeeze(x)
         return x
 
@@ -169,8 +172,8 @@ class InputSplitLinear(eqx.Module, strict=True):
     or initialization for the corresponding weight matrices.
     """
 
-    weights: Tuple[Array | ArrayWrapper, ...]
-    bias: Optional[Array | ArrayWrapper]
+    weights: Tuple[Array | Unwrappable[Array], ...]
+    bias: Optional[Array | Unwrappable[Array]]
     in_features: Tuple[Union[int, Literal["scalar"]], ...] = eqx.field(static=True)
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -183,10 +186,11 @@ class InputSplitLinear(eqx.Module, strict=True):
         weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wraps: Sequence[type[ArrayWrapper] | None]
-        | type[ArrayWrapper]
+        weight_wraps: Sequence[type[Constraint] | type[Unwrappable[Array]] | None]
+        | type[Constraint]
+        | type[Unwrappable[Array]]
         | None = None,
-        bias_wrap: type[ArrayWrapper] | None = None,
+        bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -203,13 +207,14 @@ class InputSplitLinear(eqx.Module, strict=True):
                 The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wraps: An optional `klax.ArrayWrapper` or sequence of
-                `klax.ArrayWrapper` that can be passed to enforce weight
+            weight_wraps: An optional :class:`klax.Constraint` or sequence of
+                :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce weight
                 constraints. By specifying a sequence it is possible to apply a
                 different wrapper to each weight matrix. The sequence must have the
                 same length as in_features.
-            bias_wrap: An optional `klax.ArrayWrapper` that can be passed
-               to enforce bias constraints.
+            bias_wrap: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
@@ -292,6 +297,9 @@ class InputSplitLinear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
+        assert not contains_unwrappables(self), (
+            "Model must be finalized before calling, see `klax.finalize`."
+        )
         if len(xs) != self._num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"
@@ -311,6 +319,8 @@ class InputSplitLinear(eqx.Module, strict=True):
         if self.bias is not None:
             y = y + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(y) == (1,), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            assert jnp.shape(y) == (1,), (
+                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            )
             y = jnp.squeeze(y)
         return y

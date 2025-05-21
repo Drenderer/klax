@@ -55,7 +55,7 @@ def getarraywrap():
     import klax
     from typing import Self
 
-    class Wrapper(klax.ArrayWrapper):
+    class Wrapper(klax.Constraint):
         """A dummy wrapper that multiplies the parameter by 2 using the apply functionality."""
         parameter: Array
 

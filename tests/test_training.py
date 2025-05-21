@@ -22,7 +22,7 @@ import optax
 import pytest
 from typing import Self
 
-from klax import Unwrappable, ArrayWrapper
+from klax import Unwrappable, Constraint
 
 
 def test_training(getkey):
@@ -148,8 +148,8 @@ def test_apply_in_training(getkey):
     x = jnp.linspace(0.0, 1.0, 20)
     y = -2 * x - 1
 
-    # Create dummy ArrayWrapper
-    class AtLeast(ArrayWrapper):
+    # Create dummy Constraint
+    class AtLeast(Constraint):
         array: Array
         minval: Array        
 

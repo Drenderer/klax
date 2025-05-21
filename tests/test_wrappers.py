@@ -58,7 +58,7 @@ def test_non_trainable(getarraywrap):
     assert grad.shape == (3,)
     assert jnp.all(grad == 0.0)
 
-    # ArrayWrapper model
+    # Constraint model
     model = non_trainable((getarraywrap(jnp.ones(3)), 1))
     grad = eqx.filter_grad(loss)(model)[0].tree.parameter
     assert grad.shape == (3,)

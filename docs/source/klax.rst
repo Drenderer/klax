@@ -41,7 +41,7 @@ Wrappers and constraints
     non_trainable
     Symmetric
     SkewSymmetric
-    ArrayWrapper
+    Constraint
     apply
     NonNegative
     finalize

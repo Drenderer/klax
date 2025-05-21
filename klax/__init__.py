@@ -29,7 +29,7 @@ from ._wrappers import (
     contains_unwrappables as contains_unwrappables,
     contains_array_wrappers as contains_array_wrappers,
     unwrap as unwrap,
-    ArrayWrapper as ArrayWrapper,
+    Constraint as Constraint,
     apply as apply,
     finalize as finalize,
     Parameterize as Parameterize,

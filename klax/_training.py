@@ -140,7 +140,7 @@ def fit[T: eqx.Module, H: Callback](
         params = optax.apply_updates(params, updates)
         model = eqx.combine(params, static)
 
-        # Apply the ArrayWrapper in the model to ensure apply-constrains are met after the update.
+        # Apply the Constraint in the model to ensure apply-constrains are met after the update.
         model = apply(model)
 
         flat_model = jax.tree_util.tree_leaves(model)
@@ -155,7 +155,7 @@ def fit[T: eqx.Module, H: Callback](
     else:
         opt_state = init_opt_state
 
-    # Apply the ArrayWrapper in the model to ensure apply-constrains are met initially
+    # Apply the Constraint in the model to ensure apply-constrains are met initially
     model = apply(model)
 
     # Use the unflatten trick to speed up training,

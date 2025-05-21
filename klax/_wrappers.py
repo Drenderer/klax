@@ -124,7 +124,7 @@ class Parameterize(Unwrappable[T]):
 
 
 def non_trainable(tree: PyTree):
-    """Freezes parameters by wrapping inexact array or ``ArrayWrapper`` leaves with
+    """Freezes parameters by wrapping inexact array or ``Constraint`` leaves with
     :class:`NonTrainable`.
 
     Note:
@@ -149,14 +149,14 @@ def non_trainable(tree: PyTree):
     def _map_fn(leaf):
         return (
             NonTrainable(leaf)
-            if eqx.is_inexact_array(leaf) or isinstance(leaf, ArrayWrapper)
+            if eqx.is_inexact_array(leaf) or isinstance(leaf, Constraint)
             else leaf
         )
 
     return jax.tree.map(
         f=_map_fn,
         tree=tree,
-        is_leaf=lambda x: isinstance(x, (NonTrainable, ArrayWrapper)),
+        is_leaf=lambda x: isinstance(x, (NonTrainable, Constraint)),
     )
 
 
@@ -253,15 +253,15 @@ class Symmetric(Unwrappable[Array]):
 
 
 # ===-----------------------------------------------------------------------===#
-#  ArrayWrapper
+#  Constraint
 # ===-----------------------------------------------------------------------===#
 
 
-class ArrayWrapper(Unwrappable[Array]):
+class Constraint(Unwrappable[Array]):
     """An abstract class representing array wrappers.
 
-    ``ArrayWrapper`` is a specialized version of :class:`Unwrappable`
-    that returns an updated version of itself upon applying. ``ArrayWrapper``
+    ``Constraint`` is a specialized version of :class:`Unwrappable`
+    that returns an updated version of itself upon applying. ``Constraint``
     should not be nested but is fully compatible with :func:`unwrap`.
     """
 
@@ -271,12 +271,12 @@ class ArrayWrapper(Unwrappable[Array]):
 
 
 def apply(tree: PyTree):
-    """Map across a ``PyTree`` and apply all :class:`ArrayWrapper` nodes.
+    """Map across a ``PyTree`` and apply all :class:`Constraint` nodes.
 
     This leaves all other nodes unchanged.
 
     Note:
-        ``ArrayWrapper`` nodes cannot be nested.
+        ``Constraint`` should not be nested.
 
     Example:
         Enforcing non-negativity.
@@ -290,13 +290,13 @@ def apply(tree: PyTree):
 
     def _apply(tree, *, include_self: bool):
         def _map_fn(leaf):
-            if isinstance(leaf, ArrayWrapper):
+            if isinstance(leaf, Constraint):
                 # Unwrap subnodes, then itself
                 return _apply(leaf, include_self=False).apply()
             return leaf
 
         def is_leaf(x):
-            is_unwrappable = isinstance(x, ArrayWrapper)
+            is_unwrappable = isinstance(x, Constraint)
             included = include_self or x is not tree
             return is_unwrappable and included
 
@@ -305,7 +305,7 @@ def apply(tree: PyTree):
     return _apply(tree, include_self=True)
 
 
-class NonNegative(ArrayWrapper):
+class NonNegative(Constraint):
     """Applies a non-negative constraint.
 
     Args:
@@ -352,9 +352,9 @@ def contains_unwrappables(pytree):
 
 
 def contains_array_wrappers(pytree):
-    """Check if a ``PyTree`` contains instances of :class:`ArrayWrapper`."""
+    """Check if a ``PyTree`` contains instances of :class:`Constraint`."""
 
-    return tree_contains(pytree, ArrayWrapper)
+    return tree_contains(pytree, Constraint)
 
 
 def finalize(pytree):
