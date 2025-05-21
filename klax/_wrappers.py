@@ -172,15 +172,31 @@ class NonTrainable(AbstractUnwrappable[T]):
 
 
 class SkewSymmetric(AbstractUnwrappable[Array]):
+    """Ensures skew-symmetry of a matrix upon unwrapping."""
     parameter: Array
 
     @staticmethod
     def make_skew_symmetric(x: Array) -> Array:
+        """Function that maps an arbitrary matrix to a skew symmetric matrix.
+
+        Args:
+            x: Input matrix array of shape (..., N, N).
+
+        Returns:
+            Skew-symmetric matrix array of shape (..., N, N).
+        """
         return 0.5 * (x - jnp.matrix_transpose(x))
 
     def __init__(self, parameter: Array):
+        """
+        Args:
+            parameter: To be wrapped matrix array of shape (..., N, N).
+        """
         if contains_unwrappables(parameter):
             warn("Wrapping SkewSymmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing.")
+        _array = unwrap(parameter)
+        if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
+            raise ValueError(f"Wrapped parameter must be an array of shape (..., N, N) but has shape {_array.shape}")
         self.parameter = parameter
 
     def unwrap(self) -> Array:
@@ -188,15 +204,32 @@ class SkewSymmetric(AbstractUnwrappable[Array]):
 
 
 class Symmetric(AbstractUnwrappable[Array]):
+    """Ensures symmetry of a matrix upon unwrapping."""
+
     parameter: Array
 
     @staticmethod
     def make_symmetric(x: Array) -> Array:
+        """Function that maps an arbitrary matrix to a symmetric matrix.
+
+        Args:
+            x: Input matrix array of shape (..., N, N).
+
+        Returns:
+            Symmetric matrix array of shape (..., N, N).
+        """
         return 0.5 * (x + jnp.matrix_transpose(x))
 
     def __init__(self, parameter: Array):
+        """
+        Args:
+            parameter: To be wrapped matrix array of shape (..., N, N).
+        """
         if contains_unwrappables(parameter):
             warn("Wrapping Symmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing.")
+        _array = unwrap(parameter)
+        if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
+            raise ValueError(f"Wrapped parameter must be an array of shape (..., N, N) but has shape {_array.shape}")
         self.parameter = parameter
 
     def unwrap(self) -> Array:
