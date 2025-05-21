@@ -15,6 +15,7 @@ For details, see the individual source file headers.
 The functionality provided by Paramax was copied and extended by the Klax Authors in 2025. 
 Files containing code from Paramax:
 - klax/_wrappers.py
+- tests/test_wrappers.py
 
 #### Paramax license
 The following is a copy of the Paramax software license:
