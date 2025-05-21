@@ -96,6 +96,14 @@ class Matrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: The input. Should be a JAX array of shape ``(in_size,)``. (Or
+                shape ``()`` if ``in_size="scalar"``.)
+
+        Returns:
+            A JAX array of shape ``shape``.
+        """
         return self.mlp(x).reshape(self.shape)
 
 
@@ -136,6 +144,14 @@ class ConstantMatrix(eqx.Module):
         self.array = init(key, self.shape, dtype)
 
     def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: Ignored; provided for compatibility with the rest of the
+                Matrix-valued function API.
+
+        Returns:
+            A JAX array of shape ``shape``.
+        """
         return self.array
 
 
@@ -220,6 +236,14 @@ class SkewSymmetricMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: The input. Should be a JAX array of shape ``(in_size,)``. (Or
+                shape ``()`` if ``in_size="scalar"``.)
+
+        Returns:
+            A JAX array of shape ``shape``.
+        """
         A = self.mlp(x).reshape(self.shape)
         return A - A.mT
 
@@ -262,6 +286,14 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         self.array = SkewSymmetric(array)
 
     def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: Ignored; provided for compatibility with the rest of the
+                Matrix-valued function API.
+
+        Returns:
+            A JAX array of shape ``shape``.
+        """
         return self.array
 
 
@@ -355,6 +387,14 @@ class SPDMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: The input. Should be a JAX array of shape ``(in_size,)``. (Or
+                shape ``()`` if ``in_size="scalar"``.)
+
+        Returns:
+            A JAX array of shape ``shape``.
+        """
         L = self.mlp(x).reshape(self.shape)
         A = L @ jnp.conjugate(L.mT)
         identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
@@ -412,6 +452,14 @@ class ConstantSPDMatrix(eqx.Module):
         self.B_matrix = init(key, shape, dtype)
 
     def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: Ignored; provided for compatibility with the rest of the
+                Matrix-valued function API.
+
+        Returns:
+            A JAX array of shape ``shape``.
+        """
         A = self.B_matrix @ jnp.conjugate(self.B_matrix.mT)
         identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
         return A + self.epsilon * identity
