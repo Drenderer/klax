@@ -298,17 +298,19 @@ class NonNegative(ArrayWrapper):
 
     parameter: Array
 
-    def _non_neg(self, x: Array) -> Array:
+    @staticmethod
+    def _non_neg(x: Array) -> Array:
         return jnp.maximum(x, 0)
 
     def unwrap(self) -> Array:
         return self._non_neg(self.parameter)
 
     def apply(self) -> Self:
+        non_neg_parameter = self._non_neg(self.parameter)
         return eqx.tree_at(
             lambda x: x.parameter,
             self,
-            replace_fn=lambda x: self._non_neg(x),
+            replace=non_neg_parameter,
         )
 
 
