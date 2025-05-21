@@ -71,9 +71,9 @@ class Linear(eqx.Module, strict=True):
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_warp: An optional `klax.wrappers.ArrayWrapper` that can be passed
+            weight_warp: An optional `klax.ArrayWrapper` that can be passed
                to enforce weight constraints.
-            bias_warp: An optional `klax.wrappers.ArrayWrapper` that can be passed
+            bias_warp: An optional `klax.ArrayWrapper` that can be passed
                to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
@@ -203,12 +203,12 @@ class InputSplitLinear(eqx.Module, strict=True):
                 The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wraps: An optional `klax.wrappers.ArrayWrapper` or sequence of
-                `klax.wrappers.ArrayWrapper` that can be passed to enforce weight
+            weight_wraps: An optional `klax.ArrayWrapper` or sequence of
+                `klax.ArrayWrapper` that can be passed to enforce weight
                 constraints. By specifying a sequence it is possible to apply a
                 different wrapper to each weight matrix. The sequence must have the
                 same length as in_features.
-            bias_wrap: An optional `klax.wrappers.ArrayWrapper` that can be passed
+            bias_wrap: An optional `klax.ArrayWrapper` that can be passed
                to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`

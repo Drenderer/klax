@@ -16,6 +16,7 @@
 
 from abc import abstractmethod
 from typing import Any, Callable, Self, TypeVar
+from warnings import warn
 
 import equinox as eqx
 import jax
@@ -169,6 +170,37 @@ class NonTrainable(AbstractUnwrappable[T]):
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(lax.stop_gradient(differentiable), static)
 
+
+class SkewSymmetric(AbstractUnwrappable[Array]):
+    parameter: Array
+
+    @staticmethod
+    def make_skew_symmetric(x: Array) -> Array:
+        return 0.5 * (x - jnp.matrix_transpose(x))
+
+    def __init__(self, parameter: Array):
+        if contains_unwrappables(parameter):
+            warn("Wrapping SkewSymmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing.")
+        self.parameter = parameter
+
+    def unwrap(self) -> Array:
+        return self.make_skew_symmetric(self.parameter)
+
+
+class Symmetric(AbstractUnwrappable[Array]):
+    parameter: Array
+
+    @staticmethod
+    def make_symmetric(x: Array) -> Array:
+        return 0.5 * (x + jnp.matrix_transpose(x))
+
+    def __init__(self, parameter: Array):
+        if contains_unwrappables(parameter):
+            warn("Wrapping Symmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing.")
+        self.parameter = parameter
+
+    def unwrap(self) -> Array:
+        return self.make_symmetric(self.parameter)
 
 # ===-----------------------------------------------------------------------===#
 #  ArrayWrapper

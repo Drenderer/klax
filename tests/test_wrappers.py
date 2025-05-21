@@ -16,11 +16,13 @@ import equinox as eqx
 from klax import (
     apply,
     NonNegative,
+    Symmetric, 
+    SkewSymmetric,
     non_trainable,
     Parameterize,
     unwrap
 )
-import jax.random as jrandom
+import jax.random as jr
 import jax.numpy as jnp
 
 
@@ -60,13 +62,29 @@ def test_non_trainable(getwrap):
 
 def test_non_negative(getkey):
     # Negative array input
-    parameter = -jrandom.uniform(getkey(), (10,))
+    parameter = -jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
     assert jnp.all(unwrap(non_neg) == 0)
     assert jnp.all(apply(non_neg).parameter == 0)
 
     # Positive array input
-    parameter = jrandom.uniform(getkey(), (10,))
+    parameter = jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
     assert jnp.all(unwrap(non_neg) == parameter)
     assert jnp.all(apply(non_neg).parameter == parameter)
+
+def test_symmetric(getkey):
+    # Constraint
+    parameter = jr.normal(getkey(), (3,10,3,3))
+    symmetric = Symmetric(parameter)
+    _symmetric = unwrap(symmetric)
+    assert _symmetric.shape == parameter.shape
+    assert jnp.array_equal(_symmetric, jnp.transpose(_symmetric, axes=(0,1,3,2)))
+
+def test_skewsymmetric(getkey):
+    # Constraint
+    parameter = jr.normal(getkey(), (3,10,3,3))
+    symmetric = SkewSymmetric(parameter)
+    _symmetric = unwrap(symmetric)
+    assert _symmetric.shape == parameter.shape
+    assert jnp.array_equal(_symmetric, -jnp.transpose(_symmetric, axes=(0,1,3,2)))

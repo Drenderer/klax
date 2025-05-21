@@ -30,12 +30,14 @@ from ._losses import (
 from ._training import fit as fit
 from ._wrappers import (
     AbstractUnwrappable as AbstractUnwrappable,
+    contains_unwrappables as contains_unwrappables,
     unwrap as unwrap,
+    ArrayWrapper as ArrayWrapper,
+    apply as apply,
     Parameterize as Parameterize,
     non_trainable as non_trainable,
     NonTrainable as NonTrainable,
-    ArrayWrapper as ArrayWrapper,
-    apply as apply,
     NonNegative as NonNegative,
-    contains_unwrappables as contains_unwrappables,
+    SkewSymmetric as SkewSymmetric,
+    Symmetric as Symmetric,
 )
