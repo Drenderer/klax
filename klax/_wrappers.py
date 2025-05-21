@@ -44,6 +44,10 @@ class Unwrappable[T](eqx.Module):
     """An abstract class representing an unwrappable object.
 
     Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping.
+
+    Note:
+        Models containing ``Unwrappables`` need to be :func:`finalized<klax.finalize>`
+        before they are callable.
     """
 
     @abstractmethod
@@ -53,10 +57,10 @@ class Unwrappable[T](eqx.Module):
 
 
 def unwrap(tree: PyTree):
-    """Map across a PyTree and unwrap all :class:`Unwrappable` nodes.
+    """Map across a PyTree and unwrap all :class:`Unwrappables<Unwrappable>`.
 
     This leaves all other nodes unchanged. If nested, the innermost
-    ``Unwrappable`` nodes are unwrapped first.
+    :class:`Unwrappable` is unwrapped first.
 
     Example:
         Enforcing positivity.
@@ -258,24 +262,30 @@ class Symmetric(Unwrappable[Array]):
 
 
 class Constraint(Unwrappable[Array]):
-    """Abstract class to implement constrains on JAX arrays. A Constraint is
+    """Abstract class to implement constrains for JAX arrays. A Constraint is
     a specialized verision of :class:`Unwrappable`, that marks an array in a
     pytree as constrained and implements two destinct functionalities:
 
-    - unwrap: Identicall functionality to an :class:`Unwrappable`. This is used
+    * **unwrap** 
+        Identicall functionality to an :class:`Unwrappable`. This is used
         to remove the wrapper from the pytree, most likely to make a model callable.
         The model is unwrapped inside the loss function of :func:`klax.fit`. Thus
-        it contributes to the gradients during training.
-        Constraints based on differentiable constrains can be implemented
-        via unwrap. An example would be a positivity constraint, that just passes
+        the unwrapping behavior contributes to the gradients during training.
+        Differentiable parameterization constrains can be implemented
+        via unwrap. An example would be a positivity constraint, that passes
         the array through :func:`jax.nn.softplus` upon unwrapping.
-    - apply: This modifies the wrapped array without unwrapping. It is called in the
-        training loop _after_ each parameter update. Consequently, it allows for the
-        implementation of _non-differentiable_ constraints, such as clamping a parameter
+    * **apply** 
+        This modifies the wrapped array without unwrapping. It is called in the
+        training loop *after* each parameter update. Consequently, it allows for the
+        implementation of *non-differentiable* constraints, such as clamping a parameter
         to a range of valid values. Apply functions should return a modified copy of
         ``self``.
 
     Note:
+        Models containing ``Constraints`` need to be :func:`finalized<klax.finalize>`
+        before they are callable.
+
+    Warning:
         Constraints should not be nested, as this can lead to unexpected behavior
         or errors. To combine the effects of two constriants, implements a custom
         constraint and define the combined effects via ``unwrap`` and ``apply``.
@@ -289,12 +299,9 @@ class Constraint(Unwrappable[Array]):
 
 
 def apply(tree: PyTree):
-    """Map across a ``PyTree`` and apply all :class:`Constraint` nodes.
+    """Map across a ``PyTree`` and apply all :class:`Constraints<Constraint>`.
 
     This leaves all other nodes unchanged.
-
-    Note:
-        ``Constraint`` should not be nested.
 
     Example:
         Enforcing non-negativity.
@@ -379,6 +386,18 @@ def finalize(pytree):
     """
     Combines the functionality of :func:`apply` and :func:`unwrap`.
 
-    Use this function to make a model with unwrappables callable.
+    Use this function to make a model containing unwrappables callable.
+
+    Warning:
+        Do **not** fit the output of ``finalize`` if the pytree/model contains 
+        :class:`Unwrappables<Unwrappable>` or :class:`Constraints<Constraint>`.
+        ``finalize`` returns an unwrapped pytree/model. As such 
+        all constrains and wrappers are unwrapped away to make the model callable.
+        If you want to call a model that you want to fit afterwards, we recomend
+        the following::
+            model, history = fit(model, ...)
+            _model = finalize(model)            
+            y = _model(x)                       # Call finalized model
+            model, history = fit(model, ...)    # Continue training
     """
     return unwrap(apply(pytree))
