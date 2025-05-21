@@ -1,3 +1,17 @@
+# Copyright 2025 The Klax Authors.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Testing if the non-negative wrapper can recover from a negative initial value.
 I.e., if the gradients vanish when the weights are negative or zero.
@@ -10,7 +24,7 @@ import jax.numpy as jnp
 import jax.random as jr
 
 from klax import fit
-from klax.wrappers import NonNegative, unwrap
+from klax import NonNegative, unwrap
 
 
 # %% Define a simple model

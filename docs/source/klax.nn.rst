@@ -1,9 +1,36 @@
 ``klax.nn`` module
-=========================
+==================
 
+.. currentmodule:: klax.nn
 
-.. automodule:: klax.nn
-    :members:
-    :undoc-members:
-    :special-members: __init__, __call__
-    :member-order: bysource
+Basic neural network layers
+---------------------------
+
+.. autosummary::
+    :toctree:  _autosummary
+
+    Linear
+    InputSplitLinear
+
+Neural networks
+---------------------------
+
+.. autosummary::
+    :toctree:  _autosummary
+
+    MLP
+    FICNN
+
+Matrix-valued functions
+---------------------------
+
+.. autosummary::
+    :toctree:  _autosummary
+
+    Matrix
+    ConstantMatrix
+    SkewSymmetricMatrix
+    ConstantSkewSymmetricMatrix
+    SPDMatrix
+    ConstantSPDMatrix
+

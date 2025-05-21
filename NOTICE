@@ -1,0 +1,7 @@
+This product includes code derived from Equinox (https://github.com/patrick-kidger/equinox), which is licensed under Apache License, Version 2.0. 
+
+Modifications to the code have been made by The Klax Authors in 2025. Files containing modified code are:
+- klax/nn/_linear.py
+- klax/nn/_mlp.py
+
+For details, see the individual source file headers.
