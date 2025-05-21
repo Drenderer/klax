@@ -26,10 +26,8 @@ from klax._misc import default_floating_dtype
 from klax.nn import Linear, InputSplitLinear
 from klax import (
     fit,
-    ParameterWrapper,
-    AbstractUpdatable,
+    Unwrappable,
     NonNegative,
-    Positive,
     finalize,
     split_data,
 )
@@ -61,7 +59,7 @@ class FICNN(eqx.Module, strict=True):
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
         width_sizes: Sequence[int],
-        non_neg_wrap: ParameterWrapper | AbstractUpdatable,
+        non_neg_wrap: Unwrappable,
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
@@ -230,7 +228,7 @@ class FICNN(eqx.Module, strict=True):
 # %% Define old NonNegative Wrapper
 
 
-class NonNegSoftplus(ParameterWrapper):
+class NonNegSoftplus(Unwrappable[Array]):
     parameter: Array
 
     def __init__(self, x):
@@ -240,19 +238,12 @@ class NonNegSoftplus(ParameterWrapper):
     def unwrap(self) -> Array:
         return jax.nn.softplus(self.parameter)
 
-class OldNonNegative(ParameterWrapper):
-    """Applies a non-negative constraint.
-
-    Args:
-        parameter: The parameter that is to be made non-negative. It can either
-            be a `jax.Array` or a `ParameterWrapper`.
-    """
-
+class OldNonNegative(Unwrappable[Array]):
     parameter: Array
 
-    def __init__(self, parameter: Array | ParameterWrapper):
+    def __init__(self, parameter: Array):
         # Ensure that the parameter fulfills the constraint initially
-        self.parameter = self._non_neg(finalize(parameter))
+        self.parameter = self._non_neg(parameter)
 
     def _non_neg(self, x: Array) -> Array:
         return jnp.maximum(x, 0)
@@ -261,7 +252,7 @@ class OldNonNegative(ParameterWrapper):
         return self._non_neg(self.parameter)
 
 
-class NoConstraint(ParameterWrapper):
+class NoConstraint(Unwrappable[Array]):
     parameter: Array
 
     def unwrap(self) -> Array:
@@ -294,7 +285,7 @@ train_data, vali_data = split_data((x, y), (80, 20), key=data_key)
 
 fig, ax = plt.subplots()
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-wrappers = [NonNegative, Positive, OldNonNegative, NonNegSoftplus, NoConstraint]
+wrappers = [NonNegative, OldNonNegative, NonNegSoftplus, NoConstraint]
 for wrapper, color in zip(wrappers, colors):
     name = wrapper.__name__
     model = FICNN(

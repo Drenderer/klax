@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = ["jax", "equinox", "paramax", "optax"]
+dependencies = ["jax", "equinox", "optax"]
 
 [project.optional-dependencies]
 plotting = ["matplotlib"]

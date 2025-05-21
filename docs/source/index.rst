@@ -17,7 +17,9 @@ customized calibration of these model.
 All provided models are derived from ``equinox.Module`` without any additional
 abstractions. Hence, all models are are compatible with the JAX and Equinox
 ecosystem. All parameters constraints are derived from
-``paramax.AbstractUnwrappable``, which itself is just an ``equinox.Module``.
+:class:`Unwrappable`, which itself is just an ``equinox.Module``. 
+The implementation of the :class:`Unwrappable` is an extension
+of Paramax.
 
 .. note::
 

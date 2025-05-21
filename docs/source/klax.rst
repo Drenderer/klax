@@ -34,8 +34,17 @@ Wrappers and constraints
 .. autosummary::
     :toctree: _autosummary
 
-    ParameterWrapper
+    Unwrappable
+    unwrap
+    Parameterize
+    NonTrainable
+    non_trainable
+    Symmetric
+    SkewSymmetric
+    Constraint
+    apply
     NonNegative
+    finalize
 
 
 Loss functions

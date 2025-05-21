@@ -12,27 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paramax import unwrap as unwrap
-
 from ._callbacks import (
     Callback as Callback,
     CallbackArgs as CallbackArgs,
-    HistoryCallback as HistoryCallback
+    HistoryCallback as HistoryCallback,
 )
 from ._datahandler import (
     batch_data as batch_data,
     BatchGenerator as BatchGenerator,
-    split_data as split_data
+    split_data as split_data,
 )
-from ._losses import (
-    Loss as Loss,
-    mse as mse,
-    mae as mae
-)
-from . import nn as nn
+from ._losses import Loss as Loss, mse as mse, mae as mae
 from ._training import fit as fit
 from ._wrappers import (
-    ParameterWrapper as ParameterWrapper,
+    Unwrappable as Unwrappable,
+    contains_unwrappables as contains_unwrappables,
+    contains_array_wrappers as contains_array_wrappers,
+    unwrap as unwrap,
+    Constraint as Constraint,
+    apply as apply,
+    finalize as finalize,
+    Parameterize as Parameterize,
+    non_trainable as non_trainable,
+    NonTrainable as NonTrainable,
     NonNegative as NonNegative,
     SkewSymmetric as SkewSymmetric,
     Symmetric as Symmetric,
