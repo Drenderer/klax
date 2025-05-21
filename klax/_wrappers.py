@@ -243,9 +243,9 @@ class Symmetric(AbstractUnwrappable[Array]):
 class ArrayWrapper(AbstractUnwrappable[Array]):
     """An abstract class representing array wrappers.
 
-    ``ArrayWrapper`` is a specialized version of ``paramax.AbstractUnwrappable``
+    ``ArrayWrapper`` is a specialized version of :class:`AbstractUnwrappable`
     that returns an updated version of itself upon applying. ``ArrayWrapper``
-    cannot be nested but is fully compatible with paramax's unwrapping functionality.
+    cannot be nested but is fully compatible with :func:`unwrap`.
     """
 
     @abstractmethod

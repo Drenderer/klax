@@ -22,9 +22,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from paramax import unwrap
 
-from klax import fit, NonNegative, apply
+from klax import fit, NonNegative, apply, unwrap
 
 
 
