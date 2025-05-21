@@ -1,3 +1,10 @@
+# This file includes code from Paramax
+#
+#     https://github.com/danielward27/paramax
+#
+# licensed under the MIT License (MIT). The main functionality of
+# Paramax is copied and extended within this file.
+#
 # Copyright 2025 The Klax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -245,7 +252,7 @@ class ArrayWrapper(AbstractUnwrappable[Array]):
 
     ``ArrayWrapper`` is a specialized version of :class:`AbstractUnwrappable`
     that returns an updated version of itself upon applying. ``ArrayWrapper``
-    cannot be nested but is fully compatible with :func:`unwrap`.
+    should not be nested but is fully compatible with :func:`unwrap`.
     """
 
     @abstractmethod
@@ -306,11 +313,10 @@ class NonNegative(ArrayWrapper):
         return self._non_neg(self.parameter)
 
     def apply(self) -> Self:
-        non_neg_parameter = self._non_neg(self.parameter)
         return eqx.tree_at(
             lambda x: x.parameter,
             self,
-            replace=non_neg_parameter,
+            replace=self._non_neg(self.parameter),
         )
 
 
