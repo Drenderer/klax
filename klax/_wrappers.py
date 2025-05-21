@@ -253,20 +253,38 @@ class Symmetric(Unwrappable[Array]):
 
 
 # ===-----------------------------------------------------------------------===#
-#  Constraint
+#  Constraints
 # ===-----------------------------------------------------------------------===#
 
 
 class Constraint(Unwrappable[Array]):
-    """An abstract class representing array wrappers.
+    """Abstract class to implement constrains on JAX arrays. A Constraint is
+    a specialized verision of :class:`Unwrappable`, that marks an array in a
+    pytree as constrained and implements two destinct functionalities:
 
-    ``Constraint`` is a specialized version of :class:`Unwrappable`
-    that returns an updated version of itself upon applying. ``Constraint``
-    should not be nested but is fully compatible with :func:`unwrap`.
+    - unwrap: Identicall functionality to an :class:`Unwrappable`. This is used
+        to remove the wrapper from the pytree, most likely to make a model callable.
+        The model is unwrapped inside the loss function of :func:`klax.fit`. Thus
+        it contributes to the gradients during training.
+        Constraints based on differentiable constrains can be implemented
+        via unwrap. An example would be a positivity constraint, that just passes
+        the array through :func:`jax.nn.softplus` upon unwrapping.
+    - apply: This modifies the wrapped array without unwrapping. It is called in the
+        training loop _after_ each parameter update. Consequently, it allows for the
+        implementation of _non-differentiable_ constraints, such as clamping a parameter
+        to a range of valid values. Apply functions should return a modified copy of
+        ``self``.
+
+    Note:
+        Constraints should not be nested, as this can lead to unexpected behavior
+        or errors. To combine the effects of two constriants, implements a custom
+        constraint and define the combined effects via ``unwrap`` and ``apply``.
     """
 
     @abstractmethod
     def apply(self) -> Self:
+        """Returns a modified copy of self. Most likely you want to use :func:`eqx.tree_at` 
+        for this purpose."""
         pass
 
 
