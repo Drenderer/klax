@@ -35,16 +35,16 @@ uv add klax
 **or** get the most recent changes from the main branch via
 
 ```bash
-uv add "klax @ git+https://github.com/Drenderer/klax"
+uv add "klax @ git+https://github.com/Drenderer/klax.git@main"
 ```
 
 
 ## Development
 
-The developers of klax use uv for managing dependencies and virtual environments. To setup the development environment simply clone the repository and run 
+The developers of klax use uv for managing dependencies and virtual environments. To setup the development environment with all required, optional, and development dependences simply clone the repository and run 
 
 ```bash
-uv sync
+uv sync --all-extras --all-groups
 ```
 
 from the project root. This will create a virtual environment with all the rependencies required for development and [install klax in editable mode](https://docs.astral.sh/uv/concepts/projects/config/#editable-mode).
