@@ -55,7 +55,7 @@ exclude_patterns = []
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_book_theme"
-# html_static_path = ["_static"]
+html_static_path = ["_static"]
 
 html_theme_options = {
     "use_repository_button": True,
@@ -74,22 +74,15 @@ autodoc_typehints_description_target = "all"
 autodoc_type_aliases = {
     "ArrayLike": "jaxtyping.ArrayLike",
     "PRNGKeyArray": "PRNGKeyArray",
-    "DataTree": "DataTree",
-    "MaskTree": "MaskTree",
 }
 
 # -- Options for autodoc ----------------------------------------------------
 autodoc_default_options = {
+    "members": True,
     "special-members": "__call__",
     "member-order": "bysource",
 }
 
-autodoc_default_options = {
-    "members": True,
-    "member-order": "bysource",
-    "special-members": True,
-    "exclude-members": "__weakref__, __delattr__, __setattr__",
-}
 
 
 # -- Intershinx configuration -------------------------------------------------
