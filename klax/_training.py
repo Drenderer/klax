@@ -31,7 +31,7 @@ from ._callbacks import (
 )
 from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
 from ._losses import Loss, mse
-from ._wrappers import unwrap
+from ._wrappers import unwrap, apply
 
 
 def fit[T: eqx.Module, H: Callback](
@@ -140,6 +140,9 @@ def fit[T: eqx.Module, H: Callback](
         params = optax.apply_updates(params, updates)
         model = eqx.combine(params, static)
 
+        # Apply the ArrayWrapper in the model to ensure apply-constrains are met after the update.
+        model = apply(model)
+
         flat_model = jax.tree_util.tree_leaves(model)
         flat_opt_state = jax.tree_util.tree_leaves(opt_state)
 
@@ -151,6 +154,9 @@ def fit[T: eqx.Module, H: Callback](
         opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
     else:
         opt_state = init_opt_state
+
+    # Apply the ArrayWrapper in the model to ensure apply-constrains are met initially
+    model = apply(model)
 
     # Use the unflatten trick to speed up training,
     # see https://docs.kidger.site/equinox/tricks/
