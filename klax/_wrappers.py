@@ -1,10 +1,3 @@
-# This file includes code from Paramax
-#
-#     https://github.com/danielward27/paramax
-#
-# licensed under the MIT License (MIT). The main functionality of
-# Paramax is copied and extended within this file.
-#
 # Copyright 2025 The Klax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Parameter constraints based on paramax."""
+# This file includes code from paramax (MIT License).
+#
+#     https://github.com/danielward27/paramax
+#
+# Original Copyright (c) 2022 Daniel Ward
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+"""``Unwrappables`` and ``Constraints`` modified and extended from paramax."""
 
 from abc import abstractmethod
 from typing import Any, Callable, Self, TypeVar
@@ -40,10 +57,13 @@ T = TypeVar("T")
 # ===-----------------------------------------------------------------------===#
 
 
+# This class is derived from paramax.
+# Original Copyright 2022 Daniel Ward
 class Unwrappable[T](eqx.Module):
     """An abstract class representing an unwrappable object.
 
-    Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping.
+    Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping. This
+    class is a renamed copy of ``paramax.AbstractUnwrappable``.
 
     Note:
         Models containing ``Unwrappables`` need to be :func:`finalized<klax.finalize>`
@@ -56,6 +76,8 @@ class Unwrappable[T](eqx.Module):
         pass
 
 
+# This function is copied from paramax.
+# Original Copyright 2022 Daniel Ward
 def unwrap(tree: PyTree):
     """Map across a PyTree and unwrap all :class:`Unwrappables<Unwrappable>`.
 
@@ -89,6 +111,8 @@ def unwrap(tree: PyTree):
     return _unwrap(tree, include_self=True)
 
 
+# This class is derived from paramax and has been slightly modified.
+# Original Copyright 2022 Daniel Ward
 class Parameterize(Unwrappable[T]):
     """Unwrap an object by calling fn with args and kwargs.
 
@@ -127,6 +151,8 @@ class Parameterize(Unwrappable[T]):
         return self.fn(*self.args, **self.kwargs)
 
 
+# This function is derived from paramax and has been substantially modified.
+# Original Copyright 2022 Daniel Ward
 def non_trainable(tree: PyTree):
     """Freezes parameters by wrapping inexact array or ``Constraint`` leaves with
     :class:`NonTrainable`.
@@ -139,7 +165,7 @@ def non_trainable(tree: PyTree):
 
         >>> eqx.partition(
         ...     ...,
-        ...     is_leaf=lambda leaf: isinstance(leaf, wrappers.NonTrainable),
+        ...     is_leaf=lambda leaf: isinstance(leaf, (NonTrainable, Constraint)),
         ... )
 
 
@@ -164,6 +190,8 @@ def non_trainable(tree: PyTree):
     )
 
 
+# This class is derived from paramax and has been lightly modified.
+# Original Copyright 2022 Daniel Ward
 class NonTrainable(Unwrappable[T]):
     """Applies stop gradient to all arraylike leaves before unwrapping.
 
@@ -183,13 +211,13 @@ class NonTrainable(Unwrappable[T]):
 
 
 class SkewSymmetric(Unwrappable[Array]):
-    """Ensures skew-symmetry of a matrix upon unwrapping."""
+    """Ensures skew-symmetry of a square matrix upon unwrapping."""
 
     parameter: Array
 
     @staticmethod
-    def make_skew_symmetric(x: Array) -> Array:
-        """Function that maps an arbitrary matrix to a skew symmetric matrix.
+    def _make_skew_symmetric(x: Array) -> Array:
+        """Maps an arbitrary matrix to a skew symmetric matrix.
 
         Args:
             x: Input matrix array of shape (..., N, N).
@@ -202,11 +230,13 @@ class SkewSymmetric(Unwrappable[Array]):
     def __init__(self, parameter: Array):
         """
         Args:
-            parameter: To be wrapped matrix array of shape (..., N, N).
+            parameter: Wrapped matrix as array of shape (..., N, N).
         """
         if contains_unwrappables(parameter):
+            #FIXME: This warning should be an error or not exist at all.
             warn(
-                "Wrapping SkewSymmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing."
+                "Wrapping SkewSymmetric around wrapped parameters might result in " +
+                "unexpected behaviour. Please make sure you know what you are doing."
             )
         _array = unwrap(parameter)
         if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
@@ -216,7 +246,7 @@ class SkewSymmetric(Unwrappable[Array]):
         self.parameter = parameter
 
     def unwrap(self) -> Array:
-        return self.make_skew_symmetric(self.parameter)
+        return self._make_skew_symmetric(self.parameter)
 
 
 class Symmetric(Unwrappable[Array]):
@@ -225,7 +255,7 @@ class Symmetric(Unwrappable[Array]):
     parameter: Array
 
     @staticmethod
-    def make_symmetric(x: Array) -> Array:
+    def _make_symmetric(x: Array) -> Array:
         """Function that maps an arbitrary matrix to a symmetric matrix.
 
         Args:
@@ -241,6 +271,7 @@ class Symmetric(Unwrappable[Array]):
         Args:
             parameter: To be wrapped matrix array of shape (..., N, N).
         """
+        #FIXME: This warning should be an error or not exist at all.
         if contains_unwrappables(parameter):
             warn(
                 "Wrapping Symmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing."
@@ -253,7 +284,7 @@ class Symmetric(Unwrappable[Array]):
         self.parameter = parameter
 
     def unwrap(self) -> Array:
-        return self.make_symmetric(self.parameter)
+        return self._make_symmetric(self.parameter)
 
 
 # ===-----------------------------------------------------------------------===#
@@ -262,11 +293,12 @@ class Symmetric(Unwrappable[Array]):
 
 
 class Constraint(Unwrappable[Array]):
-    """Abstract class to implement constrains for JAX arrays. A Constraint is
-    a specialized verision of :class:`Unwrappable`, that marks an array in a
-    pytree as constrained and implements two destinct functionalities:
+    """Abstract class to implement constrains for JAX arrays.
 
-    * **unwrap** 
+    A Constraint is a specialized verision of :class:`Unwrappable`, that marks an array
+    in a `PyTree` as constrained and implements two destinct functionalities:
+
+    * **unwrap**
         Identicall functionality to an :class:`Unwrappable`. This is used
         to remove the wrapper from the pytree, most likely to make a model callable.
         The model is unwrapped inside the loss function of :func:`klax.fit`. Thus
@@ -274,7 +306,7 @@ class Constraint(Unwrappable[Array]):
         Differentiable parameterization constrains can be implemented
         via unwrap. An example would be a positivity constraint, that passes
         the array through :func:`jax.nn.softplus` upon unwrapping.
-    * **apply** 
+    * **apply**
         This modifies the wrapped array without unwrapping. It is called in the
         training loop *after* each parameter update. Consequently, it allows for the
         implementation of *non-differentiable* constraints, such as clamping a parameter
@@ -293,7 +325,7 @@ class Constraint(Unwrappable[Array]):
 
     @abstractmethod
     def apply(self) -> Self:
-        """Returns a modified copy of self. Most likely you want to use :func:`eqx.tree_at` 
+        """Returns a modified copy of self. Most likely you want to use :func:`eqx.tree_at`
         for this purpose."""
         pass
 
@@ -360,7 +392,30 @@ class NonNegative(Constraint):
 # ===-----------------------------------------------------------------------===#
 
 
-def tree_contains(pytree, instance_type):
+def finalize(tree: PyTree):
+    """
+    Combines the functionality of :func:`apply` and :func:`unwrap`.
+
+    Use this function to make a model containing :class:`Unwrappables` callable.
+
+    Warning:
+        Do **not** fit the output of ``finalize`` if the pytree/model contains
+        :class:`Unwrappables<Unwrappable>` or :class:`Constraints<Constraint>`.
+        ``finalize`` returns an unwrapped pytree/model. As such
+        all constrains and wrappers are unwrapped away to make the model callable.
+        If you want to call a model that you want to fit afterwards, we recomend
+        the following::
+            model, history = fit(model, ...)
+            _model = finalize(model)
+            y = _model(x)                       # Call finalized model
+            model, history = fit(model, ...)    # Continue training
+    """
+    return unwrap(apply(tree))
+
+
+# This class contains code derived from paramax.
+# Original Copyright 2022 Daniel Ward
+def _tree_contains(pytree, instance_type):
     """Check if a ``PyTree`` contains instances of ``instance_type``."""
 
     def _is_unwrappable(leaf):
@@ -370,34 +425,15 @@ def tree_contains(pytree, instance_type):
     return any(_is_unwrappable(leaf) for leaf in leaves)
 
 
+# This class is derived from paramax and has been significantly modified.
+# Original Copyright 2022 Daniel Ward
 def contains_unwrappables(pytree):
-    """Check if a ``PyTree`` contains unwrappables."""
+    """Check if a ``PyTree`` contains instances of :class:`Unwrappables`."""
 
-    return tree_contains(pytree, Unwrappable)
+    return _tree_contains(pytree, Unwrappable)
 
 
-def contains_array_wrappers(pytree):
+def contains_constraints(pytree):
     """Check if a ``PyTree`` contains instances of :class:`Constraint`."""
 
-    return tree_contains(pytree, Constraint)
-
-
-def finalize(pytree):
-    """
-    Combines the functionality of :func:`apply` and :func:`unwrap`.
-
-    Use this function to make a model containing unwrappables callable.
-
-    Warning:
-        Do **not** fit the output of ``finalize`` if the pytree/model contains 
-        :class:`Unwrappables<Unwrappable>` or :class:`Constraints<Constraint>`.
-        ``finalize`` returns an unwrapped pytree/model. As such 
-        all constrains and wrappers are unwrapped away to make the model callable.
-        If you want to call a model that you want to fit afterwards, we recomend
-        the following::
-            model, history = fit(model, ...)
-            _model = finalize(model)            
-            y = _model(x)                       # Call finalized model
-            model, history = fit(model, ...)    # Continue training
-    """
-    return unwrap(apply(pytree))
+    return _tree_contains(pytree, Constraint)

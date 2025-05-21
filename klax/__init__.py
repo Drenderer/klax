@@ -23,19 +23,20 @@ from ._datahandler import (
     split_data as split_data,
 )
 from ._losses import Loss as Loss, mse as mse, mae as mae
+from . import nn as nn
 from ._training import fit as fit
 from ._wrappers import (
-    Unwrappable as Unwrappable,
-    contains_unwrappables as contains_unwrappables,
-    contains_array_wrappers as contains_array_wrappers,
-    unwrap as unwrap,
-    Constraint as Constraint,
     apply as apply,
+    Constraint as Constraint,
+    contains_constraints as contains_constraints,
+    contains_unwrappables as contains_unwrappables,
     finalize as finalize,
     Parameterize as Parameterize,
-    non_trainable as non_trainable,
-    NonTrainable as NonTrainable,
     NonNegative as NonNegative,
+    NonTrainable as NonTrainable,
+    non_trainable as non_trainable,
     SkewSymmetric as SkewSymmetric,
     Symmetric as Symmetric,
+    unwrap as unwrap,
+    Unwrappable as Unwrappable,
 )
