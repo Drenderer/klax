@@ -33,5 +33,7 @@ from . import nn as nn
 from ._training import fit as fit
 from ._wrappers import (
     ParameterWrapper as ParameterWrapper,
-    NonNegative as NonNegative
+    NonNegative as NonNegative,
+    SkewSymmetric as SkewSymmetric,
+    Symmetric as Symmetric,
 )

@@ -3,25 +3,34 @@
 
 .. currentmodule:: klax.nn
 
+Basic neural network layers
+---------------------------
+
 .. autosummary::
-    :toctree: _autosummary
+    :toctree:  _autosummary
 
     Linear
     InputSplitLinear
+
+Neural networks
+---------------------------
+
+.. autosummary::
+    :toctree:  _autosummary
+
+    MLP
     FICNN
 
-Linear
-~~~~~~
+Matrix-valued functions
+---------------------------
 
-.. autoclass:: Linear
+.. autosummary::
+    :toctree:  _autosummary
 
+    Matrix
+    ConstantMatrix
+    SkewSymmetricMatrix
+    ConstantSkewSymmetricMatrix
+    SPDMatrix
+    ConstantSPDMatrix
 
-InputSplitLinear
-~~~~~~~~~~~~~~~~
-
-.. autoclass:: InputSplitLinear
-
-FICNN
-~~~~~
-
-.. autoclass:: FICNN
