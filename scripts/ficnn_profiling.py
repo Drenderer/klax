@@ -10,6 +10,7 @@ from typing import (
     Literal,
     Optional,
     Union,
+    Self,
 )
 
 from functools import partial
@@ -29,7 +30,7 @@ from klax._misc import default_floating_dtype
 from klax.nn import FICNN, MLP, Linear
 from klax import fit
 from klax import HistoryCallback
-from klax import ParameterWrapper, NonNegative
+from klax import ArrayWrapper, NonNegative
 
 
 # %% Custom code for timeing code
@@ -68,7 +69,7 @@ def time_code(func, msg=""):
 # %% Define alternative FICNN implementations
 
 
-class PartialInputNonNegative(ParameterWrapper):
+class PartialInputNonNegative(ArrayWrapper):
     parameter: Array
     n: int
 
@@ -77,7 +78,8 @@ class PartialInputNonNegative(ParameterWrapper):
         self.parameter = self._apply_constraint(klax.unwrap(parameter), n)
         self.n = n
 
-    def _apply_constraint(self, x: Array, n: int) -> Array:
+    @staticmethod
+    def _apply_constraint(x: Array, n: int) -> Array:
         # Apply non-negative constraint to the first n rows
         constrained = jnp.where(
             jnp.arange(x.shape[0])[:, None] < n, jnp.maximum(x, 0), x
@@ -85,7 +87,12 @@ class PartialInputNonNegative(ParameterWrapper):
         return constrained
 
     def unwrap(self) -> Array:
-        return self._apply_constraint(self.parameter, self.n)
+        return self.parameter
+
+    def apply(self) -> Self:
+        return eqx.tree_at(
+            lambda t: t.parameter, self, self._apply_constraint(self.parameter, self.n)
+        )
 
 
 class HalfConstrainedFICNN(eqx.Module):
@@ -215,7 +222,7 @@ key = jr.key(0)
 in_size = 3
 
 x = jr.normal(key, (1000, in_size))
-y = jax.vmap(jnp.inner)(x, x) + 0.1*jr.normal(key, shape=(x.shape[0],))
+y = jax.vmap(jnp.inner)(x, x) + 0.1 * jr.normal(key, shape=(x.shape[0],))
 
 # %% Test the alternateive implementation
 for use_passthrough, non_decreasing in [
@@ -310,18 +317,31 @@ kwargs = dict(
 hc_ficnn = HalfConstrainedFICNN(**kwargs)
 ficnn = FICNN(**kwargs)
 mlp = MLP(in_size=1, out_size="scalar", width_sizes=2 * [8], key=key)
-eqx_mlp = eqx.nn.MLP(in_size=1, out_size="scalar", width_size=8, depth=2, activation=jax.nn.softplus, key=key)
+eqx_mlp = eqx.nn.MLP(
+    in_size=1,
+    out_size="scalar",
+    width_size=8,
+    depth=2,
+    activation=jax.nn.softplus,
+    key=key,
+)
 
-_hc_ficnn, hist = fit(hc_ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key)
-_ficnn, hist = fit(ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key)
+_hc_ficnn, hist = fit(
+    hc_ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+)
+_ficnn, hist = fit(
+    ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+)
 _mlp, hist = fit(mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key)
-_eqx_mlp, hist = fit(eqx_mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key)
+_eqx_mlp, hist = fit(
+    eqx_mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+)
 
 fig, ax = plt.subplots()
 ax.scatter(x, y, label="Data", marker="x", c="black")
-ax.plot(x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls='-.', label="EQX MLP")
-ax.plot(x_eval, jax.vmap(klax.finalize(_mlp))(x_eval), ls='-.', label="MLP")
+ax.plot(x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls="-.", label="EQX MLP")
+ax.plot(x_eval, jax.vmap(klax.finalize(_mlp))(x_eval), ls="-.", label="MLP")
 ax.plot(x_eval, jax.vmap(klax.finalize(_hc_ficnn))(x_eval), label="HCFICNN")
-ax.plot(x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls='--', label="FICNN")
+ax.plot(x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN")
 ax.legend()
 plt.show()
