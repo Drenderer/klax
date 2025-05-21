@@ -22,7 +22,7 @@ import optax
 import pytest
 from typing import Self
 
-from klax import AbstractUnwrappable, ArrayWrapper, unwrap
+from klax import AbstractUnwrappable, ArrayWrapper
 
 
 def test_training(getkey):
@@ -179,7 +179,7 @@ def test_apply_in_training(getkey):
     model = Model()
     model, _ = klax.fit(model, (x, y), key=getkey())
 
-    model_ = unwrap(model)
+    model_ = klax.unwrap(model)  # Important to use unwrap here not finalize
     assert model_.weight >= -1
     assert model_.bias >= 0
 

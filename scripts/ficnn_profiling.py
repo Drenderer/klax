@@ -224,7 +224,7 @@ for use_passthrough, non_decreasing in [
     (False, True),
     (True, True),
 ]:
-    ficnn = klax.unwrap(
+    ficnn = klax.finalize(
         HalfConstrainedFICNN(
             in_size,
             "scalar",
@@ -259,20 +259,20 @@ ficnn = FICNN(**kwargs)
 
 
 # %% Time the un-vmapped call time
-print("\nTiming un-vmapped call time with unwrap")
-time_code(lambda: klax.unwrap(hc_ficnn)(x[0]), "HCFICNN: ")
-time_code(lambda: klax.unwrap(ficnn)(x[0]), "FICNN:   ")
+print("\nTiming un-vmapped call time with finalize")
+time_code(lambda: klax.finalize(hc_ficnn)(x[0]), "HCFICNN: ")
+time_code(lambda: klax.finalize(ficnn)(x[0]), "FICNN:   ")
 
-_hc_ficnn = klax.unwrap(hc_ficnn)
-_ficnn = klax.unwrap(ficnn)
-print("\nTiming un-vmapped call time without unwrap")
+_hc_ficnn = klax.finalize(hc_ficnn)
+_ficnn = klax.finalize(ficnn)
+print("\nTiming un-vmapped call time without finalize")
 time_code(lambda: _hc_ficnn(x[0]), "HCFICNN: ")
 time_code(lambda: _ficnn(x[0]), "FICNN:   ")
 
 # %% Time the vmapped call time
-_hc_ficnn = jax.vmap(klax.unwrap(hc_ficnn))
+_hc_ficnn = jax.vmap(klax.finalize(hc_ficnn))
 _hc_ficnn(x[:1])  # Call to compile
-_ficnn = jax.vmap(klax.unwrap(ficnn))
+_ficnn = jax.vmap(klax.finalize(ficnn))
 _ficnn(x[:1])  # Call to compile
 print("\nTiming vmapped call time")
 time_code(lambda: _hc_ficnn(x), "HCFICNN: ")
@@ -319,9 +319,9 @@ _eqx_mlp, hist = fit(eqx_mlp, (x, y), steps=20_000, history=HistoryCallback(verb
 
 fig, ax = plt.subplots()
 ax.scatter(x, y, label="Data", marker="x", c="black")
-ax.plot(x_eval, jax.vmap(klax.unwrap(_eqx_mlp))(x_eval), ls='-.', label="EQX MLP")
-ax.plot(x_eval, jax.vmap(klax.unwrap(_mlp))(x_eval), ls='-.', label="MLP")
-ax.plot(x_eval, jax.vmap(klax.unwrap(_hc_ficnn))(x_eval), label="HCFICNN")
-ax.plot(x_eval, jax.vmap(klax.unwrap(_ficnn))(x_eval), ls='--', label="FICNN")
+ax.plot(x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls='-.', label="EQX MLP")
+ax.plot(x_eval, jax.vmap(klax.finalize(_mlp))(x_eval), ls='-.', label="MLP")
+ax.plot(x_eval, jax.vmap(klax.finalize(_hc_ficnn))(x_eval), label="HCFICNN")
+ax.plot(x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls='--', label="FICNN")
 ax.legend()
 plt.show()

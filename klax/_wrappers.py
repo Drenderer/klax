@@ -355,3 +355,12 @@ def contains_array_wrappers(pytree):
     """Check if a ``PyTree`` contains instances of :class:`ArrayWrapper`."""
 
     return tree_contains(pytree, ArrayWrapper)
+
+
+def finalize(pytree):
+    """
+    Combines the functionality of :func:`apply` and :func:`unwrap`.
+
+    Use this function to make a model with unwrappables callable.
+    """
+    return unwrap(apply(pytree))

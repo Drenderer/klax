@@ -12,7 +12,7 @@ from jax.nn.initializers import variance_scaling
 from equinox.nn import MLP as EqxMLP
 
 from klax.nn import MLP as KlaxMLP
-from klax import fit, unwrap
+from klax import fit, finalize
 from klax import HistoryCallback
 
 from matplotlib import pyplot as plt
@@ -42,7 +42,7 @@ class TrackPredictionHistory(HistoryCallback):
     def __call__(self, cbargs):
         super().__call__(cbargs)
         if cbargs.step % self.log_every_pred == 0:
-            model = unwrap(cbargs.model)
+            model = finalize(cbargs.model)
             self.predictions.append(jax.vmap(model)(self.x_eval))
             self.pred_steps.append(cbargs.step)
 

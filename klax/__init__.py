@@ -31,6 +31,7 @@ from ._wrappers import (
     unwrap as unwrap,
     ArrayWrapper as ArrayWrapper,
     apply as apply,
+    finalize as finalize,
     Parameterize as Parameterize,
     non_trainable as non_trainable,
     NonTrainable as NonTrainable,
