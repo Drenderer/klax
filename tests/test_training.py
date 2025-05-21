@@ -22,7 +22,7 @@ import optax
 import pytest
 from typing import Self
 
-from klax import AbstractUnwrappable, ArrayWrapper
+from klax import Unwrappable, ArrayWrapper
 
 
 def test_training(getkey):
@@ -165,8 +165,8 @@ def test_apply_in_training(getkey):
 
     # Create dummy model
     class Model(eqx.Module):
-        weight: AbstractUnwrappable[Array]
-        bias: AbstractUnwrappable[Array]
+        weight: Unwrappable[Array]
+        bias: Unwrappable[Array]
 
         def __init__(self):
             self.weight = AtLeast(jnp.array(0.), jnp.array(-1))

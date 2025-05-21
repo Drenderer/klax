@@ -26,7 +26,7 @@ from klax._misc import default_floating_dtype
 from klax.nn import Linear, InputSplitLinear
 from klax import (
     fit,
-    AbstractUnwrappable,
+    Unwrappable,
     NonNegative,
     finalize,
     split_data,
@@ -59,7 +59,7 @@ class FICNN(eqx.Module, strict=True):
         in_size: Union[int, Literal["scalar"]],
         out_size: Union[int, Literal["scalar"]],
         width_sizes: Sequence[int],
-        non_neg_wrap: AbstractUnwrappable,
+        non_neg_wrap: Unwrappable,
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
@@ -228,7 +228,7 @@ class FICNN(eqx.Module, strict=True):
 # %% Define old NonNegative Wrapper
 
 
-class NonNegSoftplus(AbstractUnwrappable[Array]):
+class NonNegSoftplus(Unwrappable[Array]):
     parameter: Array
 
     def __init__(self, x):
@@ -238,7 +238,7 @@ class NonNegSoftplus(AbstractUnwrappable[Array]):
     def unwrap(self) -> Array:
         return jax.nn.softplus(self.parameter)
 
-class OldNonNegative(AbstractUnwrappable[Array]):
+class OldNonNegative(Unwrappable[Array]):
     parameter: Array
 
     def __init__(self, parameter: Array):
@@ -252,7 +252,7 @@ class OldNonNegative(AbstractUnwrappable[Array]):
         return self._non_neg(self.parameter)
 
 
-class NoConstraint(AbstractUnwrappable[Array]):
+class NoConstraint(Unwrappable[Array]):
     parameter: Array
 
     def unwrap(self) -> Array:

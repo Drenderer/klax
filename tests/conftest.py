@@ -40,7 +40,7 @@ def getkey():
 def getzerowrap():
     import klax
 
-    class ZeroWrapper(klax.AbstractUnwrappable[Array]):
+    class ZeroWrapper(klax.Unwrappable[Array]):
         """A dummy wrapper that sets all parameters to zero."""
         parameter: Array
 

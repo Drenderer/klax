@@ -34,7 +34,7 @@ Wrappers and constraints
 .. autosummary::
     :toctree: _autosummary
 
-    AbstractUnwrappable
+    Unwrappable
     unwrap
     Parameterize
     NonTrainable

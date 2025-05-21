@@ -25,7 +25,7 @@ from ._datahandler import (
 from ._losses import Loss as Loss, mse as mse, mae as mae
 from ._training import fit as fit
 from ._wrappers import (
-    AbstractUnwrappable as AbstractUnwrappable,
+    Unwrappable as Unwrappable,
     contains_unwrappables as contains_unwrappables,
     contains_array_wrappers as contains_array_wrappers,
     unwrap as unwrap,

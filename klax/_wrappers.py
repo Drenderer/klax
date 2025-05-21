@@ -36,11 +36,11 @@ T = TypeVar("T")
 
 
 # ===-----------------------------------------------------------------------===#
-#  AbstractUnwrappable
+#  Unwrappable
 # ===-----------------------------------------------------------------------===#
 
 
-class AbstractUnwrappable[T](eqx.Module):
+class Unwrappable[T](eqx.Module):
     """An abstract class representing an unwrappable object.
 
     Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping.
@@ -53,10 +53,10 @@ class AbstractUnwrappable[T](eqx.Module):
 
 
 def unwrap(tree: PyTree):
-    """Map across a PyTree and unwrap all :class:`AbstractUnwrappable` nodes.
+    """Map across a PyTree and unwrap all :class:`Unwrappable` nodes.
 
     This leaves all other nodes unchanged. If nested, the innermost
-    ``AbstractUnwrappable`` nodes are unwrapped first.
+    ``Unwrappable`` nodes are unwrapped first.
 
     Example:
         Enforcing positivity.
@@ -70,13 +70,13 @@ def unwrap(tree: PyTree):
 
     def _unwrap(tree, *, include_self: bool):
         def _map_fn(leaf):
-            if isinstance(leaf, AbstractUnwrappable):
+            if isinstance(leaf, Unwrappable):
                 # Unwrap subnodes, then itself
                 return _unwrap(leaf, include_self=False).unwrap()
             return leaf
 
         def is_leaf(x):
-            is_unwrappable = isinstance(x, AbstractUnwrappable)
+            is_unwrappable = isinstance(x, Unwrappable)
             included = include_self or x is not tree
             return is_unwrappable and included
 
@@ -85,7 +85,7 @@ def unwrap(tree: PyTree):
     return _unwrap(tree, include_self=True)
 
 
-class Parameterize(AbstractUnwrappable[T]):
+class Parameterize(Unwrappable[T]):
     """Unwrap an object by calling fn with args and kwargs.
 
     All of fn, args and kwargs may contain trainable parameters.
@@ -160,7 +160,7 @@ def non_trainable(tree: PyTree):
     )
 
 
-class NonTrainable(AbstractUnwrappable[T]):
+class NonTrainable(Unwrappable[T]):
     """Applies stop gradient to all arraylike leaves before unwrapping.
 
     See also :func:`non_trainable`, which is probably a generally prefereable way to
@@ -178,7 +178,7 @@ class NonTrainable(AbstractUnwrappable[T]):
         return eqx.combine(lax.stop_gradient(differentiable), static)
 
 
-class SkewSymmetric(AbstractUnwrappable[Array]):
+class SkewSymmetric(Unwrappable[Array]):
     """Ensures skew-symmetry of a matrix upon unwrapping."""
 
     parameter: Array
@@ -215,7 +215,7 @@ class SkewSymmetric(AbstractUnwrappable[Array]):
         return self.make_skew_symmetric(self.parameter)
 
 
-class Symmetric(AbstractUnwrappable[Array]):
+class Symmetric(Unwrappable[Array]):
     """Ensures symmetry of a matrix upon unwrapping."""
 
     parameter: Array
@@ -257,10 +257,10 @@ class Symmetric(AbstractUnwrappable[Array]):
 # ===-----------------------------------------------------------------------===#
 
 
-class ArrayWrapper(AbstractUnwrappable[Array]):
+class ArrayWrapper(Unwrappable[Array]):
     """An abstract class representing array wrappers.
 
-    ``ArrayWrapper`` is a specialized version of :class:`AbstractUnwrappable`
+    ``ArrayWrapper`` is a specialized version of :class:`Unwrappable`
     that returns an updated version of itself upon applying. ``ArrayWrapper``
     should not be nested but is fully compatible with :func:`unwrap`.
     """
@@ -348,7 +348,7 @@ def tree_contains(pytree, instance_type):
 def contains_unwrappables(pytree):
     """Check if a ``PyTree`` contains unwrappables."""
 
-    return tree_contains(pytree, AbstractUnwrappable)
+    return tree_contains(pytree, Unwrappable)
 
 
 def contains_array_wrappers(pytree):

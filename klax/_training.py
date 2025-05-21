@@ -54,7 +54,7 @@ def fit[T: eqx.Module, H: Callback](
 
     Args:
         model: The model instance, which should be trained. It must be a subclass of
-            `eqx.Module`. The model may contain :class:`klax.AbstractUnwrappable` wrappers.
+            `eqx.Module`. The model may contain :class:`klax.Unwrappable` wrappers.
         data: The training data can be any `PyTree` with `ArrayLike` leaves.
             Most likely you'll want `data` to be a tuple `(x, y)` with model inputs
             `x` and model outputs `y`.
