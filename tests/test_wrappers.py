@@ -19,11 +19,13 @@ from klax import (
     apply,
     NonTrainable,
     NonNegative,
-    Symmetric, 
+    Symmetric,
     SkewSymmetric,
     non_trainable,
     Parameterize,
-    unwrap
+    unwrap,
+    contains_array_wrappers,
+    contains_unwrappables,
 )
 import jax
 import jax.random as jr
@@ -47,6 +49,7 @@ def test_parameterize():
 def test_non_trainable(getwrap):
     # Array model
     model = non_trainable((jnp.ones(3), 1))
+
     def loss(model):
         model = unwrap(model)
         return model[0].sum()
@@ -62,7 +65,7 @@ def test_non_trainable(getwrap):
     assert jnp.all(grad == 0.0)
 
 
-#TODO: Paramax implements some more tests 
+# TODO: Paramax implements some more tests
 
 
 def test_non_negative(getkey):
@@ -78,29 +81,29 @@ def test_non_negative(getkey):
     assert jnp.all(unwrap(non_neg) == parameter)
     assert jnp.all(apply(non_neg).parameter == parameter)
 
+
 def test_symmetric(getkey):
     # Constraint
-    parameter = jr.normal(getkey(), (3,10,3,3))
+    parameter = jr.normal(getkey(), (3, 10, 3, 3))
     symmetric = Symmetric(parameter)
     _symmetric = unwrap(symmetric)
     assert _symmetric.shape == parameter.shape
-    assert jnp.array_equal(_symmetric, jnp.transpose(_symmetric, axes=(0,1,3,2)))
+    assert jnp.array_equal(_symmetric, jnp.transpose(_symmetric, axes=(0, 1, 3, 2)))
+
 
 def test_skewsymmetric(getkey):
     # Constraint
-    parameter = jr.normal(getkey(), (3,10,3,3))
+    parameter = jr.normal(getkey(), (3, 10, 3, 3))
     symmetric = SkewSymmetric(parameter)
     _symmetric = unwrap(symmetric)
     assert _symmetric.shape == parameter.shape
-    assert jnp.array_equal(_symmetric, -jnp.transpose(_symmetric, axes=(0,1,3,2)))
-
-
+    assert jnp.array_equal(_symmetric, -jnp.transpose(_symmetric, axes=(0, 1, 3, 2)))
 
 
 test_cases = {
     "NonTrainable": lambda key: NonTrainable(jr.normal(key, 10)),
     "Parameterize-exp": lambda key: Parameterize(jnp.exp, jr.normal(key, 10)),
-    "NonNegative": lambda key: NonNegative(jr.normal(key, 10))
+    "NonNegative": lambda key: NonNegative(jr.normal(key, 10)),
 }
 
 
@@ -124,3 +127,17 @@ def test_vectorization_invariance(wrapper_fn, shape):
         unwrapped_vmap,
     )
     assert eqx.tree_equal(unwrapped, unwrapped_vmap_zero, atol=1e-7)
+
+
+def test_contains():
+    pytree_A = (1, "abc", jnp.array([1, 2, 3]))
+    pytree_B = (1, "abc", Parameterize(jnp.square, jnp.array([1, 2, 3])))
+    pytree_C = (1, "abc", NonNegative(jnp.array([1, 2, 3])))
+
+    assert not contains_unwrappables(pytree_A)
+    assert contains_unwrappables(pytree_B)
+    assert contains_unwrappables(pytree_C)
+
+    assert not contains_array_wrappers(pytree_A)
+    assert not contains_array_wrappers(pytree_B)
+    assert contains_array_wrappers(pytree_C)

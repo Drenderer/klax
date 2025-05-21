@@ -180,6 +180,7 @@ class NonTrainable(AbstractUnwrappable[T]):
 
 class SkewSymmetric(AbstractUnwrappable[Array]):
     """Ensures skew-symmetry of a matrix upon unwrapping."""
+
     parameter: Array
 
     @staticmethod
@@ -200,10 +201,14 @@ class SkewSymmetric(AbstractUnwrappable[Array]):
             parameter: To be wrapped matrix array of shape (..., N, N).
         """
         if contains_unwrappables(parameter):
-            warn("Wrapping SkewSymmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing.")
+            warn(
+                "Wrapping SkewSymmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing."
+            )
         _array = unwrap(parameter)
         if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
-            raise ValueError(f"Wrapped parameter must be an array of shape (..., N, N) but has shape {_array.shape}")
+            raise ValueError(
+                f"Wrapped parameter must be an array of shape (..., N, N) but has shape {_array.shape}"
+            )
         self.parameter = parameter
 
     def unwrap(self) -> Array:
@@ -233,14 +238,19 @@ class Symmetric(AbstractUnwrappable[Array]):
             parameter: To be wrapped matrix array of shape (..., N, N).
         """
         if contains_unwrappables(parameter):
-            warn("Wrapping Symmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing.")
+            warn(
+                "Wrapping Symmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing."
+            )
         _array = unwrap(parameter)
         if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
-            raise ValueError(f"Wrapped parameter must be an array of shape (..., N, N) but has shape {_array.shape}")
+            raise ValueError(
+                f"Wrapped parameter must be an array of shape (..., N, N) but has shape {_array.shape}"
+            )
         self.parameter = parameter
 
     def unwrap(self) -> Array:
         return self.make_symmetric(self.parameter)
+
 
 # ===-----------------------------------------------------------------------===#
 #  ArrayWrapper
@@ -325,11 +335,23 @@ class NonNegative(ArrayWrapper):
 # ===-----------------------------------------------------------------------===#
 
 
-def contains_unwrappables(pytree):
-    """Check if a ``PyTree`` contains unwrappables."""
+def tree_contains(pytree, instance_type):
+    """Check if a ``PyTree`` contains instances of ``instance_type``."""
 
     def _is_unwrappable(leaf):
-        return isinstance(leaf, AbstractUnwrappable)
+        return isinstance(leaf, instance_type)
 
     leaves = jax.tree.leaves(pytree, is_leaf=_is_unwrappable)
     return any(_is_unwrappable(leaf) for leaf in leaves)
+
+
+def contains_unwrappables(pytree):
+    """Check if a ``PyTree`` contains unwrappables."""
+
+    return tree_contains(pytree, AbstractUnwrappable)
+
+
+def contains_array_wrappers(pytree):
+    """Check if a ``PyTree`` contains instances of :class:`ArrayWrapper`."""
+
+    return tree_contains(pytree, ArrayWrapper)
