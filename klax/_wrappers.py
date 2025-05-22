@@ -398,13 +398,16 @@ def finalize(tree: PyTree):
 
     Use this function to make a model containing :class:`Unwrappables` callable.
 
-    Warning:
+    .. warning::
+
         Do **not** fit the output of ``finalize`` if the pytree/model contains
         :class:`Unwrappables<Unwrappable>` or :class:`Constraints<Constraint>`.
         ``finalize`` returns an unwrapped pytree/model. As such
         all constrains and wrappers are unwrapped away to make the model callable.
+
         If you want to call a model that you want to fit afterwards, we recomend
-        the following::
+        using a different name for the finalized model. For example::
+
             model, history = fit(model, ...)
             _model = finalize(model)
             y = _model(x)                       # Call finalized model
@@ -415,7 +418,7 @@ def finalize(tree: PyTree):
 
 # This function contains code derived from paramax.
 # Original Copyright 2022 Daniel Ward
-def _tree_contains(pytree, instance_type):
+def _tree_contains(pytree, instance_type) -> bool:
     """Check if a ``PyTree`` contains instances of ``instance_type``."""
 
     def _is_unwrappable(leaf):
@@ -427,13 +430,13 @@ def _tree_contains(pytree, instance_type):
 
 # This function is derived from paramax and has been significantly modified.
 # Original Copyright 2022 Daniel Ward
-def contains_unwrappables(pytree):
+def contains_unwrappables(pytree: PyTree) -> bool:
     """Check if a ``PyTree`` contains instances of :class:`Unwrappables`."""
 
     return _tree_contains(pytree, Unwrappable)
 
 
-def contains_constraints(pytree):
+def contains_constraints(pytree: PyTree) -> bool:
     """Check if a ``PyTree`` contains instances of :class:`Constraint`."""
 
     return _tree_contains(pytree, Constraint)

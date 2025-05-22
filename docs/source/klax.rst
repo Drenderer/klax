@@ -36,6 +36,7 @@ Wrappers and constraints
 
     Unwrappable
     unwrap
+    contains_unwrappables
     Parameterize
     NonTrainable
     non_trainable
@@ -43,6 +44,7 @@ Wrappers and constraints
     SkewSymmetric
     Constraint
     apply
+    contains_constraints
     NonNegative
     finalize
 
