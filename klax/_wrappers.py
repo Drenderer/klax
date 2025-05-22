@@ -40,7 +40,6 @@
 
 from abc import abstractmethod
 from typing import Any, Callable, Self, TypeVar
-from warnings import warn
 
 import equinox as eqx
 import jax
@@ -212,10 +211,10 @@ class NonTrainable(Unwrappable[T]):
 
 class SkewSymmetric(Unwrappable[Array]):
     """Ensures skew-symmetry of a square matrix upon unwrapping.
-    
+
     Warning:
-        Wrapping ``SkewSymmetric`` around parameters that are 
-        already wrapped may lead to unexpected behavior and is 
+        Wrapping ``SkewSymmetric`` around parameters that are
+        already wrapped may lead to unexpected behavior and is
         generally discouraged.
     """
 
@@ -251,10 +250,10 @@ class SkewSymmetric(Unwrappable[Array]):
 
 class Symmetric(Unwrappable[Array]):
     """Ensures symmetry of a matrix upon unwrapping.
-    
+
     Warning:
-        Wrapping ``Symmetric`` around parameters that are 
-        already wrapped may lead to unexpected behavior and is 
+        Wrapping ``Symmetric`` around parameters that are
+        already wrapped may lead to unexpected behavior and is
         generally discouraged."""
 
     parameter: Array
