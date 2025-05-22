@@ -76,7 +76,7 @@ class Unwrappable[T](eqx.Module):
         pass
 
 
-# This function is copied from paramax.
+# This function is copied from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
 def unwrap(tree: PyTree):
     """Map across a PyTree and unwrap all :class:`Unwrappables<Unwrappable>`.
@@ -211,7 +211,13 @@ class NonTrainable(Unwrappable[T]):
 
 
 class SkewSymmetric(Unwrappable[Array]):
-    """Ensures skew-symmetry of a square matrix upon unwrapping."""
+    """Ensures skew-symmetry of a square matrix upon unwrapping.
+    
+    Warning:
+        Wrapping ``SkewSymmetric`` around parameters that are 
+        already wrapped may lead to unexpected behavior and is 
+        generally discouraged.
+    """
 
     parameter: Array
 
@@ -232,12 +238,6 @@ class SkewSymmetric(Unwrappable[Array]):
         Args:
             parameter: Wrapped matrix as array of shape (..., N, N).
         """
-        if contains_unwrappables(parameter):
-            #FIXME: This warning should be an error or not exist at all.
-            warn(
-                "Wrapping SkewSymmetric around wrapped parameters might result in " +
-                "unexpected behaviour. Please make sure you know what you are doing."
-            )
         _array = unwrap(parameter)
         if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
             raise ValueError(
@@ -250,7 +250,12 @@ class SkewSymmetric(Unwrappable[Array]):
 
 
 class Symmetric(Unwrappable[Array]):
-    """Ensures symmetry of a matrix upon unwrapping."""
+    """Ensures symmetry of a matrix upon unwrapping.
+    
+    Warning:
+        Wrapping ``Symmetric`` around parameters that are 
+        already wrapped may lead to unexpected behavior and is 
+        generally discouraged."""
 
     parameter: Array
 
@@ -271,11 +276,6 @@ class Symmetric(Unwrappable[Array]):
         Args:
             parameter: To be wrapped matrix array of shape (..., N, N).
         """
-        #FIXME: This warning should be an error or not exist at all.
-        if contains_unwrappables(parameter):
-            warn(
-                "Wrapping Symmetric around wrapped parameters might result in unexpected behaviour. Please make sure you know what you are doing."
-            )
         _array = unwrap(parameter)
         if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
             raise ValueError(
@@ -413,7 +413,7 @@ def finalize(tree: PyTree):
     return unwrap(apply(tree))
 
 
-# This class contains code derived from paramax.
+# This function contains code derived from paramax.
 # Original Copyright 2022 Daniel Ward
 def _tree_contains(pytree, instance_type):
     """Check if a ``PyTree`` contains instances of ``instance_type``."""
@@ -425,7 +425,7 @@ def _tree_contains(pytree, instance_type):
     return any(_is_unwrappable(leaf) for leaf in leaves)
 
 
-# This class is derived from paramax and has been significantly modified.
+# This function is derived from paramax and has been significantly modified.
 # Original Copyright 2022 Daniel Ward
 def contains_unwrappables(pytree):
     """Check if a ``PyTree`` contains instances of :class:`Unwrappables`."""
