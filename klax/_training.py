@@ -23,7 +23,6 @@ import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray, PyTree
 import optax
-import paramax as px
 
 from ._callbacks import (
     Callback,
@@ -32,6 +31,7 @@ from ._callbacks import (
 )
 from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
 from ._losses import Loss, mse
+from ._wrappers import unwrap, apply
 
 
 def fit[T: eqx.Module, H: Callback](
@@ -54,7 +54,7 @@ def fit[T: eqx.Module, H: Callback](
 
     Args:
         model: The model instance, which should be trained. It must be a subclass of
-            `eqx.Module`. The model may contain `paramax.AbstractUnwrappable` wrappers.
+            `eqx.Module`. The model may contain :class:`klax.Unwrappable` wrappers.
         data: The training data can be any `PyTree` with `ArrayLike` leaves.
             Most likely you'll want `data` to be a tuple `(x, y)` with model inputs
             `x` and model outputs `y`.
@@ -109,7 +109,7 @@ def fit[T: eqx.Module, H: Callback](
     # the loss evaluation for the loss history.
     @eqx.filter_jit
     def combined_loss(model, batch):
-        model = px.unwrap(model)
+        model = unwrap(model)
         return loss_fn(model, batch, batch_axis=batch_axis)
 
     # This partitioned loss function is required within the make_step function, because
@@ -140,6 +140,9 @@ def fit[T: eqx.Module, H: Callback](
         params = optax.apply_updates(params, updates)
         model = eqx.combine(params, static)
 
+        # Apply the Constraint in the model to ensure apply-constrains are met after the update.
+        model = apply(model)
+
         flat_model = jax.tree_util.tree_leaves(model)
         flat_opt_state = jax.tree_util.tree_leaves(opt_state)
 
@@ -151,6 +154,9 @@ def fit[T: eqx.Module, H: Callback](
         opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
     else:
         opt_state = init_opt_state
+
+    # Apply the Constraint in the model to ensure apply-constrains are met initially
+    model = apply(model)
 
     # Use the unflatten trick to speed up training,
     # see https://docs.kidger.site/equinox/tricks/

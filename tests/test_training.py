@@ -20,6 +20,9 @@ import jax.random as jrandom
 from jaxtyping import Array
 import optax
 import pytest
+from typing import Self
+
+from klax import Unwrappable, Constraint
 
 
 def test_training(getkey):
@@ -137,3 +140,48 @@ def test_training_optax_optimizers(getkey, optimizer):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     klax.fit(model, (x, x), optimizer=optimizer, key=getkey())
+
+
+def test_apply_in_training(getkey):
+
+    # Create dummy data
+    x = jnp.linspace(0.0, 1.0, 20)
+    y = -2 * x - 1
+
+    # Create dummy Constraint
+    class AtLeast(Constraint):
+        array: Array
+        minval: Array        
+
+        def unwrap(self) -> Array:
+            return self.array
+        
+        def apply(self) -> Self:
+            return eqx.tree_at(
+                lambda x: x.array,
+                self,
+                replace=jnp.maximum(self.array, self.minval),
+            )
+
+    # Create dummy model
+    class Model(eqx.Module):
+        weight: Unwrappable[Array]
+        bias: Unwrappable[Array]
+
+        def __init__(self):
+            self.weight = AtLeast(jnp.array(0.), jnp.array(-1))
+            self.bias = AtLeast(jnp.array(-1.), jnp.array(0))
+
+        def __call__(self, x):
+            return self.weight * x + self.bias
+        
+    # Create and train model
+    model = Model()
+    model, _ = klax.fit(model, (x, y), key=getkey())
+
+    model_ = klax.unwrap(model)  # Important to use unwrap here not finalize
+    assert model_.weight >= -1
+    assert model_.bias >= 0
+
+
+

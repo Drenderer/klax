@@ -1,7 +1,14 @@
-This product includes code derived from Equinox (https://github.com/patrick-kidger/equinox), which is licensed under Apache License, Version 2.0. 
+========================================================================
+NOTICE file for the klax package
+========================================================================
 
-Modifications to the code have been made by The Klax Authors in 2025. Files containing modified code are:
-- klax/nn/_linear.py
-- klax/nn/_mlp.py
+This product includes code derived from `equinox`
+(https://github.com/patrick-kidger/equinox).
+Licensed under the Apache License Version 2.0. Files containing modified code are 
+`klax/nn/_linear.py` and `klax/nn/_mlp.py`. For details see the individual source file
+headers.
 
-For details, see the individual source file headers.
+This product includes code derived from `paramax`
+(https://github.com/danielward27/paramax). Copyright 2022 Daniel Ward.
+Licensed under the MIT License. A copy of the license is included in the header of the 
+modified source file at `klax/_wrappers.py`.
