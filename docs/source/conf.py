@@ -23,9 +23,7 @@ import sys
 from pathlib import Path
 
 
-# sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path("..").resolve()))
-print(Path("..").resolve())
 
 
 project = "Klax"
@@ -75,14 +73,6 @@ autodoc_type_aliases = {
     "ArrayLike": "jaxtyping.ArrayLike",
     "PRNGKeyArray": "PRNGKeyArray",
 }
-
-# -- Options for autodoc ----------------------------------------------------
-autodoc_default_options = {
-    "members": True,
-    "special-members": "__call__",
-    "member-order": "bysource",
-}
-
 
 
 # -- Intershinx configuration -------------------------------------------------
