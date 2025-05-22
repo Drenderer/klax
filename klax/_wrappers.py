@@ -377,7 +377,7 @@ class NonNegative(Constraint):
         return jnp.maximum(x, 0)
 
     def unwrap(self) -> Array:
-        return self._non_neg(self.parameter)
+        return self.parameter
 
     def apply(self) -> Self:
         return eqx.tree_at(

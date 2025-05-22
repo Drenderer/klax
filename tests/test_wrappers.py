@@ -26,6 +26,7 @@ from klax import (
     Symmetric,
     SkewSymmetric,
     unwrap,
+    finalize,
 )
 import jax
 import jax.random as jr
@@ -69,13 +70,13 @@ def test_non_negative(getkey):
     # Negative array input
     parameter = -jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert jnp.all(unwrap(non_neg) == 0)
+    assert jnp.all(finalize(non_neg) == 0)
     assert jnp.all(apply(non_neg).parameter == 0)
 
     # Positive array input
     parameter = jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert jnp.all(unwrap(non_neg) == parameter)
+    assert jnp.all(finalize(non_neg) == parameter)
     assert jnp.all(apply(non_neg).parameter == parameter)
 
 
