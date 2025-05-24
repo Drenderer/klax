@@ -67,4 +67,18 @@ uv sync
 
 For more information on uv, visit the [uv documentation](https://docs.astral.sh/uv/). Note, that klax does not add `.python-version` and `uv.lock` files to VCS, as it is generally not recommended for libraries. See [this](https://stackoverflow.com/questions/61037557/should-i-commit-lock-file-changes-separately-what-should-i-write-for-the-commi) discussion on Stack Overflow for reference.
 
+### Nix development shell
+
+For Nix users a flake is provided in `flake.nix`. To create a development environment first run
+
+```bash
+nix run nixpkgs#uv lock
+```
+
+to create the required lock file and the virtual environment. To enter the development shell and source the virtual environment run
+
+```bash
+nix develop
+```
+
 ## Related
