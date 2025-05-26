@@ -35,6 +35,7 @@ release = "0.1.0"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    "myst_nb",  # This is used for the .ipynb notebooks
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
@@ -42,11 +43,11 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx_autodoc_typehints",
+    "sphinxcontrib.collections",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = []
-
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -65,7 +66,7 @@ html_title = "Klax Docs"
 html_logo = "_static/dummy_logo.png"
 
 
-# -- Autodoc configuration  -------------------------------------------------
+# -- Autodoc configuration  --------------------------------------------------
 autodoc_typehints_description_target = "all"
 
 # Aliases for some lengthy type annotations
@@ -74,9 +75,18 @@ autodoc_type_aliases = {
     "PRNGKeyArray": "PRNGKeyArray",
 }
 
+# -- Sphinx-collections configuration ----------------------------------------
+colletions = {
+    "examples": {
+        "driver": "copy_folder",
+        "source": "../../examples/",
+        # "target": "_collections",
+        # "final_clean": False,
+    }
+}
 
-# -- Intershinx configuration -------------------------------------------------
-# InterSphinx configuration
+
+# -- Intersphinx configuration -----------------------------------------------
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "jax": ("https://jax.readthedocs.io/en/latest/", None),
@@ -85,3 +95,12 @@ intersphinx_mapping = {
     "optax": ("https://optax.readthedocs.io/en/latest/", None),
     "paramax": ("https://danielward27.github.io/paramax/", None),
 }
+
+source_suffix = [".rst", ".md", ".ipynb"]
+
+
+# -- Myst-NB configuration ---------------------------------------------------
+myst_enable_extensions = ["amsmath", "dollarmath", "html_image"]
+nb_execution_mode = "force"
+nb_execution_allows_error = False
+
