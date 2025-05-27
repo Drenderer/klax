@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Configuration file for the Sphinx documentation builder.
-#
+"""Configuration file for the Sphinx documentation builder."""
+
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+# -- Path setup -------------------------------------------------------------
 import sys
 from pathlib import Path
-
 
 sys.path.insert(0, str(Path("..").resolve()))
 
 
+# -- Project information -----------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 project = "Klax"
 copyright = "2025, The Klax Authors."
 author = "Jasper Schommartz, Fabian Roth"
@@ -43,7 +43,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx_autodoc_typehints",
-    "sphinxcontrib.collections",
 ]
 
 templates_path = ["_templates"]
@@ -73,16 +72,6 @@ autodoc_typehints_description_target = "all"
 autodoc_type_aliases = {
     "ArrayLike": "jaxtyping.ArrayLike",
     "PRNGKeyArray": "PRNGKeyArray",
-}
-
-# -- Sphinx-collections configuration ----------------------------------------
-colletions = {
-    "examples": {
-        "driver": "copy_folder",
-        "source": "../../examples/",
-        # "target": "_collections",
-        # "final_clean": False,
-    }
 }
 
 

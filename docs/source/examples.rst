@@ -3,4 +3,4 @@
 
 .. toctree::
 
-   _collections/examples/isotropic_hyperelasticity.ipynb
+   examples/isotropic_hyperelasticity

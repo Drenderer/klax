@@ -45,7 +45,6 @@ docs = [
     "sphinx>=8.2.3",
     "sphinx-autodoc-typehints>=3.2.0",
     "sphinx-book-theme>=1.1.4",
-    "sphinx-collections>=0.0.1",
 ]
 
 [dependency-groups]
