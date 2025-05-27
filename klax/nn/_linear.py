@@ -113,7 +113,9 @@ class Linear(eqx.Module, strict=True):
         self.out_features = out_features
         self.use_bias = use_bias
 
-    def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(
+        self, x: Array, *, key: Optional[PRNGKeyArray] = None
+    ) -> Array:
         """
         Args:
             x: The input. Should be a JAX array of shape `(in_features,)`. (Or
@@ -174,7 +176,9 @@ class InputSplitLinear(eqx.Module, strict=True):
 
     weights: Tuple[Array | Unwrappable[Array], ...]
     bias: Optional[Array | Unwrappable[Array]]
-    in_features: Tuple[Union[int, Literal["scalar"]], ...] = eqx.field(static=True)
+    in_features: Tuple[Union[int, Literal["scalar"]], ...] = eqx.field(
+        static=True
+    )
     out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
     _num_inputs: int
@@ -186,7 +190,9 @@ class InputSplitLinear(eqx.Module, strict=True):
         weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wraps: Sequence[type[Constraint] | type[Unwrappable[Array]] | None]
+        weight_wraps: Sequence[
+            type[Constraint] | type[Unwrappable[Array]] | None
+        ]
         | type[Constraint]
         | type[Unwrappable[Array]]
         | None = None,
@@ -233,7 +239,7 @@ class InputSplitLinear(eqx.Module, strict=True):
             work if one of `in_features` or `out_features`
             is zero.
 
-            Likewise, some `jax.nn.initializers.Initialzers`s do not work when
+            Likewise, some `jax.nn.initializers.Initialzer`s do not work when
             `dtype` is `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -268,7 +274,8 @@ class InputSplitLinear(eqx.Module, strict=True):
             for init, wkey, wshape in zip(weight_inits, wkeys, wshapes)
         ]
         weights = [
-            w if wrap is None else wrap(w) for w, wrap in zip(weights, weight_wraps)
+            w if wrap is None else wrap(w)
+            for w, wrap in zip(weights, weight_wraps)
         ]
         self.weights = tuple(weights)
 
@@ -284,7 +291,9 @@ class InputSplitLinear(eqx.Module, strict=True):
         self.use_bias = use_bias
         self._num_inputs = _num_inputs
 
-    def __call__(self, *xs: Array, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(
+        self, *xs: Array, key: Optional[PRNGKeyArray] = None
+    ) -> Array:
         """
         Args:
             xs: The inputs. Should be n JAX arrays x_i of shape `(in_features[i],)`. (Or
@@ -313,7 +322,10 @@ class InputSplitLinear(eqx.Module, strict=True):
             return jnp.matmul(x, weight)
 
         y = jnp.stack(
-            [mult(w, f, x) for w, f, x in zip(self.weights, self.in_features, xs)],
+            [
+                mult(w, f, x)
+                for w, f, x in zip(self.weights, self.in_features, xs)
+            ],
             axis=0,
         ).sum(axis=0)
         if self.bias is not None:

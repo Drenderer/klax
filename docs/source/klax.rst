@@ -28,8 +28,10 @@ Calibration and data handling
     fit
 
 
-Wrappers and constraints
-----------------------------------
+Unwrappables and constraints
+----------------------------
+
+Base classes and functions
 
 .. autosummary::
     :toctree: _autosummary
@@ -37,16 +39,28 @@ Wrappers and constraints
     Unwrappable
     unwrap
     contains_unwrappables
+    Constraint
+    apply
+    contains_constraints
+    finalize
+
+Unwrappables
+
+.. autosummary::
+    :toctree: _autosummary
+
     Parameterize
     NonTrainable
     non_trainable
     Symmetric
     SkewSymmetric
-    Constraint
-    apply
-    contains_constraints
+
+Constraints
+
+.. autosummary::
+    :toctree: _autosummary
+
     NonNegative
-    finalize
 
 
 Loss functions

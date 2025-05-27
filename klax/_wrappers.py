@@ -65,7 +65,7 @@ class Unwrappable[T](eqx.Module):
     class is a renamed copy of ``paramax.AbstractUnwrappable``.
 
     Note:
-        Models containing ``Unwrappables`` need to be :func:`finalized<klax.finalize>`
+        Models containing :class:`Unwrappables<Unwrappable>` need to be :func:`finalized<klax.finalize>`
         before they are callable.
     """
 
@@ -153,7 +153,7 @@ class Parameterize(Unwrappable[T]):
 # This function is derived from paramax and has been substantially modified.
 # Original Copyright 2022 Daniel Ward
 def non_trainable(tree: PyTree):
-    """Freezes parameters by wrapping inexact array or ``Constraint`` leaves with
+    """Freezes parameters by wrapping inexact array or :class:`Constraint` leaves with
     :class:`NonTrainable`.
 
     Note:
@@ -292,10 +292,11 @@ class Symmetric(Unwrappable[Array]):
 
 
 class Constraint(Unwrappable[Array]):
-    """Abstract class to implement constrains for JAX arrays.
+    """An abstract class derived from :class:`Unwrappable` to constrain JAX
+    arrays.
 
-    A Constraint is a specialized verision of :class:`Unwrappable`, that marks an array
-    in a `PyTree` as constrained and implements two destinct functionalities:
+    A Constraint is a specialized version of :class:`Unwrappable`, that marks an
+    array in a `PyTree` as constrained and implements two destinct functionalities:
 
     * **unwrap**
         Identicall functionality to an :class:`Unwrappable`. This is used
@@ -395,9 +396,10 @@ def finalize(tree: PyTree):
     """
     Combines the functionality of :func:`apply` and :func:`unwrap`.
 
-    Use this function to make a model containing :class:`Unwrappables` callable.
+    Use this function to make a model containing :class:`Unwrappables<Unwrappable>`
+    callable.
 
-    .. warning::
+    Warning:
 
         Do **not** fit the output of ``finalize`` if the pytree/model contains
         :class:`Unwrappables<Unwrappable>` or :class:`Constraints<Constraint>`.
@@ -430,7 +432,7 @@ def _tree_contains(pytree, instance_type) -> bool:
 # This function is derived from paramax and has been significantly modified.
 # Original Copyright 2022 Daniel Ward
 def contains_unwrappables(pytree: PyTree) -> bool:
-    """Check if a ``PyTree`` contains instances of :class:`Unwrappables`."""
+    """Check if a ``PyTree`` contains instances of :class:`Unwrappable`."""
 
     return _tree_contains(pytree, Unwrappable)
 
