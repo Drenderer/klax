@@ -18,11 +18,7 @@ Implementation of convex neural networks.
 
 from __future__ import annotations
 from collections.abc import Callable, Sequence
-from typing import (
-    Literal,
-    Optional,
-    Union,
-)
+from typing import Literal
 
 import equinox as eqx
 import jax
@@ -49,14 +45,14 @@ class FICNN(eqx.Module, strict=True):
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
     non_decreasing: bool = eqx.field(static=True)
-    in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    in_size: int | Literal["scalar"] = eqx.field(static=True)
+    out_size: int | Literal["scalar"] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
 
     def __init__(
         self,
-        in_size: Union[int, Literal["scalar"]],
-        out_size: Union[int, Literal["scalar"]],
+        in_size: int | Literal["scalar"],
+        out_size: int | Literal["scalar"],
         width_sizes: Sequence[int],
         use_passthrough: bool = True,
         non_decreasing: bool = False,
@@ -102,7 +98,7 @@ class FICNN(eqx.Module, strict=True):
                 initialisation. (Keyword only argument.)
         """
 
-        #TODO:
+        # TODO:
         # What's up with this? Why not let the user define a final activation?
         # def final_activation(x):
         #     return x
@@ -151,9 +147,11 @@ class FICNN(eqx.Module, strict=True):
                             weight_init,
                             bias_init,
                             ub,
-                            (NonNegative, NonNegative)
-                            if non_decreasing
-                            else (NonNegative, None),
+                            (
+                                (NonNegative, NonNegative)
+                                if non_decreasing
+                                else (NonNegative, None)
+                            ),
                             dtype=dtype,
                             key=key,
                         )
@@ -187,7 +185,7 @@ class FICNN(eqx.Module, strict=True):
                 lambda: final_activation, axis_size=out_size
             )()
 
-    def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
         """
         Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if

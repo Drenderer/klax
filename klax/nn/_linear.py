@@ -19,12 +19,8 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import (
-    Literal,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Literal
+
 from collections.abc import Sequence
 
 import equinox as eqx
@@ -34,7 +30,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from .._wrappers import ParameterWrapper
+from .._wrappers import Constraint, Unwrappable, contains_unwrappables
 
 
 class Linear(eqx.Module, strict=True):
@@ -43,21 +39,21 @@ class Linear(eqx.Module, strict=True):
     This class is modified from `eqx.nn.Linear` to allow for custom initialization.
     """
 
-    weight: Array | ParameterWrapper
-    bias: Optional[Array | ParameterWrapper]
-    in_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    weight: Array | Unwrappable[Array]
+    bias: Array | Unwrappable[Array] | None
+    in_features: int | Literal["scalar"] = eqx.field(static=True)
+    out_features: int | Literal["scalar"] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
 
     def __init__(
         self,
-        in_features: Union[int, Literal["scalar"]],
-        out_features: Union[int, Literal["scalar"]],
+        in_features: int | Literal["scalar"],
+        out_features: int | Literal["scalar"],
         weight_init: Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wrap: type[ParameterWrapper] | None = None,
-        bias_wrap: type[ParameterWrapper] | None = None,
+        weight_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
+        bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -65,21 +61,21 @@ class Linear(eqx.Module, strict=True):
         """
         Args:
             in_features: The input size. The input to the layer should be a vector of
-               shape `(in_features,)`
+                shape `(in_features,)`
             out_features: The output size. The output from the layer will be a vector
-               of shape `(out_features,)`.
+                of shape `(out_features,)`.
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_warp: An optional `klax.ParameterWrapper` that can be passed
-               to enforce weight constraints.
-            bias_warp: An optional `klax.ParameterWrapper` that can be passed
-               to enforce bias constraints.
+            weight_warp: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce weight constraints.
+            bias_warp: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
-               Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
-               on whether JAX is in 64-bit mode.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
+                on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for parameter
-               initialisation. (Keyword only argument.)
+                initialisation. (Keyword only argument.)
 
         Note:
             Note that `in_features` also supports the string `"scalar"` as a
@@ -113,7 +109,7 @@ class Linear(eqx.Module, strict=True):
         self.out_features = out_features
         self.use_bias = use_bias
 
-    def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
         """
         Args:
             x: The input. Should be a JAX array of shape `(in_features,)`. (Or
@@ -144,9 +140,10 @@ class Linear(eqx.Module, strict=True):
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
         """
-        assert not isinstance(self.weight, ParameterWrapper), (
-            "Model must be unwrapped before calling."
-        )
+
+        assert not contains_unwrappables(
+            self
+        ), "Model must be finalized before calling, see `klax.finalize`."
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
@@ -155,39 +152,44 @@ class Linear(eqx.Module, strict=True):
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(x) == (1,), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            assert jnp.shape(x) == (
+                1,
+            ), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
             x = jnp.squeeze(x)
         return x
 
 
 class InputSplitLinear(eqx.Module, strict=True):
-    """Performs a linear transformation for multiple inputs `x_1, ..., x_n`:
-    `y = x_1 @ W_1 + x_2 @ W_2 + ... +x_n @ W_n + b`
+    """Performs a linear transformation for multiple inputs ``x_1, ..., x_n``
+    as ``y = x_1 @ W_1 + x_2 @ W_2 + ... +x_n @ W_n + b``
 
     This layer is useful for formulating transformations with multiple
-    inputs where different inputs requre different weight constraints
+    inputs where different inputs require different weight constraints
     or initialization for the corresponding weight matrices.
     """
 
-    weights: Tuple[Array | ParameterWrapper, ...]
-    bias: Optional[Array | ParameterWrapper]
-    in_features: Tuple[Union[int, Literal["scalar"]], ...] = eqx.field(static=True)
-    out_features: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    weights: tuple[Array | Unwrappable[Array], ...]
+    bias: Array | Unwrappable[Array] | None
+    in_features: tuple[int | Literal["scalar"], ...] = eqx.field(static=True)
+    out_features: int | Literal["scalar"] = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
     _num_inputs: int
 
     def __init__(
         self,
-        in_features: Sequence[Union[int, Literal["scalar"]]],
-        out_features: Union[int, Literal["scalar"]],
+        in_features: Sequence[int | Literal["scalar"]],
+        out_features: int | Literal["scalar"],
         weight_inits: Sequence[Initializer] | Initializer,
         bias_init: Initializer = zeros,
         use_bias: bool = True,
-        weight_wraps: Sequence[type[ParameterWrapper] | None]
-        | type[ParameterWrapper]
-        | None = None,
-        bias_wrap: type[ParameterWrapper] | None = None,
-        dtype=None,
+        weight_wraps: (
+            Sequence[type[Constraint] | type[Unwrappable[Array]] | None]
+            | type[Constraint]
+            | type[Unwrappable[Array]]
+            | None
+        ) = None,
+        bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
+        dtype: type | None = None,
         *,
         key: PRNGKeyArray,
     ):
@@ -203,13 +205,14 @@ class InputSplitLinear(eqx.Module, strict=True):
                 The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wraps: An optional `klax.ParameterWrapper` or sequence of
-                `klax.ParameterWrapper` that can be passed to enforce weight
+            weight_wraps: An optional :class:`klax.Constraint` or sequence of
+                :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce weight
                 constraints. By specifying a sequence it is possible to apply a
                 different wrapper to each weight matrix. The sequence must have the
                 same length as in_features.
-            bias_wrap: An optional `klax.ParameterWrapper` that can be passed
-               to enforce bias constraints.
+            bias_wrap: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that can be passed to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
@@ -228,7 +231,7 @@ class InputSplitLinear(eqx.Module, strict=True):
             work if one of `in_features` or `out_features`
             is zero.
 
-            Likewise, some `jax.nn.initializers.Initialzers`s do not work when
+            Likewise, some `jax.nn.initializers.Initialzer`s do not work when
             `dtype` is `jax.numpy.complex64`.
         """
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -279,7 +282,7 @@ class InputSplitLinear(eqx.Module, strict=True):
         self.use_bias = use_bias
         self._num_inputs = _num_inputs
 
-    def __call__(self, *xs: Array, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(self, *xs: Array, key: PRNGKeyArray | None = None) -> Array:
         """
         Args:
             xs: The inputs. Should be n JAX arrays x_i of shape `(in_features[i],)`. (Or
@@ -292,6 +295,9 @@ class InputSplitLinear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
+        assert not contains_unwrappables(
+            self
+        ), "Model must be finalized before calling, see `klax.finalize`."
         if len(xs) != self._num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"
@@ -311,6 +317,8 @@ class InputSplitLinear(eqx.Module, strict=True):
         if self.bias is not None:
             y = y + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(y) == (1,), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            assert jnp.shape(y) == (
+                1,
+            ), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
             y = jnp.squeeze(y)
         return y

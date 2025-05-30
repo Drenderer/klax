@@ -23,8 +23,8 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 
-from klax import fit
-from klax import NonNegative, unwrap
+from klax import fit, NonNegative, apply, finalize
+
 
 
 # %% Define a simple model
@@ -52,7 +52,12 @@ model = SimpleModel()
 #     lambda m: m.weight.parameter, model, jnp.array(-1e-10)
 # )
 
-print("Initial weight:", unwrap(model).weight)
+print("Initial weight:", finalize(model).weight)
+print("Initial parameter:", model.weight.parameter)
+
+model = apply(model)
+
+print("Parameter after applying wrapper:", model.weight.parameter)
 
 model, hist = fit(
     model,
@@ -61,6 +66,7 @@ model, hist = fit(
     key = jr.key(0)
 )
 
-print("Final weight:", unwrap(model).weight)
+print("Final weight:", finalize(model).weight)
+print("Final parameter:", model.weight.parameter)
 
 

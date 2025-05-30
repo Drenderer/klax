@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import sys
-import pytest
+import time
 
 import klax
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
+import pytest
 
 
 def test_callbackargs(getkey, getmodel, getloss):
@@ -94,6 +95,7 @@ def test_history_callback(getkey, getmodel, getloss, tmp_path):
     # On training start update
     cbargs.update(flat_model, flat_opt_state, 0)
     history.on_training_start(cbargs)
+    time.sleep(1e-6) # Sleep to ensure that training time is greater than 0
 
     # First update
     cbargs.update(flat_model, flat_opt_state, 1)

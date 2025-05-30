@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.nn.initializers import Initializer, he_normal, zeros
 
-from typing import Literal, Sequence, Any, Callable, Optional
+from typing import Literal, Sequence, Any, Callable
 from jaxtyping import PRNGKeyArray, Array
 
 import timeit
@@ -49,7 +49,9 @@ def time_code(func, msg=""):
         + f"{mean} ± {std} per loop (mean ± std. dev. of {timer.size} runs, {n} loops each)"
     )
 
+
 # %% Define implementations
+
 
 class OriginalSPDMatrix(eqx.Module):
 
@@ -61,9 +63,9 @@ class OriginalSPDMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | tuple[int]] = None,
+        shape: int | tuple[int] | None = None,
         epsilon: float = 1e-6,
-        width_sizes: Optional[Sequence[int]] = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -78,7 +80,7 @@ class OriginalSPDMatrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                int(2**(jnp.ceil(jnp.log2(in_size_)))),
+                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
@@ -131,9 +133,9 @@ class AlternativeSPDMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | tuple[int]] = None,
+        shape: int | tuple[int] | None = None,
         epsilon: float = 1e-6,
-        width_sizes: Optional[Sequence[int]] = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -148,7 +150,7 @@ class AlternativeSPDMatrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                int(2**(jnp.ceil(jnp.log2(in_size_)))),
+                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
@@ -182,7 +184,7 @@ class AlternativeSPDMatrix(eqx.Module):
         A = L @ jnp.conjugate(L.mT)
         identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
         return A + self.epsilon * identity
-    
+
 
 class OriginalSkewSymmetricMatrix(eqx.Module):
     """*Skew-symmetric matrix-valued function.*
@@ -196,8 +198,8 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | tuple[int]] = None,
-        width_sizes: Optional[Sequence[int]] = None,
+        shape: int | tuple[int] | None = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -217,7 +219,7 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or 
+                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or
                 equal to `in_size`.)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
                 (Defaults to `he_normal()`)
@@ -245,7 +247,7 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                int(2**(jnp.ceil(jnp.log2(in_size_)))),
+                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
@@ -299,8 +301,8 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | tuple[int]] = None,
-        width_sizes: Optional[Sequence[int]] = None,
+        shape: int | tuple[int] | None = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -320,7 +322,7 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or 
+                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or
                 equal to `in_size`.)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
                 (Defaults to `he_normal()`)
@@ -348,7 +350,7 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
         shape = in_size_ if shape is None else shape
         width_sizes = (
             [
-                int(2**(jnp.ceil(jnp.log2(in_size_)))),
+                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
             ]
             if width_sizes is None
             else width_sizes
@@ -378,6 +380,7 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
     def __call__(self, x: Array) -> Array:
         A = self.func(x).reshape(self.shape)
         return A - A.mT
+
 
 # %% Time the different versions
 
@@ -422,3 +425,4 @@ _alternative(X)
 
 time_code(lambda: _original(X), "Original   : JIT, vmap: ")
 time_code(lambda: _alternative(X), "Alternative: JIT, vmap: ")
+

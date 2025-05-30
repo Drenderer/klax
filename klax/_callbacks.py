@@ -18,7 +18,7 @@ from collections.abc import Callable
 import datetime
 import importlib
 import time
-from typing import Optional
+from typing import Any, Self
 
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
@@ -28,7 +28,7 @@ from pathlib import Path
 
 class CallbackArgs:
     """
-    A callback argument designed to work in conjunction with :py:func:`klax.fit`.
+    A callback argument designed to work in conjunction with :func:`fit`.
 
     This class should not be instantiated directly.
     An instance of this class is passed to every callback object in the fit function.
@@ -42,7 +42,7 @@ class CallbackArgs:
     """
 
     step: int  #: Current step-count of the training.
-    time_on_last_update: float  #: Global time of the last :py:meth:`update` call.
+    time_on_last_update: float  #: Global time of the last :meth:`update` call.
     data: PyTree  #: PyTree of the training data.
     val_data: PyTree | None  #: PyTree of the validation data.
     _treedef_model: PyTreeDef
@@ -59,16 +59,18 @@ class CallbackArgs:
         treedef_model: PyTreeDef,
         treedef_opt_state: PyTreeDef,
         data: PyTree,
-        val_data: Optional[PyTree] = None,
+        val_data: PyTree | None = None,
     ):
         """
         Args:
-            get_loss: Function that takes a model and a batch of data and returns the loss.
-            treedef_model: ``PyTreeDef`` of the model.
-            treedef_opt_state: ``PyTreeDef`` of the :py:mod:`optax` optimizer.
-            data: ``PyTree`` of the training data.
-            val_data: ``PyTree`` of the validation data. If None, no validation loss is calculated and
-                the property :py:attr:`val_loss` will return None.
+            get_loss: Function that takes a model and a batch of data and
+                returns the loss.
+            treedef_model: Tree structure of the model.
+            treedef_opt_state: Tree structure of the :py:mod:`optax` optimizer.
+            data: PyTree of the training data.
+            val_data: PyTree of the validation data. If None, no validation
+                loss is calculated and the property :py:attr:`val_loss` will
+                return None.
         """
         self.data = data
         self.val_data = val_data
@@ -96,23 +98,23 @@ class CallbackArgs:
         self._cache = {}
 
     @staticmethod
-    def _lazy_evaluated_and_cached(fun: Callable) -> property:
+    def _lazy_evaluated_and_cached(fun: Callable[[Any], Any]) -> property:
         """Turns a public method into a property.
 
-        The return value of `fun`is stored in the `_cache` dictionary of the
-        current object using the function name as key. If the name is already in
-        `_cache` then the cached value is simply returned, wihout evaluating
-        `fun`.
+        The return value of ``fun`` is stored in the ``_cache`` dictionary of
+        the current object using the function name as key. If the name is
+        already in ``_cache`` then the cached value is simply returned,
+        without evaluating ``fun``.
 
         Args:
             fun: Method to wrap.
 
         Returns:
-            Wraped method as a property.
+            Wrapped method as a property.
         """
         attr_name = fun.__name__
 
-        def wrapper(self):
+        def wrapper(self: Self):
             if attr_name not in self._cache:
                 self._cache.setdefault(attr_name, fun(self))
             return self._cache.get(attr_name)
@@ -201,7 +203,7 @@ class HistoryCallback(Callback):
 
     def __call__(self, cbargs: CallbackArgs):
         """Records the losses and step count.
-        
+
         Called at each step during training.
         """
         if cbargs.step % self.log_every == 0:
@@ -218,11 +220,13 @@ class HistoryCallback(Callback):
 
     def on_training_start(self, cbargs: CallbackArgs):
         """Initializes the training start time.
-        
+
         Called at beginning of training.
         """
         self.last_start_time = cbargs.time_on_last_update
-        if self.steps:  # If there are already steps, we assume that this is a continuation of a training.
+        if (
+            self.steps
+        ):  # If there are already steps, we assume that this is a continuation of a training.
             self.step_offset = self.steps[-1]
         else:
             self(cbargs)

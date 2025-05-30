@@ -6,11 +6,7 @@ multiple different implementations of a non-negative constraint.
 # %% Imports
 from __future__ import annotations
 from collections.abc import Callable, Sequence
-from typing import (
-    Literal,
-    Optional,
-    Union,
-)
+from typing import Literal
 
 from matplotlib import pyplot as plt
 
@@ -26,10 +22,8 @@ from klax._misc import default_floating_dtype
 from klax.nn import Linear, InputSplitLinear
 from klax import (
     fit,
-    ParameterWrapper,
-    AbstractUpdatable,
+    Unwrappable,
     NonNegative,
-    Positive,
     finalize,
     split_data,
 )
@@ -52,16 +46,16 @@ class FICNN(eqx.Module, strict=True):
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
     non_decreasing: bool = eqx.field(static=True)
-    in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    in_size: int | Literal["scalar"] = eqx.field(static=True)
+    out_size: int | Literal["scalar"] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
 
     def __init__(
         self,
-        in_size: Union[int, Literal["scalar"]],
-        out_size: Union[int, Literal["scalar"]],
+        in_size: int | Literal["scalar"],
+        out_size: int | Literal["scalar"],
         width_sizes: Sequence[int],
-        non_neg_wrap: ParameterWrapper | AbstractUpdatable,
+        non_neg_wrap: Unwrappable,
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
@@ -70,7 +64,7 @@ class FICNN(eqx.Module, strict=True):
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
-        dtype=None,
+        dtype: type | None = None,
         *,
         key: PRNGKeyArray,
     ):
@@ -112,8 +106,8 @@ class FICNN(eqx.Module, strict=True):
         # What's up with this? Why not let the user define a final activation?
         # def final_activation(x):
         #     return x
-        # Response jaosch: Changing the output activation could break convexity without
-        # notice.
+        # Response jaosch: Changing the output activation could break convexity
+        # without notice.
 
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
@@ -157,9 +151,11 @@ class FICNN(eqx.Module, strict=True):
                             weight_init,
                             bias_init,
                             ub,
-                            (non_neg_wrap, non_neg_wrap)
-                            if non_decreasing
-                            else (non_neg_wrap, None),
+                            (
+                                (non_neg_wrap, non_neg_wrap)
+                                if non_decreasing
+                                else (non_neg_wrap, None)
+                            ),
                             dtype=dtype,
                             key=key,
                         )
@@ -193,7 +189,7 @@ class FICNN(eqx.Module, strict=True):
                 lambda: final_activation, axis_size=out_size
             )()
 
-    def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
         """
         Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
@@ -230,7 +226,7 @@ class FICNN(eqx.Module, strict=True):
 # %% Define old NonNegative Wrapper
 
 
-class NonNegSoftplus(ParameterWrapper):
+class NonNegSoftplus(Unwrappable[Array]):
     parameter: Array
 
     def __init__(self, x):
@@ -240,19 +236,13 @@ class NonNegSoftplus(ParameterWrapper):
     def unwrap(self) -> Array:
         return jax.nn.softplus(self.parameter)
 
-class OldNonNegative(ParameterWrapper):
-    """Applies a non-negative constraint.
 
-    Args:
-        parameter: The parameter that is to be made non-negative. It can either
-            be a `jax.Array` or a `ParameterWrapper`.
-    """
-
+class OldNonNegative(Unwrappable[Array]):
     parameter: Array
 
-    def __init__(self, parameter: Array | ParameterWrapper):
+    def __init__(self, parameter: Array):
         # Ensure that the parameter fulfills the constraint initially
-        self.parameter = self._non_neg(finalize(parameter))
+        self.parameter = self._non_neg(parameter)
 
     def _non_neg(self, x: Array) -> Array:
         return jnp.maximum(x, 0)
@@ -261,7 +251,7 @@ class OldNonNegative(ParameterWrapper):
         return self._non_neg(self.parameter)
 
 
-class NoConstraint(ParameterWrapper):
+class NoConstraint(Unwrappable[Array]):
     parameter: Array
 
     def unwrap(self) -> Array:
@@ -294,7 +284,7 @@ train_data, vali_data = split_data((x, y), (80, 20), key=data_key)
 
 fig, ax = plt.subplots()
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-wrappers = [NonNegative, Positive, OldNonNegative, NonNegSoftplus, NoConstraint]
+wrappers = [NonNegative, OldNonNegative, NonNegSoftplus, NoConstraint]
 for wrapper, color in zip(wrappers, colors):
     name = wrapper.__name__
     model = FICNN(
