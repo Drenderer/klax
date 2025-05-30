@@ -8,18 +8,19 @@ Klax
 
 A lightweight machine learning package for computational mechanics.
 
-The package is build on top of Equinox, Optax, and Paramax. It is aimed at
-providing access to implementations of specialized machine learning models, such
-as custom parameter initializations, input convex neural networks (ICNNs) and
-monotonic neural networks (MNNs). On top, we provide methods and classes for
-customized calibration of these model.
+Klax is built on top of Equinox, Jax, and Optax. It provides:
 
-All provided models are derived from :class:`equinox.Module` without any additional
-abstractions. Hence, all models are are compatible with the JAX and Equinox
-ecosystem. All parameters constraints are derived from
-:class:`Unwrappable`, which itself is just a Module. 
-The implementation of the :class:`Unwrappable` is an extension
-of Paramax.
+* specialized neural network architectures, such as input convex neural networks (ICNNs), monotonic neural networks
+  (MNNs), matrices, and more;
+* differentiable and non-differentiable parameter wrappers and constraints;
+* functions and classes for data handling and calibration.
+
+All provided models are derived from :class:`equinox.Module` and are fully compatible with the Equinox and Jax
+ecosystem. All wrappers and constraints are derived from :class:`Unwrappable<klax.Unwrappable>` or
+:class:`Constraint<klax.Constraint>`, which themselves are just :class:`Modules<equinox.Module>`.
+
+The implementation of the :class:`Unwrappable<klax.Unwrappable>` is a renamed and slightly modified version of
+:class:`paramax.AbstractUnwrappable`, which we decided to include as part of the klax API.
 
 .. note::
 
@@ -38,9 +39,4 @@ of Paramax.
    :caption: 📖 Reference
 
    klax
-
-
-License
--------
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 

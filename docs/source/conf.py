@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path("..").resolve()))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 project = "Klax"
-copyright = "2025, The Klax Authors."
+copyright = "2025, The Klax Authors"
 author = "Jasper Schommartz, Fabian Roth"
 release = "0.1.0"
 
@@ -92,4 +92,3 @@ source_suffix = [".rst", ".md", ".ipynb"]
 myst_enable_extensions = ["amsmath", "dollarmath", "html_image"]
 nb_execution_mode = "force"
 nb_execution_allows_error = False
-
