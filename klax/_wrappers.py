@@ -38,8 +38,8 @@
 
 """``Unwrappables`` and ``Constraints`` modified and extended from paramax."""
 
-from abc import abstractmethod
-from typing import Any, Callable, Self, TypeVar
+from abc import ABC, abstractmethod
+from typing import Any, Callable, override, Self, Sequence, TypeVar
 
 import equinox as eqx
 import jax
@@ -58,7 +58,7 @@ T = TypeVar("T")
 
 # This class is derived from paramax.
 # Original Copyright 2022 Daniel Ward
-class Unwrappable[T](eqx.Module):
+class Unwrappable[T](eqx.Module, ABC):
     """An abstract class representing an unwrappable object.
 
     Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping.
@@ -78,7 +78,7 @@ class Unwrappable[T](eqx.Module):
 
 # This function is copied from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
-def unwrap(tree: PyTree):
+def unwrap(tree: PyTree) -> PyTree:
     """Map across a PyTree and unwrap all :class:`Unwrappables<Unwrappable>`.
 
     This leaves all other nodes unchanged. If nested, the innermost
@@ -101,7 +101,7 @@ def unwrap(tree: PyTree):
                 return _unwrap(leaf, include_self=False).unwrap()
             return leaf
 
-        def is_leaf(x):
+        def is_leaf(x) -> bool:
             is_unwrappable = isinstance(x, Unwrappable)
             included = include_self or x is not tree
             return is_unwrappable and included
@@ -114,21 +114,21 @@ def unwrap(tree: PyTree):
 # This class is derived from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
 class Parameterize(Unwrappable[T]):
-    """Unwrap an object by calling fn with args and kwargs.
+    """Unwrap an object by calling ``fn`` with ``args`` and ``kwargs``.
 
     All of ``fn``, ``*args`` and ``**kwargs`` may contain trainable parameters.
 
     Note:
         Unwrapping typically occurs after model initialization. Therefore, if
-        the :class:`Parameterize` object may be created in a vectorized context,
-        we recommend ensuring that ``fn`` still unwraps correctly, e.g. by
-        supporting broadcasting.
+        the :class:`Parameterize` object may be created in a vectorized
+        context, we recommend ensuring that ``fn`` still unwraps correctly,
+        e.g. by supporting broadcasting.
 
     Example:
         >>> from klax import Parameterize, unwrap
         >>> import jax.numpy as jnp
         >>> positive = Parameterize(jnp.exp, jnp.zeros(3))
-        >>> unwrap(positive)  # Aplies exp on unwrapping
+        >>> unwrap(positive)  # Applies exp on unwrapping
         Array([1., 1., 1.], dtype=float32)
 
     Args:
@@ -141,18 +141,21 @@ class Parameterize(Unwrappable[T]):
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
-    def __init__(self, fn: Callable, *args, **kwargs):
+    def __init__(
+        self, fn: Callable[..., T], *args: Sequence[Any], **kwargs: dict[str, Any]
+    ):
         self.fn = fn
         self.args = tuple(args)
         self.kwargs = kwargs
 
+    @override
     def unwrap(self) -> T:
         return self.fn(*self.args, **self.kwargs)
 
 
 # This function is derived from paramax and has been substantially modified.
 # Original Copyright 2022 Daniel Ward
-def non_trainable(tree: PyTree):
+def non_trainable(tree: PyTree) -> PyTree:
     """Freezes parameters by wrapping inexact array or :class:`Constraint`
     leaves with :class:`NonTrainable`.
 
@@ -194,8 +197,8 @@ def non_trainable(tree: PyTree):
 class NonTrainable(Unwrappable[T]):
     """Applies stop gradient to all ArrayLike leaves before unwrapping.
 
-    See also :func:`non_trainable`, which is probably a generally prefereable
-    way to achieve similar behaviour, which wraps the arraylike leaves directly,
+    See also :func:`non_trainable`, which is probably a generally preferable
+    way to achieve similar behaviour, which wraps the ArrayLike leaves directly,
     rather than the tree. Useful to mark PyTrees (Arrays, Modules, etc.) as
     frozen/non-trainable. Note that the underlying parameters may still be
     impacted by regularization, so it is generally advised to use this as a
@@ -204,6 +207,7 @@ class NonTrainable(Unwrappable[T]):
 
     tree: T
 
+    @override
     def unwrap(self) -> T:
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(lax.stop_gradient(differentiable), static)
@@ -228,11 +232,12 @@ class SkewSymmetric(Unwrappable[Array]):
         _array = unwrap(parameter)
         if not (_array.ndim >= 2 and _array.shape[-1] == _array.shape[-2]):
             raise ValueError(
-                "Wrapped parameter must be an array of shape (..., N, N) but " \
+                "Wrapped parameter must be an array of shape (..., N, N) but "
                 f"has shape {_array.shape}"
             )
         self.parameter = parameter
 
+    @override
     def unwrap(self) -> Array:
         return self._make_skew_symmetric(self.parameter)
 
@@ -277,20 +282,20 @@ class Symmetric(Unwrappable[Array]):
 # ===-----------------------------------------------------------------------===#
 
 
-class Constraint(Unwrappable[Array]):
+class Constraint(Unwrappable[Array], ABC):
     """An abstract class derived from :class:`Unwrappable` to constrain JAX
     arrays.
 
-    A :class:`Constraint` is an extened version of :class:`Unwrappable`, that
+    A :class:`Constraint` is an extended version of :class:`Unwrappable`, that
     marks an array in a PyTree as constrained. It implements the known
     ``unwrap`` method from :class:`Unwrappable` and adds the ``apply``
     functionality for the implementation of constraints that are
-    non-differentiable or could lead to vanishing gradient during optimization. 
+    non-differentiable or could lead to vanishing gradient during optimization.
 
-    We intend the following usage of the ``unwarp`` and ``apply`` methods:
+    We intend the following usage of the ``unwrap`` and ``apply`` methods:
 
     ``unwrap``: Identical functionality to an :class:`Unwrappable`.
-        Use this for the implementaion of constraints that are differentiable
+        Use this for the implementation of constraints that are differentiable
         and shall be applied withing the training loop. E.g., our implementation
         of :func:`fit` will unwrap the model as part of the loss function. Thus,
         the implementation of ``unwrap`` contributes to the gradients during
@@ -304,16 +309,16 @@ class Constraint(Unwrappable[Array]):
         implementation of `non-differentiable` constraints, such as clamping
         a parameter to a range of admissible values. Apply functions should
         return a modified copy of ``Self``.
-    
+
     Note:
         Models containing :class:`Constraints<Constraint>` need to be
-        :func:`finalized<klax.finalize>` before they are callable.
+        :func:`finalized<finalize>` before they are callable.
 
     Warning:
         :class:`Constraints<Constraint>` should not be nested, as this can lead
-        to unexpected behavior or errors. To combine the effects of two constriants,
-        implement a custom constraint and define the combined effects via
-        ``unwrap`` and ``apply``.
+        to unexpected behavior or errors. To combine the effects of two
+        constraints, implement a custom constraint and define the combined
+        effects via ``unwrap`` and ``apply``.
     """
 
     @abstractmethod
@@ -369,9 +374,11 @@ class NonNegative(Constraint):
     def _non_neg(x: Array) -> Array:
         return jnp.maximum(x, 0)
 
+    @override
     def unwrap(self) -> Array:
         return self.parameter
 
+    @override
     def apply(self) -> Self:
         return eqx.tree_at(
             lambda x: x.parameter,
@@ -412,10 +419,10 @@ def finalize(tree: PyTree):
 
 # This function contains code derived from paramax.
 # Original Copyright 2022 Daniel Ward
-def _tree_contains(tree: PyTree, instance_type) -> bool:
+def _tree_contains(tree: PyTree, instance_type: type) -> bool:
     """Check if a PyTree contains instances of ``instance_type``."""
 
-    def _is_unwrappable(leaf):
+    def _is_unwrappable(leaf) -> bool:
         return isinstance(leaf, instance_type)
 
     leaves = jax.tree.leaves(tree, is_leaf=_is_unwrappable)
