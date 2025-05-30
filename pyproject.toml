@@ -46,6 +46,9 @@ docs = [
     "sphinx-autodoc-typehints>=3.2.0",
     "sphinx-book-theme>=1.1.4",
 ]
+examples = [
+    "ipykernel>=6.29.5",
+]
 
 [dependency-groups]
 dev = [
