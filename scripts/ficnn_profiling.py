@@ -8,8 +8,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import (
     Literal,
-    Optional,
-    Union,
     Self,
 )
 
@@ -103,14 +101,14 @@ class HalfConstrainedFICNN(eqx.Module):
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
     non_decreasing: bool = eqx.field(static=True)
-    in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    in_size: int | Literal["scalar"] = eqx.field(static=True)
+    out_size: int | Literal["scalar"] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
 
     def __init__(
         self,
-        in_size: Union[int, Literal["scalar"]],
-        out_size: Union[int, Literal["scalar"]],
+        in_size: int | Literal["scalar"],
+        out_size: int | Literal["scalar"],
         width_sizes: Sequence[int],
         use_passthrough: bool = True,
         non_decreasing: bool = False,
@@ -120,7 +118,7 @@ class HalfConstrainedFICNN(eqx.Module):
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
-        dtype=None,
+        dtype: type | None = None,
         *,
         key: PRNGKeyArray,
     ):
@@ -183,7 +181,7 @@ class HalfConstrainedFICNN(eqx.Module):
                 lambda: final_activation, axis_size=out_size
             )()
 
-    def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
         """
         Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
@@ -244,9 +242,9 @@ for use_passthrough, non_decreasing in [
     assert ficnn(x[0]).shape == (), "Unexpected output shape"
     if non_decreasing:
         ficnn_x = jax.vmap(jax.grad(ficnn))
-        assert jnp.all(ficnn_x(x) >= 0), (
-            "FICNN(..., non_decreasing=True) is not non-decreasing."
-        )
+        assert jnp.all(
+            ficnn_x(x) >= 0
+        ), "FICNN(..., non_decreasing=True) is not non-decreasing."
     ficnn_xx = jax.vmap(jax.hessian(ficnn))
     assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), "FICNN(...) is not convex."
 

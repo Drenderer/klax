@@ -22,7 +22,7 @@ import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, he_normal, zeros, variance_scaling
 
-from typing import Literal, Sequence, Any, Callable, Optional
+from typing import Literal, Sequence, Any, Callable
 from jaxtyping import PRNGKeyArray, Array
 
 from . import MLP
@@ -44,8 +44,8 @@ class Matrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | AtLeast2DTuple[int]] = None,
-        width_sizes: Optional[Sequence[int]] = None,
+        shape: int | AtLeast2DTuple[int] | None = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -180,8 +180,8 @@ class SkewSymmetricMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | AtLeast2DTuple[int]] = None,
-        width_sizes: Optional[Sequence[int]] = None,
+        shape: int | AtLeast2DTuple[int] | None = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -325,9 +325,9 @@ class SPDMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: Optional[int | AtLeast2DTuple[int]] = None,
+        shape: int | AtLeast2DTuple[int] | None = None,
         epsilon: float = 1e-6,
-        width_sizes: Optional[Sequence[int]] = None,
+        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -427,7 +427,7 @@ class ConstantSPDMatrix(eqx.Module):
 
     def __init__(
         self,
-        shape: Optional[int | AtLeast2DTuple[int]] = None,
+        shape: int | AtLeast2DTuple[int] | None = None,
         epsilon: float = 1e-6,
         init: Initializer = variance_scaling(
             scale=1, mode="fan_avg", distribution="normal"
