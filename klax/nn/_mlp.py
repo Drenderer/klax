@@ -1,4 +1,4 @@
-# This file includes code from Equinox 
+# This file includes code from Equinox
 #
 #     https://github.com/patrick-kidger/equinox
 #
@@ -20,7 +20,7 @@
 
 from __future__ import annotations
 from collections.abc import Callable
-from typing import Literal, Optional, Sequence, Union
+from typing import Literal, Sequence
 
 import equinox as eqx
 import jax
@@ -46,14 +46,14 @@ class MLP(eqx.Module, strict=True):
     final_activation: Callable
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
-    in_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
-    out_size: Union[int, Literal["scalar"]] = eqx.field(static=True)
+    in_size: int | Literal["scalar"] = eqx.field(static=True)
+    out_size: int | Literal["scalar"] = eqx.field(static=True)
     width_sizes: tuple[int, ...] = eqx.field(static=True)
 
     def __init__(
         self,
-        in_size: Union[int, Literal["scalar"]],
-        out_size: Union[int, Literal["scalar"]],
+        in_size: int | Literal["scalar"],
+        out_size: int | Literal["scalar"],
         width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
@@ -136,7 +136,7 @@ class MLP(eqx.Module, strict=True):
                 lambda: final_activation, axis_size=out_size
             )()
 
-    def __call__(self, x: Array, *, key: Optional[PRNGKeyArray] = None) -> Array:
+    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
         """
         Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if

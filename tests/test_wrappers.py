@@ -17,15 +17,16 @@ from math import prod
 import equinox as eqx
 from klax import (
     apply,
-    NonTrainable,
+    contains_constraints,
+    contains_unwrappables,
     NonNegative,
-    Symmetric,
-    SkewSymmetric,
+    NonTrainable,
     non_trainable,
     Parameterize,
+    Symmetric,
+    SkewSymmetric,
     unwrap,
-    contains_array_wrappers,
-    contains_unwrappables,
+    finalize,
 )
 import jax
 import jax.random as jr
@@ -69,13 +70,13 @@ def test_non_negative(getkey):
     # Negative array input
     parameter = -jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert jnp.all(unwrap(non_neg) == 0)
+    assert jnp.all(finalize(non_neg) == 0)
     assert jnp.all(apply(non_neg).parameter == 0)
 
     # Positive array input
     parameter = jr.uniform(getkey(), (10,))
     non_neg = NonNegative(parameter)
-    assert jnp.all(unwrap(non_neg) == parameter)
+    assert jnp.all(finalize(non_neg) == parameter)
     assert jnp.all(apply(non_neg).parameter == parameter)
 
 
@@ -127,14 +128,17 @@ def test_vectorization_invariance(wrapper_fn, shape):
 
 
 def test_contains():
-    pytree_A = (1, "abc", jnp.array([1, 2, 3]))
-    pytree_B = (1, "abc", Parameterize(jnp.square, jnp.array([1, 2, 3])))
-    pytree_C = (1, "abc", NonNegative(jnp.array([1, 2, 3])))
+    # Contains nothing
+    tree = (1, "abc", jnp.ones(3))
+    assert not contains_unwrappables(tree)
+    assert not contains_constraints(tree)
 
-    assert not contains_unwrappables(pytree_A)
-    assert contains_unwrappables(pytree_B)
-    assert contains_unwrappables(pytree_C)
+    # Contains Unwrappable
+    tree = (1, "abc", Parameterize(jnp.square, jnp.ones(3)))
+    assert contains_unwrappables(tree)
+    assert not contains_constraints(tree)
 
-    assert not contains_array_wrappers(pytree_A)
-    assert not contains_array_wrappers(pytree_B)
-    assert contains_array_wrappers(pytree_C)
+    # Contains Constraint
+    tree = (1, "abc", NonNegative(jnp.ones(3)))
+    assert contains_unwrappables(tree)
+    assert contains_constraints(tree)

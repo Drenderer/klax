@@ -17,7 +17,7 @@ This module implements a basic training loop.
 """
 
 from __future__ import annotations
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 
 import equinox as eqx
 import jax
@@ -34,20 +34,22 @@ from ._losses import Loss, mse
 from ._wrappers import unwrap, apply
 
 
-def fit[T: eqx.Module, H: Callback](
+def fit[
+    T: eqx.Module, H: Callback
+](
     model: T,
     data: PyTree[Any],
     *,
     batch_size: int = 32,
     batch_axis: PyTree[int | None] = 0,
-    validation_data: Optional[PyTree[Any]] = None,
+    validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss_fn: Loss = mse,
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    history: Optional[H] = None,
-    callbacks: Optional[Iterable[Callback]] = None,
+    history: H | None = None,
+    callbacks: Iterable[Callback] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[T, HistoryCallback | H]:
     """Trains a model using an optimizer from optax.
@@ -135,7 +137,9 @@ def fit[T: eqx.Module, H: Callback](
             params,
             value=value,
             grad=grad,
-            value_fn=jax.tree_util.Partial(partitioned_loss, static=static, batch=batch)
+            value_fn=jax.tree_util.Partial(
+                partitioned_loss, static=static, batch=batch
+            ),
         )
         params = optax.apply_updates(params, updates)
         model = eqx.combine(params, static)
