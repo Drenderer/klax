@@ -6,7 +6,7 @@
 Klax
 ====
 
-A lightweight machine learning pacakge for computational mechanics.
+A lightweight machine learning package for computational mechanics.
 
 The package is build on top of Equinox, Optax, and Paramax. It is aimed at
 providing access to implementations of specialized machine learning models, such
