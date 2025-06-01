@@ -457,3 +457,9 @@ def contains_constraints(tree: PyTree) -> bool:
     """Check if a PyTree contains instances of :class:`Constraint`."""
 
     return _tree_contains(tree, Constraint)
+
+
+class ContainsUnwrappables(RuntimeError):
+    """Should be raised when calling a PyTree that contains 
+    instances of :class:`Unwrappable`."""
+    pass
