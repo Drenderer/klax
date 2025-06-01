@@ -150,7 +150,7 @@ class Parameterize(Unwrappable[T]):
     kwargs: dict[str, Any]
 
     def __init__(
-        self, fn: Callable[..., T], *args: Sequence[Any], **kwargs: dict[str, Any]
+        self, fn: Callable[..., T], *args, **kwargs
     ):
         self.fn = fn
         self.args = tuple(args)
