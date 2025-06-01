@@ -30,7 +30,7 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from .._wrappers import Constraint, Unwrappable, contains_unwrappables
+from .._wrappers import Constraint, Unwrappable, contains_unwrappables, ContainsUnwrappables
 
 
 class Linear(eqx.Module, strict=True):
@@ -141,9 +141,8 @@ class Linear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
-        assert not contains_unwrappables(
-            self
-        ), "Model must be finalized before calling, see `klax.finalize`."
+        if contains_unwrappables(self):
+            raise ContainsUnwrappables("Model must be finalized before calling, see `klax.finalize`.")
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
@@ -296,9 +295,8 @@ class InputSplitLinear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
-        assert not contains_unwrappables(
-            self
-        ), "Model must be finalized before calling, see `klax.finalize`."
+        if contains_unwrappables(self):
+            raise ContainsUnwrappables("Model must be finalized before calling, see `klax.finalize`.")
         if len(xs) != self._num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"

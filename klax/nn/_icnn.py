@@ -18,7 +18,7 @@ Implementation of convex neural networks.
 
 from __future__ import annotations
 from collections.abc import Callable, Sequence
-from typing import Literal
+from typing import cast, Literal
 
 import equinox as eqx
 import jax
@@ -207,6 +207,8 @@ class FICNN(eqx.Module, strict=True):
             y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
 
             if self.use_passthrough:
+                # Tell type checker that this is an InputSplitLinear
+                layer = cast(InputSplitLinear, layer) 
                 y = layer(y, x)
             else:
                 y = layer(y)
