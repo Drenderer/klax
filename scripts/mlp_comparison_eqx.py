@@ -68,7 +68,9 @@ log_every_pred = 1000
 key1, key2, train_key = jax.random.split(key, 3)
 
 # Weight init from equinox
-eqx_w_init = variance_scaling(scale=1 / 3, mode="fan_in", distribution="uniform")
+eqx_w_init = variance_scaling(
+    scale=1 / 3, mode="fan_in", distribution="uniform"
+)
 
 klax_mlp = KlaxMLP(
     in_size,
@@ -77,7 +79,9 @@ klax_mlp = KlaxMLP(
     activation=activation,
     key=key1,
 )
-eqx_mlp = EqxMLP(in_size, out_size, width, depth, activation=activation, key=key2)
+eqx_mlp = EqxMLP(
+    in_size, out_size, width, depth, activation=activation, key=key2
+)
 
 # Train the models
 klax_mlp, klax_hist = fit(

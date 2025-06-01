@@ -42,12 +42,14 @@ def getzerowrap():
 
     class ZeroWrapper(klax.Unwrappable[Array]):
         """A dummy wrapper that sets all parameters to zero."""
+
         parameter: Array
 
         def unwrap(self) -> Array:
             return jnp.zeros_like(self.parameter)
 
     return ZeroWrapper
+
 
 @pytest.fixture
 def getarraywrap():
@@ -57,6 +59,7 @@ def getarraywrap():
 
     class Wrapper(klax.Constraint):
         """A dummy wrapper that multiplies the parameter by 2 using the apply functionality."""
+
         parameter: Array
 
         def unwrap(self) -> Array:

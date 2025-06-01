@@ -89,7 +89,9 @@ class PartialInputNonNegative(Constraint):
 
     def apply(self) -> Self:
         return eqx.tree_at(
-            lambda t: t.parameter, self, self._apply_constraint(self.parameter, self.n)
+            lambda t: t.parameter,
+            self,
+            self._apply_constraint(self.parameter, self.n),
         )
 
 
@@ -172,7 +174,9 @@ class HalfConstrainedFICNN(eqx.Module):
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -196,7 +200,9 @@ class HalfConstrainedFICNN(eqx.Module):
 
         y = self.layers[0](x)
 
-        for i, (layer, activation) in enumerate(zip(self.layers[1:], self.activations)):
+        for i, (layer, activation) in enumerate(
+            zip(self.layers[1:], self.activations)
+        ):
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
@@ -242,11 +248,13 @@ for use_passthrough, non_decreasing in [
     assert ficnn(x[0]).shape == (), "Unexpected output shape"
     if non_decreasing:
         ficnn_x = jax.vmap(jax.grad(ficnn))
-        assert jnp.all(
-            ficnn_x(x) >= 0
-        ), "FICNN(..., non_decreasing=True) is not non-decreasing."
+        assert jnp.all(ficnn_x(x) >= 0), (
+            "FICNN(..., non_decreasing=True) is not non-decreasing."
+        )
     ficnn_xx = jax.vmap(jax.hessian(ficnn))
-    assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), "FICNN(...) is not convex."
+    assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), (
+        "FICNN(...) is not convex."
+    )
 
 # %% Define models
 
@@ -287,13 +295,21 @@ time_code(lambda: _ficnn(x), "FICNN:   ")
 print("\nTiming training time")
 time_code(
     lambda: fit(
-        hc_ficnn, (x, y), steps=10_000, history=HistoryCallback(verbose=0), key=key
+        hc_ficnn,
+        (x, y),
+        steps=10_000,
+        history=HistoryCallback(verbose=0),
+        key=key,
     ),
     "HCFICNN: ",
 )
 time_code(
     lambda: fit(
-        ficnn, (x, y), steps=10_000, history=HistoryCallback(verbose=0), key=key
+        ficnn,
+        (x, y),
+        steps=10_000,
+        history=HistoryCallback(verbose=0),
+        key=key,
     ),
     "FICNN:   ",
 )
@@ -330,16 +346,22 @@ _hc_ficnn, hist = fit(
 _ficnn, hist = fit(
     ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
 )
-_mlp, hist = fit(mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key)
+_mlp, hist = fit(
+    mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+)
 _eqx_mlp, hist = fit(
     eqx_mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
 )
 
 fig, ax = plt.subplots()
 ax.scatter(x, y, label="Data", marker="x", c="black")
-ax.plot(x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls="-.", label="EQX MLP")
+ax.plot(
+    x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls="-.", label="EQX MLP"
+)
 ax.plot(x_eval, jax.vmap(klax.finalize(_mlp))(x_eval), ls="-.", label="MLP")
 ax.plot(x_eval, jax.vmap(klax.finalize(_hc_ficnn))(x_eval), label="HCFICNN")
-ax.plot(x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN")
+ax.plot(
+    x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN"
+)
 ax.legend()
 plt.show()

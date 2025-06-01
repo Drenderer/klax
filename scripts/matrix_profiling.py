@@ -54,7 +54,6 @@ def time_code(func, msg=""):
 
 
 class OriginalSPDMatrix(eqx.Module):
-
     func: MLP
     shape: tuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
@@ -118,14 +117,15 @@ class OriginalSPDMatrix(eqx.Module):
 
     def __call__(self, x: Array) -> Array:
         elements = self.func(x).reshape(*self.shape[:-2], -1)
-        L = jnp.einsum("ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements)
+        L = jnp.einsum(
+            "ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
+        )
         A = L @ jnp.conjugate(L.mT)
         identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
         return A + self.epsilon * identity
 
 
 class AlternativeSPDMatrix(eqx.Module):
-
     func: MLP
     shape: tuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
@@ -425,4 +425,3 @@ _alternative(X)
 
 time_code(lambda: _original(X), "Original   : JIT, vmap: ")
 time_code(lambda: _alternative(X), "Alternative: JIT, vmap: ")
-

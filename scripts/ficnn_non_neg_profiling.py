@@ -180,7 +180,9 @@ class FICNN(eqx.Module, strict=True):
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -204,7 +206,9 @@ class FICNN(eqx.Module, strict=True):
 
         y = self.layers[0](x)
 
-        for i, (layer, activation) in enumerate(zip(self.layers[1:], self.activations)):
+        for i, (layer, activation) in enumerate(
+            zip(self.layers[1:], self.activations)
+        ):
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )

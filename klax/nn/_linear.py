@@ -141,9 +141,9 @@ class Linear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
-        assert not contains_unwrappables(
-            self
-        ), "Model must be finalized before calling, see `klax.finalize`."
+        assert not contains_unwrappables(self), (
+            "Model must be finalized before calling, see `klax.finalize`."
+        )
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
@@ -152,9 +152,9 @@ class Linear(eqx.Module, strict=True):
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(x) == (
-                1,
-            ), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            assert jnp.shape(x) == (1,), (
+                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            )
             x = jnp.squeeze(x)
         return x
 
@@ -266,7 +266,8 @@ class InputSplitLinear(eqx.Module, strict=True):
             for init, wkey, wshape in zip(weight_inits, wkeys, wshapes)
         ]
         weights = [
-            w if wrap is None else wrap(w) for w, wrap in zip(weights, weight_wraps)
+            w if wrap is None else wrap(w)
+            for w, wrap in zip(weights, weight_wraps)
         ]
         self.weights = tuple(weights)
 
@@ -295,9 +296,9 @@ class InputSplitLinear(eqx.Module, strict=True):
             `out_features="scalar"`.)
         """
 
-        assert not contains_unwrappables(
-            self
-        ), "Model must be finalized before calling, see `klax.finalize`."
+        assert not contains_unwrappables(self), (
+            "Model must be finalized before calling, see `klax.finalize`."
+        )
         if len(xs) != self._num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"
@@ -311,14 +312,17 @@ class InputSplitLinear(eqx.Module, strict=True):
             return jnp.matmul(x, weight)
 
         y = jnp.stack(
-            [mult(w, f, x) for w, f, x in zip(self.weights, self.in_features, xs)],
+            [
+                mult(w, f, x)
+                for w, f, x in zip(self.weights, self.in_features, xs)
+            ],
             axis=0,
         ).sum(axis=0)
         if self.bias is not None:
             y = y + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(y) == (
-                1,
-            ), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            assert jnp.shape(y) == (1,), (
+                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            )
             y = jnp.squeeze(y)
         return y
