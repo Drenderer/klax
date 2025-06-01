@@ -90,7 +90,9 @@ class Matrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
+        width_sizes = (
+            [max(8, in_size_)] if width_sizes is None else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else 2 * (shape,)
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -226,7 +228,9 @@ class SkewSymmetricMatrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
+        width_sizes = (
+            [max(8, in_size_)] if width_sizes is None else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else 2 * (shape,)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -376,7 +380,9 @@ class SPDMatrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
+        width_sizes = (
+            [max(8, in_size_)] if width_sizes is None else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else 2 * (shape,)
         if shape[-1] != shape[-2]:
             raise ValueError(

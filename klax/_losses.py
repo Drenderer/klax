@@ -26,7 +26,10 @@ class Loss(Protocol):
     """A callable loss object."""
 
     def __call__(
-        self, model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any]
+        self,
+        model: PyTree,
+        data: PyTree,
+        batch_axis: int | None | Sequence[Any],
     ) -> Scalar:
         raise NotImplementedError
 

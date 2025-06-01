@@ -29,14 +29,16 @@ from ._callbacks import (
     CallbackArgs,
     HistoryCallback,
 )
-from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
+from ._datahandler import (
+    batch_data,
+    BatchGenerator,
+    broadcast_and_get_batch_size,
+)
 from ._losses import Loss, mse
 from ._wrappers import unwrap, apply
 
 
-def fit[
-    T: eqx.Module, H: Callback
-](
+def fit[T: eqx.Module, H: Callback](
     model: T,
     data: PyTree[Any],
     *,
@@ -126,11 +128,15 @@ def fit[
         # Use the unflatten trick to speed up training,
         # see https://docs.kidger.site/equinox/tricks/
         model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
-        opt_state = jax.tree_util.tree_unflatten(treedef_opt_state, flat_opt_state)
+        opt_state = jax.tree_util.tree_unflatten(
+            treedef_opt_state, flat_opt_state
+        )
 
         # Compute and apply the parameter updates
         params, static = eqx.partition(model, eqx.is_inexact_array)
-        value, grad = jax.value_and_grad(partitioned_loss)(params, static, batch)
+        value, grad = jax.value_and_grad(partitioned_loss)(
+            params, static, batch
+        )
         updates, opt_state = optimizer.update(
             grad,
             opt_state,

@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.11
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
+  # - repo: https://github.com/RobertCraigie/pyright-python
+  #   rev: v1.1.379
+  #   hooks:
+  #     - id: pyright
+  #       additional_dependencies:
+  #         [
+  #           beartype,
+  #           einops,
+  #           jax,
+  #           jaxtyping,
+  #           optax,
+  #           pytest,
+  #           typing_extensions,
+  #           wadler_lindig,
+  #         ]

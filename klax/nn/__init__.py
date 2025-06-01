@@ -30,12 +30,12 @@ from ._matrices import (
 __all__ = [
     "Linear",
     "InputSplitLinear",
-    "MLP", 
+    "MLP",
     "FICNN",
     "Matrix",
     "ConstantMatrix",
     "SkewSymmetricMatrix",
     "ConstantSkewSymmetricMatrix",
     "SPDMatrix",
-    "ConstantSPDMatrix"
+    "ConstantSPDMatrix",
 ]

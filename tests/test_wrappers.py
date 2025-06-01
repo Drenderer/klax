@@ -86,7 +86,9 @@ def test_symmetric(getkey):
     symmetric = Symmetric(parameter)
     _symmetric = unwrap(symmetric)
     assert _symmetric.shape == parameter.shape
-    assert jnp.array_equal(_symmetric, jnp.transpose(_symmetric, axes=(0, 1, 3, 2)))
+    assert jnp.array_equal(
+        _symmetric, jnp.transpose(_symmetric, axes=(0, 1, 3, 2))
+    )
 
 
 def test_skewsymmetric(getkey):
@@ -95,7 +97,9 @@ def test_skewsymmetric(getkey):
     symmetric = SkewSymmetric(parameter)
     _symmetric = unwrap(symmetric)
     assert _symmetric.shape == parameter.shape
-    assert jnp.array_equal(_symmetric, -jnp.transpose(_symmetric, axes=(0, 1, 3, 2)))
+    assert jnp.array_equal(
+        _symmetric, -jnp.transpose(_symmetric, axes=(0, 1, 3, 2))
+    )
 
 
 test_cases = {
@@ -106,7 +110,9 @@ test_cases = {
 
 
 @pytest.mark.parametrize("shape", [(), (2,), (5, 2, 4)])
-@pytest.mark.parametrize("wrapper_fn", test_cases.values(), ids=test_cases.keys())
+@pytest.mark.parametrize(
+    "wrapper_fn", test_cases.values(), ids=test_cases.keys()
+)
 def test_vectorization_invariance(wrapper_fn, shape):
     keys = jr.split(jr.key(0), prod(shape))
     wrapper = wrapper_fn(keys[0])  # Standard init
