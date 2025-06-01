@@ -39,7 +39,7 @@
 """``Unwrappables`` and ``Constraints`` modified and extended from paramax."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, override, Self, Sequence, TypeVar
+from typing import Any, Callable, override, Self, Sequence, TypeVar, TYPE_CHECKING
 
 import equinox as eqx
 import jax
@@ -69,6 +69,14 @@ class Unwrappable[T](eqx.Module, ABC):
         :func:`unwrapped<klax.unwrap>` or :func:`finalized<klax.finalize>`
         before they are callable.
     """
+
+    # If type checking is enabled, we define an empty constructor to avoid
+    # issues with type checkers that expect an __init__ method. The actual
+    # constructor is defined in the derived classes or provided by equinox
+    # Module.
+    if TYPE_CHECKING:
+        def __init__(self, *args, **kwargs):
+            pass
 
     @abstractmethod
     def unwrap(self) -> T:
@@ -320,6 +328,14 @@ class Constraint(Unwrappable[Array], ABC):
         constraints, implement a custom constraint and define the combined
         effects via ``unwrap`` and ``apply``.
     """
+
+    # If type checking is enabled, we define an empty constructor to avoid
+    # issues with type checkers that expect an __init__ method. The actual
+    # constructor is defined in the derived classes or provided by equinox
+    # Module.
+    if TYPE_CHECKING:
+        def __init__(self, *args, **kwargs):
+            pass
 
     @abstractmethod
     def apply(self) -> Self:

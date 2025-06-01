@@ -19,7 +19,7 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Literal
+from typing import cast, Literal
 
 from collections.abc import Sequence
 
@@ -148,7 +148,8 @@ class Linear(eqx.Module, strict=True):
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
             x = jnp.broadcast_to(x, (1,))
-        x = jnp.matmul(x, self.weight)
+        weight = cast(Array, self.weight)   # Tell type checker that weight is not an Unwrappable
+        x = jnp.matmul(x, weight)
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
