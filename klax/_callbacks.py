@@ -316,6 +316,10 @@ class HistoryCallback(Callback):
         """
         filename = Path(filename)
 
+        if filename.suffix == "":
+            filename = filename.with_suffix(".pkl")
+        assert filename.suffix == ".pkl", "File must have a .pkl suffix."
+
         if filename.exists() and not overwrite:
             raise FileExistsError(
                 f"The file '{filename}' already exists. Use overwrite=True to overwrite it."
@@ -323,10 +327,6 @@ class HistoryCallback(Callback):
 
         if create_dir:
             filename.parent.mkdir(parents=True, exist_ok=True)
-
-        if filename.suffix == "":
-            filename = filename.with_suffix(".pkl")
-        assert filename.suffix == ".pkl", "File must have a .pkl suffix."
 
         with filename.open("wb") as f:
             pickle.dump(self, f)

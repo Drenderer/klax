@@ -11,7 +11,6 @@ from typing import (
     Self,
 )
 
-from functools import partial
 import timeit
 
 from matplotlib import pyplot as plt
@@ -56,8 +55,8 @@ def time_code(func, msg=""):
     timer = timeit.repeat(func, repeat=repeat, number=n)
     timer += [t1]
     timer = jnp.array(timer) / n
-    mean = format_time(jnp.mean(timer))
-    std = format_time(jnp.std(timer))
+    mean = format_time(float(jnp.mean(timer)))
+    std = format_time(float(jnp.std(timer)))
     print(
         msg
         + f"{mean} ± {std} per loop (mean ± std. dev. of {timer.size} runs, {n} loops each)"
@@ -89,7 +88,9 @@ class PartialInputNonNegative(Constraint):
 
     def apply(self) -> Self:
         return eqx.tree_at(
-            lambda t: t.parameter, self, self._apply_constraint(self.parameter, self.n)
+            lambda t: t.parameter,
+            self,
+            self._apply_constraint(self.parameter, self.n),
         )
 
 
@@ -133,6 +134,7 @@ class HalfConstrainedFICNN(eqx.Module):
         self.use_passthrough = use_passthrough
         self.non_decreasing = non_decreasing
 
+        in_size = 1 if in_size == "scalar" else in_size
         in_sizes = (in_size,) + width_sizes
         out_sizes = width_sizes + (out_size,)
         use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
@@ -147,11 +149,15 @@ class HalfConstrainedFICNN(eqx.Module):
                 constr = NonNegative if non_decreasing else None
             else:
                 _sin = sin + in_size if use_passthrough else sin
-                constr = (
-                    NonNegative
-                    if non_decreasing
-                    else partial(PartialInputNonNegative, n=sin)
-                )
+                if non_decreasing:
+                    constr = NonNegative
+                else:
+                    # Define a constraint type that captures n=sin
+                    class _PartialInputNonNegative(PartialInputNonNegative):
+                        def __new__(cls, parameter):
+                            return PartialInputNonNegative(parameter, n=sin)
+
+                    constr = _PartialInputNonNegative
 
             layers.append(
                 Linear(
@@ -172,7 +178,9 @@ class HalfConstrainedFICNN(eqx.Module):
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -196,7 +204,9 @@ class HalfConstrainedFICNN(eqx.Module):
 
         y = self.layers[0](x)
 
-        for i, (layer, activation) in enumerate(zip(self.layers[1:], self.activations)):
+        for i, (layer, activation) in enumerate(
+            zip(self.layers[1:], self.activations)
+        ):
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
@@ -242,11 +252,13 @@ for use_passthrough, non_decreasing in [
     assert ficnn(x[0]).shape == (), "Unexpected output shape"
     if non_decreasing:
         ficnn_x = jax.vmap(jax.grad(ficnn))
-        assert jnp.all(
-            ficnn_x(x) >= 0
-        ), "FICNN(..., non_decreasing=True) is not non-decreasing."
+        assert jnp.all(ficnn_x(x) >= 0), (
+            "FICNN(..., non_decreasing=True) is not non-decreasing."
+        )
     ficnn_xx = jax.vmap(jax.hessian(ficnn))
-    assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), "FICNN(...) is not convex."
+    assert jnp.all(jnp.linalg.eigvals(ficnn_xx(x)) >= 0), (
+        "FICNN(...) is not convex."
+    )
 
 # %% Define models
 
@@ -259,8 +271,8 @@ kwargs = dict(
     key=key,
 )
 
-hc_ficnn = HalfConstrainedFICNN(**kwargs)
-ficnn = FICNN(**kwargs)
+hc_ficnn = HalfConstrainedFICNN(**kwargs)  # pyright: ignore
+ficnn = FICNN(**kwargs)  # pyright: ignore
 
 
 # %% Time the un-vmapped call time
@@ -287,13 +299,21 @@ time_code(lambda: _ficnn(x), "FICNN:   ")
 print("\nTiming training time")
 time_code(
     lambda: fit(
-        hc_ficnn, (x, y), steps=10_000, history=HistoryCallback(verbose=0), key=key
+        hc_ficnn,
+        (x, y),
+        steps=10_000,
+        history=HistoryCallback(verbose=False),
+        key=key,
     ),
     "HCFICNN: ",
 )
 time_code(
     lambda: fit(
-        ficnn, (x, y), steps=10_000, history=HistoryCallback(verbose=0), key=key
+        ficnn,
+        (x, y),
+        steps=10_000,
+        history=HistoryCallback(verbose=False),
+        key=key,
     ),
     "FICNN:   ",
 )
@@ -312,8 +332,8 @@ kwargs = dict(
     non_decreasing=False,
     key=key,
 )
-hc_ficnn = HalfConstrainedFICNN(**kwargs)
-ficnn = FICNN(**kwargs)
+hc_ficnn = HalfConstrainedFICNN(**kwargs)  # pyright: ignore
+ficnn = FICNN(**kwargs)  # pyright: ignore
 mlp = MLP(in_size=1, out_size="scalar", width_sizes=2 * [8], key=key)
 eqx_mlp = eqx.nn.MLP(
     in_size=1,
@@ -325,21 +345,39 @@ eqx_mlp = eqx.nn.MLP(
 )
 
 _hc_ficnn, hist = fit(
-    hc_ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+    hc_ficnn,
+    (x, y),
+    steps=20_000,
+    history=HistoryCallback(verbose=False),
+    key=key,
 )
 _ficnn, hist = fit(
-    ficnn, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+    ficnn,
+    (x, y),
+    steps=20_000,
+    history=HistoryCallback(verbose=False),
+    key=key,
 )
-_mlp, hist = fit(mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key)
+_mlp, hist = fit(
+    mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=False), key=key
+)
 _eqx_mlp, hist = fit(
-    eqx_mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=0), key=key
+    eqx_mlp,
+    (x, y),
+    steps=20_000,
+    history=HistoryCallback(verbose=False),
+    key=key,
 )
 
 fig, ax = plt.subplots()
 ax.scatter(x, y, label="Data", marker="x", c="black")
-ax.plot(x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls="-.", label="EQX MLP")
+ax.plot(
+    x_eval, jax.vmap(klax.finalize(_eqx_mlp))(x_eval), ls="-.", label="EQX MLP"
+)
 ax.plot(x_eval, jax.vmap(klax.finalize(_mlp))(x_eval), ls="-.", label="MLP")
 ax.plot(x_eval, jax.vmap(klax.finalize(_hc_ficnn))(x_eval), label="HCFICNN")
-ax.plot(x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN")
+ax.plot(
+    x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN"
+)
 ax.legend()
 plt.show()

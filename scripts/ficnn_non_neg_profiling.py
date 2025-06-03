@@ -6,7 +6,7 @@ multiple different implementations of a non-negative constraint.
 # %% Imports
 from __future__ import annotations
 from collections.abc import Callable, Sequence
-from typing import Literal
+from typing import Literal, cast
 
 from matplotlib import pyplot as plt
 
@@ -55,7 +55,7 @@ class FICNN(eqx.Module, strict=True):
         in_size: int | Literal["scalar"],
         out_size: int | Literal["scalar"],
         width_sizes: Sequence[int],
-        non_neg_wrap: Unwrappable,
+        non_neg_wrap: type[Unwrappable[Array]],
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
@@ -101,13 +101,6 @@ class FICNN(eqx.Module, strict=True):
             key: A `jax.random.PRNGKey` used to provide randomness for parameter
                 initialisation. (Keyword only argument.)
         """
-
-        # TODO:
-        # What's up with this? Why not let the user define a final activation?
-        # def final_activation(x):
-        #     return x
-        # Response jaosch: Changing the output activation could break convexity
-        # without notice.
 
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
@@ -180,7 +173,9 @@ class FICNN(eqx.Module, strict=True):
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -204,13 +199,16 @@ class FICNN(eqx.Module, strict=True):
 
         y = self.layers[0](x)
 
-        for i, (layer, activation) in enumerate(zip(self.layers[1:], self.activations)):
+        for i, (layer, activation) in enumerate(
+            zip(self.layers[1:], self.activations)
+        ):
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
             y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
 
             if self.use_passthrough:
+                layer = cast(InputSplitLinear, layer)
                 y = layer(y, x)
             else:
                 y = layer(y)
@@ -265,7 +263,7 @@ data_key, model_key, train_key = jr.split(key, 3)
 
 n = 100
 
-c = jr.uniform(data_key, shape=n, minval=0.1, maxval=1.2) / n
+c = jr.uniform(data_key, shape=(n,), minval=0.1, maxval=1.2) / n
 
 
 def f(x):
