@@ -21,7 +21,7 @@ import time
 from typing import Any, Self
 
 import jax
-from jaxtyping import PyTree, PyTreeDef, Scalar
+from jaxtyping import PyTree, Scalar
 import pickle
 from pathlib import Path
 
@@ -45,9 +45,9 @@ class CallbackArgs:
     time_on_last_update: float  #: Global time of the last :meth:`update` call.
     data: PyTree  #: PyTree of the training data.
     val_data: PyTree | None  #: PyTree of the validation data.
-    _treedef_model: PyTreeDef
+    _treedef_model: Any #TODO: Should be TreeDef, but that causes pylance error
     _flat_model: list
-    _treedef_opt_state: PyTreeDef
+    _treedef_opt_state: Any #TODO: Should be TreeDef, but that causes pylance error
     _flat_opt_state: list
     _cache: dict = {}
     _get_loss: Callable[[PyTree, PyTree], Scalar]
@@ -56,8 +56,8 @@ class CallbackArgs:
     def __init__(
         self,
         get_loss: Callable[[PyTree, PyTree], Scalar],
-        treedef_model: PyTreeDef,
-        treedef_opt_state: PyTreeDef,
+        treedef_model: Any, #TODO: Should be TreeDef, but that causes pylance error
+        treedef_opt_state: Any, #TODO: Should be TreeDef, but that causes pylance error
         data: PyTree,
         val_data: PyTree | None = None,
     ):

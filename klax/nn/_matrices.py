@@ -22,14 +22,15 @@ import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, he_normal, zeros, variance_scaling
 
-from typing import Literal, Sequence, Any, Callable
+from typing import Literal, Sequence, Any, Callable, TypeVar
 from jaxtyping import PRNGKeyArray, Array
 
 from . import MLP
 from .._misc import default_floating_dtype
 from .._wrappers import SkewSymmetric
 
-type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
+T = TypeVar("T")
+AtLeast2DTuple = tuple[T, T, *tuple[T, ...]]
 
 
 class Matrix(eqx.Module):
@@ -91,7 +92,7 @@ class Matrix(eqx.Module):
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
         width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
 
         out_size = int(jnp.prod(jnp.array(shape)))
         self.shape = shape
@@ -154,7 +155,7 @@ class ConstantMatrix(eqx.Module):
                 initialisation. (Keyword only argument.)
         """
         dtype = default_floating_dtype() if dtype is None else dtype
-        self.shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        self.shape = shape if isinstance(shape, tuple) else (shape, shape)
         self.array = init(key, self.shape, dtype)
 
     def __call__(self, x: Array) -> Array:
@@ -227,7 +228,7 @@ class SkewSymmetricMatrix(eqx.Module):
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
         width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for skew-symmetric matrices."
@@ -268,7 +269,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
     matrix-valued funciton interfrace.
     """
 
-    array: Array
+    array: SkewSymmetric
     shape: AtLeast2DTuple[int] = eqx.field(static=True)
 
     def __init__(
@@ -295,7 +296,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
                 initialisation. (Keyword only argument.)
         """
         dtype = default_floating_dtype() if dtype is None else dtype
-        self.shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        self.shape = shape if isinstance(shape, tuple) else (shape, shape)
         array = init(key, self.shape, dtype)
         self.array = SkewSymmetric(array)
 
@@ -377,7 +378,7 @@ class SPDMatrix(eqx.Module):
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
         width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for symmetric matrices."
@@ -455,7 +456,7 @@ class ConstantSPDMatrix(eqx.Module):
             key: A `jax.random.PRNGKey` used to provide randomness for parameter
                 initialisation. (Keyword only argument.)
         """
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for symmetric matrices."

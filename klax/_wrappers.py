@@ -39,7 +39,7 @@
 """``Unwrappables`` and ``Constraints`` modified and extended from paramax."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, override, Self, Sequence, TypeVar
+from typing import Any, Callable, Self, Sequence, TypeVar, Generic
 
 import equinox as eqx
 import jax
@@ -58,7 +58,7 @@ T = TypeVar("T")
 
 # This class is derived from paramax.
 # Original Copyright 2022 Daniel Ward
-class Unwrappable[T](eqx.Module, ABC):
+class Unwrappable(eqx.Module, ABC, Generic[T]):
     """An abstract class representing an unwrappable object.
 
     Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping.
@@ -148,7 +148,6 @@ class Parameterize(Unwrappable[T]):
         self.args = tuple(args)
         self.kwargs = kwargs
 
-    @override
     def unwrap(self) -> T:
         return self.fn(*self.args, **self.kwargs)
 
@@ -207,7 +206,6 @@ class NonTrainable(Unwrappable[T]):
 
     tree: T
 
-    @override
     def unwrap(self) -> T:
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(lax.stop_gradient(differentiable), static)
@@ -237,7 +235,6 @@ class SkewSymmetric(Unwrappable[Array]):
             )
         self.parameter = parameter
 
-    @override
     def unwrap(self) -> Array:
         return self._make_skew_symmetric(self.parameter)
 
@@ -374,11 +371,9 @@ class NonNegative(Constraint):
     def _non_neg(x: Array) -> Array:
         return jnp.maximum(x, 0)
 
-    @override
     def unwrap(self) -> Array:
         return self.parameter
 
-    @override
     def apply(self) -> Self:
         return eqx.tree_at(
             lambda x: x.parameter,

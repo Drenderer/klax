@@ -17,7 +17,7 @@ This module implements a basic training loop.
 """
 
 from __future__ import annotations
-from typing import Any, Iterable
+from typing import Any, Iterable, TypeVar
 
 import equinox as eqx
 import jax
@@ -34,9 +34,9 @@ from ._losses import Loss, mse
 from ._wrappers import unwrap, apply
 
 
-def fit[
-    T: eqx.Module, H: Callback
-](
+T = TypeVar("T", bound=eqx.Module)
+
+def fit(
     model: T,
     data: PyTree[Any],
     *,
@@ -48,10 +48,10 @@ def fit[
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    history: H | None = None,
+    history: Callback | None = None,
     callbacks: Iterable[Callback] | None = None,
     key: PRNGKeyArray,
-) -> tuple[T, HistoryCallback | H]:
+) -> tuple[T, Callback]:
     """Trains a model using an optimizer from optax.
 
     Args:

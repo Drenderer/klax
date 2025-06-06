@@ -12,12 +12,12 @@ authors = [
     { name = "Drenderer", email = "some@email.com" },
     { name = "jaosch", email = "jasper.schommartz@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
-    "equinox>=0.12.2",
-    "jax>=0.6.0",
-    "optax>=0.2.4",
-    "paramax>=0.0.3",
+    "equinox",
+    "jax",
+    "optax",
+    "paramax",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -38,7 +38,7 @@ Issues = "https://github.com/jaosch/feap-caller/klax"
 
 [project.optional-dependencies]
 plot = [
-    "matplotlib>=3.10.3",
+    "matplotlib",
 ]
 docs = [
     "sphinx>=8.2.3",
