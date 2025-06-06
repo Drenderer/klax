@@ -22,12 +22,12 @@ import jax
 import jax.numpy as jnp
 from jax.nn.initializers import Initializer, he_normal, zeros, variance_scaling
 
-from typing import Literal, Sequence, Any, Callable, TypeVar
+from typing import Literal, Sequence, Any, Callable, TypeVar, cast
 from jaxtyping import PRNGKeyArray, Array
 
 from . import MLP
 from .._misc import default_floating_dtype
-from .._wrappers import SkewSymmetric
+from .._wrappers import SkewSymmetric, contains_unwrappables, ContainsUnwrappables
 
 T = TypeVar("T")
 AtLeast2DTuple = tuple[T, T, *tuple[T, ...]]
@@ -309,7 +309,10 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         Returns:
             A JAX array of shape ``shape``.
         """
-        return self.array
+        if contains_unwrappables(self):
+            raise ContainsUnwrappables("Model must be finalized before calling, see `klax.finalize`.")
+        array = cast(Array, self.array)
+        return array
 
 
 class SPDMatrix(eqx.Module):
@@ -428,7 +431,7 @@ class ConstantSPDMatrix(eqx.Module):
 
     def __init__(
         self,
-        shape: int | AtLeast2DTuple[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
         epsilon: float = 1e-6,
         init: Initializer = variance_scaling(
             scale=1, mode="fan_avg", distribution="normal"
@@ -442,7 +445,6 @@ class ConstantSPDMatrix(eqx.Module):
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-                (Defaults to `(in_size, in_size)`)
             epsilon: Small value that is added to the diagonal of the output matrix
                 to ensure positive definiteness. If only positive semi-definiteness is
                 required set `epsilon = 0.`
