@@ -39,7 +39,7 @@
 """``Unwrappables`` and ``Constraints`` modified and extended from paramax."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, override, Self, Sequence, TypeVar, TYPE_CHECKING
+from typing import Any, Callable, override, Self, TypeVar, TYPE_CHECKING
 
 import equinox as eqx
 import jax
