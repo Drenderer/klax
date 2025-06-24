@@ -30,6 +30,7 @@ from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
 from ._linear import Linear
+from .._wrappers import Constraint, Unwrappable
 
 
 class MLP(eqx.Module, strict=True):
@@ -61,6 +62,8 @@ class MLP(eqx.Module, strict=True):
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
+        weight_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
+        bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         dtype=None,
         *,
         key: PRNGKeyArray,
@@ -84,6 +87,10 @@ class MLP(eqx.Module, strict=True):
                 (Defaults to `True`.)
             use_final_bias: Whether to add on a bias to the final layer.
                 (Defaults to `True`.)
+            weight_warp: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that is passed to all weights.
+            bias_warp: An optional :class:`klax.Constraint` (or more generally a
+                :class:`klax.Unwrappable`) that is passed to all biases.
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
@@ -117,6 +124,8 @@ class MLP(eqx.Module, strict=True):
                 weight_init,
                 bias_init,
                 ub,
+                weight_wrap,
+                bias_wrap,
                 dtype=dtype,
                 key=key,
             )
