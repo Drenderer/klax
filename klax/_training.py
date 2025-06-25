@@ -16,7 +16,6 @@
 This module implements a basic training loop.
 """
 
-from __future__ import annotations
 from typing import Any, Iterable
 
 import equinox as eqx
@@ -29,14 +28,16 @@ from ._callbacks import (
     CallbackArgs,
     HistoryCallback,
 )
-from ._datahandler import batch_data, BatchGenerator, broadcast_and_get_batch_size
+from ._datahandler import (
+    batch_data,
+    BatchGenerator,
+    broadcast_and_get_batch_size,
+)
 from ._losses import Loss, mse
 from ._wrappers import unwrap, apply
 
 
-def fit[
-    T: eqx.Module, H: Callback
-](
+def fit[T: eqx.Module, H: Callback](
     model: T,
     data: PyTree[Any],
     *,
@@ -80,7 +81,7 @@ def fit[
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        History: A callback intended for tracking the training process.
+        history: A callback intended for tracking the training process.
             If no custom callback is passed the :obj:`klax.HistoryCallback` with a logging interval of
             100 steps is used. To change the logging increment or verbosity of this default callback,
             pass a `HistoryCallback` object to this argument, e.g.,
@@ -126,11 +127,15 @@ def fit[
         # Use the unflatten trick to speed up training,
         # see https://docs.kidger.site/equinox/tricks/
         model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
-        opt_state = jax.tree_util.tree_unflatten(treedef_opt_state, flat_opt_state)
+        opt_state = jax.tree_util.tree_unflatten(
+            treedef_opt_state, flat_opt_state
+        )
 
         # Compute and apply the parameter updates
         params, static = eqx.partition(model, eqx.is_inexact_array)
-        value, grad = jax.value_and_grad(partitioned_loss)(params, static, batch)
+        value, grad = jax.value_and_grad(partitioned_loss)(
+            params, static, batch
+        )
         updates, opt_state = optimizer.update(
             grad,
             opt_state,

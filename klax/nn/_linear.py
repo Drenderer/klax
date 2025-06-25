@@ -18,7 +18,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
 from typing import cast, Literal
 
 from collections.abc import Sequence
@@ -30,13 +29,18 @@ import jax.random as jrandom
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from .._wrappers import Constraint, Unwrappable, contains_unwrappables, ContainsUnwrappables
+from .._wrappers import (
+    Constraint,
+    Unwrappable,
+    contains_unwrappables,
+    ContainsUnwrappables,
+)
 
 
 class Linear(eqx.Module, strict=True):
     """Performs a linear transformation.
 
-    This class is modified from `eqx.nn.Linear` to allow for custom initialization.
+    This class is modified from [`equinox.nn.Linear`](https://docs.kidger.site/equinox/api/nn/linear/#equinox.nn.Line(https://docs.kidger.site/equinox/api/nn/linear/#equinox.nn.Linear)) to allow for custom initialization.
     """
 
     weight: Array | Unwrappable[Array]
@@ -67,10 +71,8 @@ class Linear(eqx.Module, strict=True):
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_warp: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that can be passed to enforce weight constraints.
-            bias_warp: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that can be passed to enforce bias constraints.
+            weight_wrap: An optional wrapper that can be passed to enforce weight constraints.
+            bias_wrap: An optional wrapper that can be passed to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
                 on whether JAX is in 64-bit mode.
@@ -122,6 +124,7 @@ class Linear(eqx.Module, strict=True):
             "batch dimensions) then use `jax.vmap`. For example, for an input `x` of "
             "shape `(batch, in_features)`, using
 
+            ```python
             >>> import jax
             >>> from jax.nn.initializers import he_normal
             >>> import jax.random as jrandom
@@ -133,6 +136,7 @@ class Linear(eqx.Module, strict=True):
             >>> linear = klax.nn.Linear("scalar", "scalar", he_normal(), key=keys[1])
             >>> jax.vmap(linear)(x).shape
             (10,)
+            ```
 
             will produce the appropriate output of shape `(batch, out_features)`.
 
@@ -142,19 +146,23 @@ class Linear(eqx.Module, strict=True):
         """
 
         if contains_unwrappables(self):
-            raise ContainsUnwrappables("Model must be finalized before calling, see `klax.finalize`.")
+            raise ContainsUnwrappables(
+                "Model must be finalized before calling, see `klax.finalize`."
+            )
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
             x = jnp.broadcast_to(x, (1,))
-        weight = cast(Array, self.weight)   # Tell type checker that weight is not an Unwrappable
+        weight = cast(
+            Array, self.weight
+        )  # Tell type checker that weight is not an Unwrappable
         x = jnp.matmul(x, weight)
         if self.bias is not None:
             x = x + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(x) == (
-                1,
-            ), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            assert jnp.shape(x) == (1,), (
+                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+            )
             x = jnp.squeeze(x)
         return x
 
@@ -205,14 +213,11 @@ class InputSplitLinear(eqx.Module, strict=True):
                 The sequence must have the same length as in_features.
             bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wraps: An optional :class:`klax.Constraint` or sequence of
-                :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that can be passed to enforce weight
+            weight_wraps: One or a list/tuple of wrappers that can be passed to enforce weight
                 constraints. By specifying a sequence it is possible to apply a
                 different wrapper to each weight matrix. The sequence must have the
                 same length as in_features.
-            bias_wrap: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that can be passed to enforce bias constraints.
+            bias_wrap: An optional wrapper that can be passed to enforce bias constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
@@ -266,7 +271,8 @@ class InputSplitLinear(eqx.Module, strict=True):
             for init, wkey, wshape in zip(weight_inits, wkeys, wshapes)
         ]
         weights = [
-            w if wrap is None else wrap(w) for w, wrap in zip(weights, weight_wraps)
+            w if wrap is None else wrap(w)
+            for w, wrap in zip(weights, weight_wraps)
         ]
         self.weights = tuple(weights)
 
@@ -296,7 +302,9 @@ class InputSplitLinear(eqx.Module, strict=True):
         """
 
         if contains_unwrappables(self):
-            raise ContainsUnwrappables("Model must be finalized before calling, see `klax.finalize`.")
+            raise ContainsUnwrappables(
+                "Model must be finalized before calling, see `klax.finalize`."
+            )
         if len(xs) != self._num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"
@@ -310,14 +318,17 @@ class InputSplitLinear(eqx.Module, strict=True):
             return jnp.matmul(x, weight)
 
         y = jnp.stack(
-            [mult(w, f, x) for w, f, x in zip(self.weights, self.in_features, xs)],
+            [
+                mult(w, f, x)
+                for w, f, x in zip(self.weights, self.in_features, xs)
+            ],
             axis=0,
         ).sum(axis=0)
         if self.bias is not None:
             y = y + self.bias
         if self.out_features == "scalar":
-            assert jnp.shape(y) == (
-                1,
-            ), f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            assert jnp.shape(y) == (1,), (
+                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+            )
             y = jnp.squeeze(y)
         return y

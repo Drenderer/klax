@@ -16,7 +16,6 @@
 This module implements methods for handling data, such as batching and splitting.
 """
 
-from __future__ import annotations
 import typing
 from typing import Any, Generator, Protocol, Sequence
 import warnings
@@ -96,7 +95,7 @@ def batch_data(
     *,
     key: PRNGKeyArray,
 ) -> Generator[PyTree[Any], None, None]:
-    """Returns a batch `Generator` that yields randomly chosen subsets of data
+    """Returns a `Generator` that yields randomly chosen subsets of data
     without replacement.
 
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
@@ -106,7 +105,7 @@ def batch_data(
         This is an example for a nested `PyTree`, where the elements x and y
         have batch dimension along the first axis.
 
-
+        ```python
         >>> import klax
         >>> import jax
         >>> import jax.numpy as jnp
@@ -122,6 +121,7 @@ def batch_data(
         ...     key=jax.random.key(0)
         ... )
         >>>
+        ```
 
     Args:
         data: The data that shall be batched. It can be any `PyTree` with
@@ -200,6 +200,7 @@ def split_data(
         have batch dimension along different axes.
 
 
+        ```python
         >>> import klax
         >>> import jax
         >>>
@@ -214,6 +215,7 @@ def split_data(
         (Array([1., 2.], dtype=float32), {'a': 1.0, 'b': Array([1., 2.], dtype=float32)})
         >>> s2
         (Array([3.], dtype=float32), {'a': 1.0, 'b': Array([3.], dtype=float32)})
+        ```
 
     Args:
         data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
@@ -232,7 +234,7 @@ def split_data(
     props = jnp.array(proportions, dtype=float)
     if props.ndim != 1:
         raise ValueError("Proportions must be a 1D Sequence.")
-    if jnp.any(props < 0.):
+    if jnp.any(props < 0.0):
         raise ValueError("Proportions must be non-negative.")
     props = props / jnp.sum(props)
 

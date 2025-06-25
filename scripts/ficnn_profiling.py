@@ -4,7 +4,6 @@ Testing the computational performance of FICNN and comparing it to alternative i
 
 # %% Imports
 
-from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import (
     Literal,

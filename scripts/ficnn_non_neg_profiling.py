@@ -4,7 +4,6 @@ multiple different implementations of a non-negative constraint.
 """
 
 # %% Imports
-from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Literal, cast
 

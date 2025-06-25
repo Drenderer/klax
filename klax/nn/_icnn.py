@@ -16,7 +16,6 @@
 Implementation of convex neural networks.
 """
 
-from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import cast, Literal
 
@@ -33,7 +32,7 @@ from ._linear import Linear, InputSplitLinear
 
 class FICNN(eqx.Module, strict=True):
     """
-    A fully input convex neural network (https://arxiv.org/abs/1609.07152).
+    A [fully input convex neural network](https://arxiv.org/abs/1609.07152).
 
     Each element of the output is a convex function of the input.
     """
@@ -67,6 +66,10 @@ class FICNN(eqx.Module, strict=True):
         key: PRNGKeyArray,
     ):
         """
+        Warning:
+            Modifying `final_activation` to a non-convex function will
+            break the convexity of the FICNN. Use this parameter with care.
+
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_features,)`.
@@ -89,6 +92,7 @@ class FICNN(eqx.Module, strict=True):
             final_activation: The activation function after the output layer. To ensure
                 convexity this function must be convex and non-decreasing.
                 Defaults to the identity.
+
             use_bias: Whether to add on a bias in the hidden layers. Defaults to True.
             use_final_bias: Whether to add on a bias to the final layer. Defaults to True.
             dtype: The dtype to use for all the weights and biases in this MLP.
@@ -96,14 +100,8 @@ class FICNN(eqx.Module, strict=True):
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for parameter
                 initialisation. (Keyword only argument.)
-        """
 
-        # TODO:
-        # What's up with this? Why not let the user define a final activation?
-        # def final_activation(x):
-        #     return x
-        # Response jaosch: Changing the output activation could break convexity without
-        # notice.
+        """
 
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
@@ -176,7 +174,9 @@ class FICNN(eqx.Module, strict=True):
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -200,7 +200,9 @@ class FICNN(eqx.Module, strict=True):
 
         y = self.layers[0](x)
 
-        for i, (layer, activation) in enumerate(zip(self.layers[1:], self.activations)):
+        for i, (layer, activation) in enumerate(
+            zip(self.layers[1:], self.activations)
+        ):
             layer_activation = jax.tree.map(
                 lambda y: y[i] if eqx.is_array(y) else y, activation
             )
@@ -208,7 +210,7 @@ class FICNN(eqx.Module, strict=True):
 
             if self.use_passthrough:
                 # Tell type checker that this is an InputSplitLinear
-                layer = cast(InputSplitLinear, layer) 
+                layer = cast(InputSplitLinear, layer)
                 y = layer(y, x)
             else:
                 y = layer(y)

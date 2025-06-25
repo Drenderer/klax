@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
 from abc import ABC
 from collections.abc import Callable
 import datetime
@@ -126,7 +125,9 @@ class CallbackArgs:
     @_lazy_evaluated_and_cached
     def model(self):
         """Lazy-evaluated and cached model."""
-        return jax.tree_util.tree_unflatten(self._treedef_model, self._flat_model)
+        return jax.tree_util.tree_unflatten(
+            self._treedef_model, self._flat_model
+        )
 
     @_lazy_evaluated_and_cached
     def opt_state(self):
@@ -224,9 +225,7 @@ class HistoryCallback(Callback):
         Called at beginning of training.
         """
         self.last_start_time = cbargs.time_on_last_update
-        if (
-            self.steps
-        ):  # If there are already steps, we assume that this is a continuation of a training.
+        if self.steps:  # If there are already steps, we assume that this is a continuation of a training.
             self.step_offset = self.steps[-1]
         else:
             self(cbargs)
@@ -240,9 +239,13 @@ class HistoryCallback(Callback):
         self.training_time += self.last_end_time - self.last_start_time
         self.last_opt_state = cbargs.opt_state
         if self.verbose:
-            print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
+            print(
+                f"Training took: {datetime.timedelta(seconds=self.training_time)}"
+            )
 
-    def plot(self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}):
+    def plot(
+        self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}
+    ):
         """Plots the recorded training and validation losses.
 
         Note:
@@ -284,7 +287,8 @@ class HistoryCallback(Callback):
 
             loss_options = dict(label="Loss", ls="-", c="black") | loss_options
             val_loss_options = (
-                dict(label="Validation loss", ls="--", c="red") | val_loss_options
+                dict(label="Validation loss", ls="--", c="red")
+                | val_loss_options
             )
             ax.plot(self.steps, self.loss, **loss_options)
             if any(x is not None for x in self.val_loss):
@@ -298,7 +302,10 @@ class HistoryCallback(Callback):
             )
 
     def save(
-        self, filename: str | Path, overwrite: bool = False, create_dir: bool = True
+        self,
+        filename: str | Path,
+        overwrite: bool = False,
+        create_dir: bool = True,
     ) -> None:
         """Save the HistoryCallback instance to a file using pickle.
 
@@ -332,7 +339,7 @@ class HistoryCallback(Callback):
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str | Path) -> HistoryCallback:
+    def load(filename: str | Path) -> "HistoryCallback":
         """Load a HistoryCallback instance from a file.
 
         Args:

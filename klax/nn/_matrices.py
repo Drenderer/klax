@@ -27,15 +27,20 @@ from jaxtyping import PRNGKeyArray, Array
 
 from . import MLP
 from .._misc import default_floating_dtype
-from .._wrappers import SkewSymmetric, contains_unwrappables, ContainsUnwrappables
+from .._wrappers import (
+    SkewSymmetric,
+    contains_unwrappables,
+    ContainsUnwrappables,
+)
 
 type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
 
 
 class Matrix(eqx.Module):
-    """*Unconstrained matrix-valued function.*
-    Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a matrix.
+    """
+    An unconstrained matrix-valued function based on an MLP.
+
+    The MLP maps to a vector of elements which is transformed into a matrix.
     """
 
     mlp: MLP
@@ -90,7 +95,9 @@ class Matrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
+        width_sizes = (
+            [max(8, in_size_)] if width_sizes is None else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else (shape, shape)
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -122,9 +129,10 @@ class Matrix(eqx.Module):
 
 
 class ConstantMatrix(eqx.Module):
-    """*Constant unconstrained matrix.*
-    Wrapper around a constant array with the matrix-valued funciton
-    interfrace.
+    """A constant, unconstrained matrix.
+
+    It is a wrapper around a constant array that implements the matrix-valued
+    function interface.
     """
 
     array: Array
@@ -170,9 +178,11 @@ class ConstantMatrix(eqx.Module):
 
 
 class SkewSymmetricMatrix(eqx.Module):
-    """*Skew-symmetric matrix-valued function.*
-    Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a skew-symmetric matrix."""
+    """A kkew-symmetric matrix-valued function based on an MLP.
+
+    The MLP maps the input to a vector of elements that are transformed into a
+    skew-symmetric matrix.
+    """
 
     mlp: MLP
     shape: AtLeast2DTuple[int] = eqx.field(static=True)
@@ -226,7 +236,9 @@ class SkewSymmetricMatrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
+        width_sizes = (
+            [max(8, in_size_)] if width_sizes is None else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -263,9 +275,10 @@ class SkewSymmetricMatrix(eqx.Module):
 
 
 class ConstantSkewSymmetricMatrix(eqx.Module):
-    """*Constant skew-symmetric matrix.*
-    Wrapper around a constant skew-symmetry-constrained array with the
-    matrix-valued funciton interfrace.
+    """A constant skew-symmetric matrix.
+
+    It is a wrapper around a constant skew-symmetry-constraind array that
+    implements the matrix-valued function interface.
     """
 
     array: SkewSymmetric
@@ -282,6 +295,8 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         key: PRNGKeyArray,
     ):
         """
+        Initializes the object
+
         Args:
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single
@@ -309,17 +324,19 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
             A JAX array of shape ``shape``.
         """
         if contains_unwrappables(self):
-            raise ContainsUnwrappables("Model must be finalized before calling, see `klax.finalize`.")
+            raise ContainsUnwrappables(
+                "Model must be finalized before calling, see `klax.finalize`."
+            )
         array = cast(Array, self.array)
         return array
 
 
 class SPDMatrix(eqx.Module):
-    """*Symmetric positive definite matrix-valued function.*
-    Wrapper around a `MLP` that maps the input to a symmetric
-    positive definite matrix.
-    The output vector `v` of the MLP is mapped to
-    a matrix `B`. The module's output is then computed via `A=B@B*`."""
+    """A symmetric positive definite matrix-valued function based on an MLP.
+
+    The output vector `v` of the MLP is mapped to a matrix `B`. The module's
+    output is then computed via `A=B@B*`.
+    """
 
     mlp: MLP
     shape: AtLeast2DTuple[int] = eqx.field(static=True)
@@ -379,7 +396,9 @@ class SPDMatrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = [max(8, in_size_)] if width_sizes is None else width_sizes
+        width_sizes = (
+            [max(8, in_size_)] if width_sizes is None else width_sizes
+        )
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -419,9 +438,10 @@ class SPDMatrix(eqx.Module):
 
 
 class ConstantSPDMatrix(eqx.Module):
-    """*Constant symmetric positive definite matrix-valued function.*
-    Wrapper around a constant symmetric postive semi-definite matrix with the
-    matrix-valued funciton interfrace.
+    """A constant symmetric positive definite matrix-valued function.
+
+    It is a wrapper around a constant symmetric postive semi-definite matrix
+    with the matrix-valued function interface.
     """
 
     B_matrix: Array
@@ -440,6 +460,8 @@ class ConstantSPDMatrix(eqx.Module):
         key: PRNGKeyArray,
     ):
         """
+        Initializes the object
+
         Args:
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single

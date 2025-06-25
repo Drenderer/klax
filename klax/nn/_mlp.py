@@ -18,7 +18,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal, Sequence
 
@@ -37,9 +36,9 @@ class MLP(eqx.Module, strict=True):
     """Standard Multi-Layer Perceptron; also known as a feed-forward network.
 
 
-    This class is modified form `eqx.nn.MLP` to allow for custom initialization
-    and different node numbers in the hidden layers. Hence, it may also be used
-    for ecoder/decoder tasks.
+    This class is modified form [`equinox.nn.MLP`](https://docs.kidger.site/equinox/api/nn/mlp/#equinox.nn.MLP)
+    to allow for custom initialization and different node numbers in the hidden
+    layers. Hence, it may also be used for ecoder/decoder tasks.
     """
 
     layers: tuple[Linear, ...]
@@ -87,10 +86,8 @@ class MLP(eqx.Module, strict=True):
                 (Defaults to `True`.)
             use_final_bias: Whether to add on a bias to the final layer.
                 (Defaults to `True`.)
-            weight_warp: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that is passed to all weights.
-            bias_warp: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that is passed to all biases.
+            weight_wrap: An optional wrapper that is passed to all weights.
+            bias_wrap: An optional wrapper that is passed to all biases.
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
@@ -129,14 +126,18 @@ class MLP(eqx.Module, strict=True):
                 dtype=dtype,
                 key=key,
             )
-            for sin, sout, ub, key in zip(in_sizes, out_sizes, use_biases, keys)
+            for sin, sout, ub, key in zip(
+                in_sizes, out_sizes, use_biases, keys
+            )
         )
 
         # In case `activation` or `final_activation` are learnt, then make a separate
         # copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation

@@ -62,11 +62,11 @@ class Unwrappable[T](eqx.Module, ABC):
     """An abstract class representing an unwrappable object.
 
     Unwrappables replace PyTree nodes, applying custom behavior upon unwrapping.
-    This class is a renamed copy of :class:`paramax.AbstractUnwrappable`.
+    This class is a renamed copy of [`paramax.AbstractUnwrappable`](https://danielward27.github.io/paramax/api/wrappers.html#paramax.wrappers.AbstractUnwrappable).
 
     Note:
-        Models containing :class:`Unwrappables<Unwrappable>` need to be
-        :func:`unwrapped<klax.unwrap>` or :func:`finalized<klax.finalize>`
+        Models containing [Unwrappables][klax.Unwrappable] need to be
+        [unwrapped][klax.unwrap] or [finalized][klax.finalize]
         before they are callable.
     """
 
@@ -75,6 +75,7 @@ class Unwrappable[T](eqx.Module, ABC):
     # constructor is defined in the derived classes or provided by equinox
     # Module.
     if TYPE_CHECKING:
+
         def __init__(self, *args, **kwargs):
             pass
 
@@ -87,19 +88,21 @@ class Unwrappable[T](eqx.Module, ABC):
 # This function is copied from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
 def unwrap(tree: PyTree) -> PyTree:
-    """Map across a PyTree and unwrap all :class:`Unwrappables<Unwrappable>`.
+    """Map across a PyTree and unwrap all [`klax.Unwrappable`][] objects.
 
     This leaves all other nodes unchanged. If nested, the innermost
-    :class:`Unwrappable` is unwrapped first.
+    [`klax.Unwrappable`][] is unwrapped first.
 
     Example:
         Enforcing positivity.
 
+        ```python
         >>> import klax
         >>> import jax.numpy as jnp
         >>> params = klax.Parameterize(jnp.exp, jnp.zeros(3))
         >>> klax.unwrap(("abc", 1, params))
         ('abc', 1, Array([1., 1., 1.], dtype=float32))
+        ```
     """
 
     def _unwrap(tree, *, include_self: bool):
@@ -122,22 +125,24 @@ def unwrap(tree: PyTree) -> PyTree:
 # This class is derived from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
 class Parameterize(Unwrappable[T]):
-    """Unwrap an object by calling ``fn`` with ``args`` and ``kwargs``.
+    """Unwrap an object by calling `fn` with `args` and ``kwargs`.
 
-    All of ``fn``, ``*args`` and ``**kwargs`` may contain trainable parameters.
+    All of `fn`, `*args` and `**kwargs` may contain trainable parameters.
 
     Note:
         Unwrapping typically occurs after model initialization. Therefore, if
-        the :class:`Parameterize` object may be created in a vectorized
-        context, we recommend ensuring that ``fn`` still unwraps correctly,
+        the [`klax.Parameterize`][] object may be created in a vectorized
+        context, we recommend ensuring that `fn` still unwraps correctly,
         e.g. by supporting broadcasting.
 
     Example:
+        ```python
         >>> from klax import Parameterize, unwrap
         >>> import jax.numpy as jnp
         >>> positive = Parameterize(jnp.exp, jnp.zeros(3))
         >>> unwrap(positive)  # Applies exp on unwrapping
         Array([1., 1., 1.], dtype=float32)
+        ```
 
     Args:
         fn: Callable to call with args, and kwargs.
@@ -149,9 +154,7 @@ class Parameterize(Unwrappable[T]):
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
-    def __init__(
-        self, fn: Callable[..., T], *args, **kwargs
-    ):
+    def __init__(self, fn: Callable[..., T], *args, **kwargs):
         self.fn = fn
         self.args = tuple(args)
         self.kwargs = kwargs
@@ -164,19 +167,20 @@ class Parameterize(Unwrappable[T]):
 # This function is derived from paramax and has been substantially modified.
 # Original Copyright 2022 Daniel Ward
 def non_trainable(tree: PyTree) -> PyTree:
-    """Freezes parameters by wrapping inexact array or :class:`Constraint`
-    leaves with :class:`NonTrainable`.
+    """Freezes parameters by wrapping inexact array or [`klax.Constraint`][]
+    leaves with [`klax.NonTrainable`][].
 
     Note:
         Regularization is likely to apply before unwrapping. To avoid
         regularization impacting non-trainable parameters, they should be
         filtered out, for example using:
 
+        ```python
         >>> eqx.partition(
         ...     ...,
         ...     is_leaf=lambda leaf: isinstance(leaf, (NonTrainable, Constraint)),
         ... )
-
+        ```
 
     Wrapping the arrays in a model rather than the entire tree is often
     preferable, allowing easier access to attributes compared to wrapping the
@@ -205,7 +209,7 @@ def non_trainable(tree: PyTree) -> PyTree:
 class NonTrainable(Unwrappable[T]):
     """Applies stop gradient to all ArrayLike leaves before unwrapping.
 
-    See also :func:`non_trainable`, which is probably a generally preferable
+    See also [`klax.non_trainable`][], which is probably a generally preferable
     way to achieve similar behaviour, which wraps the ArrayLike leaves directly,
     rather than the tree. Useful to mark PyTrees (Arrays, Modules, etc.) as
     frozen/non-trainable. Note that the underlying parameters may still be
@@ -225,7 +229,7 @@ class SkewSymmetric(Unwrappable[Array]):
     """Ensures skew-symmetry of a square matrix upon unwrapping.
 
     Warning:
-        Wrapping ``SkewSymmetric`` around parameters that are
+        Wrapping `SkewSymmetric` around parameters that are
         already wrapped may lead to unexpected behavior and is
         generally discouraged.
     """
@@ -258,7 +262,7 @@ class Symmetric(Unwrappable[Array]):
     """Ensures symmetry of a square matrix upon unwrapping.
 
     Warning:
-        Wrapping ``Symmetric`` around parameters that are
+        Wrapping `Symmetric` around parameters that are
         already wrapped may lead to unexpected behavior and is
         generally discouraged.
     """
@@ -291,42 +295,42 @@ class Symmetric(Unwrappable[Array]):
 
 
 class Constraint(Unwrappable[Array], ABC):
-    """An abstract class derived from :class:`Unwrappable` to constrain JAX
+    """An abstract class derived from [`klax.Unwrappable`][] to constrain JAX
     arrays.
 
-    A :class:`Constraint` is an extended version of :class:`Unwrappable`, that
+    A [`klax.Constraint`][] is an extended version of [`klax.Unwrappable`][], that
     marks an array in a PyTree as constrained. It implements the known
-    ``unwrap`` method from :class:`Unwrappable` and adds the ``apply``
-    functionality for the implementation of constraints that are
+    `unwrap` method from [`klax.Unwrappable`][] and adds the `apply`
+    method for the implementation of constraints that are
     non-differentiable or could lead to vanishing gradient during optimization.
 
-    We intend the following usage of the ``unwrap`` and ``apply`` methods:
+    We intend the following usage of the `unwrap` and `apply` methods:
 
-    ``unwrap``: Identical functionality to an :class:`Unwrappable`.
+    `unwrap`: Identical functionality to an [`klax.Unwrappable`][].
         Use this for the implementation of constraints that are differentiable
         and shall be applied withing the training loop. E.g., our implementation
-        of :func:`fit` will unwrap the model as part of the loss function. Thus,
-        the implementation of ``unwrap`` contributes to the gradients during
+        of [`klax.fit`][] will unwrap the model as part of the loss function. Thus,
+        the implementation of `unwrap` contributes to the gradients during
         training. An example would be a positivity constraint, that passes
-        the array through :func:`jax.nn.softplus` upon unwrapping.
+        the array through `jax.nn.softplus` upon unwrapping.
 
-    ``apply``: New functionality added with :class:`Constraint`.
+    `apply`: New functionality added with [`klax.Constraint`][].
         Use this to implement non-differentiable or zero-gradient constraints
         that shall be applied `after` the parameter update and modify the
         wrapped array without unwrapping. Consequently, its suitable for the
         implementation of `non-differentiable` constraints, such as clamping
         a parameter to a range of admissible values. Apply functions should
-        return a modified copy of ``Self``.
+        return a modified copy of `Self`.
 
     Note:
-        Models containing :class:`Constraints<Constraint>` need to be
-        :func:`finalized<finalize>` before they are callable.
+        Models containing [Constraints][klax.Constraint] need to be
+        [finalized][klax.finalize] before they are callable.
 
     Warning:
-        :class:`Constraints<Constraint>` should not be nested, as this can lead
+        [Constraints][klax.Constraint] objects should not be nested, as this can lead
         to unexpected behavior or errors. To combine the effects of two
         constraints, implement a custom constraint and define the combined
-        effects via ``unwrap`` and ``apply``.
+        effects via `unwrap` and `apply`.
     """
 
     # If type checking is enabled, we define an empty constructor to avoid
@@ -334,29 +338,32 @@ class Constraint(Unwrappable[Array], ABC):
     # constructor is defined in the derived classes or provided by equinox
     # Module.
     if TYPE_CHECKING:
+
         def __init__(self, *args, **kwargs):
             pass
 
     @abstractmethod
     def apply(self) -> Self:
         """Returns a modified copy of self. Most likely you want to use
-        :func:`eqx.tree_at` for this purpose."""
+        [`equinox.tree_at`](https://docs.kidger.site/equinox/api/manipulation/#equinox.tree_at) for this purpose."""
         pass
 
 
 def apply(tree: PyTree):
-    """Map across a PyTree and apply all :class:`Constraints<Constraint>`.
+    """Map across a PyTree and apply all [Constraints][klax.Constraint].
 
     This leaves all other nodes unchanged.
 
     Example:
         Enforcing non-negativity.
 
+        ```python
         >>> import klax
         >>> import jax.numpy as jnp
         >>> params = klax.NonNegative(-1 * jnp.ones(3))
         >>> klax.apply(("abc", 1, params))
         ('abc', 1, Array([0., 0., 0.], dtype=float32))
+        ```
     """
 
     def _apply(tree, *, include_self: bool):
@@ -380,7 +387,7 @@ class NonNegative(Constraint):
     """Applies a non-negative constraint.
 
     Args:
-        parameter: The :class:`jax.Array` that is to be made non-negative upon
+        parameter: The `jax.Array` that is to be made non-negative upon
             unwrapping and applying.
     """
 
@@ -410,25 +417,27 @@ class NonNegative(Constraint):
 
 def finalize(tree: PyTree):
     """
-    Combines the functionality of :func:`apply` and :func:`unwrap`.
+    Combines the functionality of [`klax.apply`][] and [`klax.unwrap`][].
 
     Use this function to make a model containing
-    :class:`Constraints<Constraint>` callable.
+    [Constraints][klax.Constraint] callable.
 
     Warning:
-        For models/PyTrees containing :class:`Constraints<Constraint>`, only
-        ``finalize`` the model after the parameter update or after
-        training with :func:`fit`. This is because :func:`finalize` returns an
-        unwrapped PyTree where all constraints and wrappers have been applied.
-        However, this also means that the returned PyTree is no longer
-        constrained.
+        For models/PyTrees containing [Constraints][klax.Constraint], only
+        `finalize` the model after the parameter update or after
+        training with [`klax.fit`][]. This is because [`klax.finalize`][]
+        returns an unwrapped PyTree where all constraints and wrappers have
+        been applied. However, this also means that the returned PyTree is no
+        longer constrained.
 
         If you want to call a model that you want to fit afterwards, we
         recommend using a different name for the finalized model. For example::
 
-            finalized_model = klax.finalize(model)
-            y = finalzed_model(x)            # Call finalized model
-            model, history = fit(model, ...) # Continue training with constrained model
+        ```python
+        >>> finalized_model = klax.finalize(model)
+        >>> y = finalzed_model(x)            # Call finalized model
+        >>> model, history = fit(model, ...) # Continue training with constrained model
+        ```
     """
     return unwrap(apply(tree))
 
@@ -436,7 +445,7 @@ def finalize(tree: PyTree):
 # This function contains code derived from paramax.
 # Original Copyright 2022 Daniel Ward
 def _tree_contains(tree: PyTree, instance_type: type) -> bool:
-    """Check if a PyTree contains instances of ``instance_type``."""
+    """Check if a PyTree contains instances of `instance_type`."""
 
     def _is_unwrappable(leaf) -> bool:
         return isinstance(leaf, instance_type)
@@ -448,18 +457,21 @@ def _tree_contains(tree: PyTree, instance_type: type) -> bool:
 # This function is derived from paramax and has been significantly modified.
 # Original Copyright 2022 Daniel Ward
 def contains_unwrappables(tree: PyTree) -> bool:
-    """Check if a PyTree contains instances of :class:`Unwrappable`."""
+    """Check if a PyTree contains instances of [`klax.Unwrappable`][]."""
 
     return _tree_contains(tree, Unwrappable)
 
 
 def contains_constraints(tree: PyTree) -> bool:
-    """Check if a PyTree contains instances of :class:`Constraint`."""
+    """Check if a PyTree contains instances of [`klax.Constraint`][]."""
 
     return _tree_contains(tree, Constraint)
 
 
 class ContainsUnwrappables(RuntimeError):
-    """Should be raised when calling a PyTree that contains 
-    instances of :class:`Unwrappable`."""
+    """
+    Should be raised when calling a PyTree that contains instances of
+    [`klax.Unwrappable`][].
+    """
+
     pass

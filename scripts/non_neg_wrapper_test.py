@@ -26,20 +26,21 @@ import jax.random as jr
 from klax import fit, NonNegative, apply, finalize
 
 
-
 # %% Define a simple model
 class SimpleModel(eqx.Module):
     weight: jax.Array
 
     def __init__(self):
-        self.weight = NonNegative(jnp.array(-1.))
+        self.weight = NonNegative(jnp.array(-1.0))
 
     def __call__(self, x):
         return self.weight * x
-    
+
+
 # %% Generate data
 def fun(x):
-    return 2*x
+    return 2 * x
+
 
 x = jnp.linspace(-1, 1, 100)
 y = jax.vmap(fun)(x)
@@ -59,14 +60,7 @@ model = apply(model)
 
 print("Parameter after applying wrapper:", model.weight.parameter)
 
-model, hist = fit(
-    model,
-    (x, y),
-    steps=10000,
-    key = jr.key(0)
-)
+model, hist = fit(model, (x, y), steps=10000, key=jr.key(0))
 
 print("Final weight:", finalize(model).weight)
 print("Final parameter:", model.weight.parameter)
-
-
