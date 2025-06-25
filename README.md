@@ -1,22 +1,23 @@
-klax
-====
+<div align="center">
+<img src="docs/assets/logo.png" alt="logo" width="200">
+</div>
+
 A lightweight machine learning package for computational mechanics.
 -------------------------------------------------------------------
 
 ## Documentation
 
-To build the documentation `cd` into the `docs` directoy and run
+To preview the documentation run
 
 ```bash
-make html
+mkdocs serve
 ```
 
-Doctests can be executed by runnning
+To build it run
 
 ```bash
-make doctest
+mkdocs build
 ```
-
 
 ## Installation
 
