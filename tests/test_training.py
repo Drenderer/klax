@@ -12,17 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Self
+
 import equinox as eqx
-import klax
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
-from jaxtyping import Array
 import optax
 import pytest
-from typing import Self
+from jaxtyping import Array
 
-from klax import Unwrappable, Constraint
+import klax
+from klax import Constraint, Unwrappable
 
 
 def test_training(getkey):
@@ -60,7 +61,9 @@ def test_training(getkey):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     history = klax.HistoryCallback(log_every=100)
-    model, history = klax.fit(model, (x, x), steps=1000, history=history, key=getkey())
+    model, history = klax.fit(
+        model, (x, x), steps=1000, history=history, key=getkey()
+    )
     assert len(history.steps) == 11
     assert len(history.loss) == 11
     time_1 = history.training_time
@@ -104,7 +107,9 @@ def test_training(getkey):
     assert history.steps[-1] == 123
 
 
-@pytest.mark.parametrize("optimizer", [
+@pytest.mark.parametrize(
+    "optimizer",
+    [
         optax.adabelief(1.0),
         optax.adadelta(1.0),
         optax.adan(1.0),
@@ -133,7 +138,7 @@ def test_training(getkey):
         optax.sign_sgd(1.0),
         optax.sm3(1.0),
         optax.yogi(1.0),
-    ]
+    ],
 )
 def test_training_optax_optimizers(getkey, optimizer):
     # Test all optex optimizers
@@ -143,7 +148,6 @@ def test_training_optax_optimizers(getkey, optimizer):
 
 
 def test_apply_in_training(getkey):
-
     # Create dummy data
     x = jnp.linspace(0.0, 1.0, 20)
     y = -2 * x - 1
@@ -151,11 +155,11 @@ def test_apply_in_training(getkey):
     # Create dummy Constraint
     class AtLeast(Constraint):
         array: Array
-        minval: Array        
+        minval: Array
 
         def unwrap(self) -> Array:
             return self.array
-        
+
         def apply(self) -> Self:
             return eqx.tree_at(
                 lambda x: x.array,
@@ -169,12 +173,12 @@ def test_apply_in_training(getkey):
         bias: Unwrappable[Array]
 
         def __init__(self):
-            self.weight = AtLeast(jnp.array(0.), jnp.array(-1))
-            self.bias = AtLeast(jnp.array(-1.), jnp.array(0))
+            self.weight = AtLeast(jnp.array(0.0), jnp.array(-1))
+            self.bias = AtLeast(jnp.array(-1.0), jnp.array(0))
 
         def __call__(self, x):
             return self.weight * x + self.bias
-        
+
     # Create and train model
     model = Model()
     model, _ = klax.fit(model, (x, y), key=getkey())
@@ -182,6 +186,3 @@ def test_apply_in_training(getkey):
     model_ = klax.unwrap(model)  # Important to use unwrap here not finalize
     assert model_.weight >= -1
     assert model_.bias >= 0
-
-
-

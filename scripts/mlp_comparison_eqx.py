@@ -1,22 +1,17 @@
-"""
-Compare the klax.nn.MLP implementaiton with eqx.nn.MLP
-"""
+"""Compare the klax.nn.MLP implementaiton with eqx.nn.MLP."""
 
 # %% Imports
 
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from equinox.nn import MLP as EQXMLP
 from jax.nn.initializers import variance_scaling
-
-from equinox.nn import MLP as EqxMLP
-
-from klax.nn import MLP as KlaxMLP
-from klax import fit, finalize
-from klax import HistoryCallback
-
-from matplotlib import pyplot as plt
 from jaxtyping import Array
+from matplotlib import pyplot as plt
+
+from klax import HistoryCallback, finalize, fit
+from klax.nn import MLP as KLAXMLP
 
 
 # Callback for recording predictions during training
@@ -68,16 +63,20 @@ log_every_pred = 1000
 key1, key2, train_key = jax.random.split(key, 3)
 
 # Weight init from equinox
-eqx_w_init = variance_scaling(scale=1 / 3, mode="fan_in", distribution="uniform")
+eqx_w_init = variance_scaling(
+    scale=1 / 3, mode="fan_in", distribution="uniform"
+)
 
-klax_mlp = KlaxMLP(
+klax_mlp = KLAXMLP(
     in_size,
     out_size,
     depth * [width],
     activation=activation,
     key=key1,
 )
-eqx_mlp = EqxMLP(in_size, out_size, width, depth, activation=activation, key=key2)
+eqx_mlp = EQXMLP(
+    in_size, out_size, width, depth, activation=activation, key=key2
+)
 
 # Train the models
 klax_mlp, klax_hist = fit(

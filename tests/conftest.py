@@ -16,9 +16,8 @@ import typing
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
 import pytest
-
+from jaxtyping import Array
 
 typing.TESTING = True  # pyright: ignore
 
@@ -29,8 +28,8 @@ jax.config.update("jax_numpy_rank_promotion", "raise")
 
 @pytest.fixture
 def getkey():
-    # Delayed import so that jaxtyping can transform the AST of Equinox before it is
-    # imported, but conftest.py is ran before then.
+    # Delayed import so that jaxtyping can transform the AST of Equinox before
+    # it is imported, but conftest.py is ran before then.
     import equinox.internal as eqxi
 
     return eqxi.GetKey()
@@ -42,6 +41,7 @@ def getzerowrap():
 
     class ZeroWrapper(klax.Unwrappable[Array]):
         """A dummy wrapper that sets all parameters to zero."""
+
         parameter: Array
 
         def unwrap(self) -> Array:
@@ -49,14 +49,18 @@ def getzerowrap():
 
     return ZeroWrapper
 
+
 @pytest.fixture
 def getarraywrap():
-    import equinox as eqx
-    import klax
     from typing import Self
 
+    import equinox as eqx
+
+    import klax
+
     class Wrapper(klax.Constraint):
-        """A dummy wrapper that multiplies the parameter by 2 using the apply functionality."""
+        """A constraint that multiplies the parameter by 2 when applied."""
+
         parameter: Array
 
         def unwrap(self) -> Array:

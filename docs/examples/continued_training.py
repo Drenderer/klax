@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-# Continued trainig example
+"""# Continued trainig example
 This example demonstrates how to continue a training session.
 It shows how to initialize the optax initializer state with a previous training session's final state,
 and how to use the `HistoryCallback` to add the training history to the subsequent training sessions.
@@ -25,7 +24,6 @@ from matplotlib import pyplot as plt
 
 import klax
 from klax import HistoryCallback
-
 
 key = jr.key(0)
 data_key, model_key, train1_key, train2_key = jr.split(key, 4)
@@ -48,7 +46,9 @@ model, history = klax.fit(
     key=train1_key,
 )
 
-history.plot(ax=ax, loss_options=dict(label="Single session", ls="-", color="orange"))
+history.plot(
+    ax=ax, loss_options=dict(label="Single session", ls="-", color="orange")
+)
 
 # B: Training split into two sessions with 1000 steps each.
 #    The optimizer state of the second session is initialized
@@ -71,9 +71,9 @@ model, history = klax.fit(
     model,
     (x, y),
     steps=1000,
-    optimizer=optax.adabelief(1e-5),    # (!) Same optimizer as in first session
-    init_opt_state=last_opt_state,      # Initialize the optimizer state with the last state
-    history=history,                    # Continue the history
+    optimizer=optax.adabelief(1e-5),  # (!) Same optimizer as in first session
+    init_opt_state=last_opt_state,  # Initialize the optimizer state with the last state
+    history=history,  # Continue the history
     key=train2_key,
 )
 
@@ -100,9 +100,9 @@ model, history = klax.fit(
     model,
     (x, y),
     steps=1000,
-    optimizer=optax.adabelief(1e-5),    # (!) Same optimizer as in first session
-    init_opt_state=None,                # No optimizer state is provided, so the optimizer is again initialized from scratch
-    history=history,                    # Continue the history
+    optimizer=optax.adabelief(1e-5),  # (!) Same optimizer as in first session
+    init_opt_state=None,  # No optimizer state is provided, so the optimizer is again initialized from scratch
+    history=history,  # Continue the history
     key=train2_key,
 )
 
@@ -116,9 +116,9 @@ history.plot(
 
 ax.set(
     title="Comparison of training loss histories",
-    yscale="log", 
+    yscale="log",
     xlabel="Training steps",
-    ylabel="Loss"
+    ylabel="Loss",
 )
 ax.legend()
 plt.show()
