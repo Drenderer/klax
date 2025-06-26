@@ -15,12 +15,10 @@
 
 [data-md-color-scheme="default"] {
     --doc-heading-color: rgb(230, 230, 230);
-    /* --doc-heading-border-color: #CCC; */
     --doc-heading-color-alt: rgb(240, 240, 240);
 }
 [data-md-color-scheme="slate"] {
     --doc-heading-color: rgb(25,25,33);
-    /* --doc-heading-border-color: rgb(25,25,33); */
     --doc-heading-color-alt: rgb(33,33,44);
     --md-code-bg-color: rgb(38,38,50);
 }
@@ -29,12 +27,11 @@ h3.doc-heading {
     /* NOT var(--md-code-bg-color) as that's not visually distinct from other code blocks.*/
     background-color: var(--doc-heading-color);
     border: solid var(--doc-heading-border-color);
-    /* border-width: 1.5pt; */
-    /* border-radius: 2pt; */
+    border-radius: 2pt;
     padding: 0pt 0pt 0pt 2.5pt;
 }
 h4.doc-heading, h5.heading {
     background-color: var(--doc-heading-color-alt);
-    /* border-radius: 2pt; */
+    border-radius: 2pt;
     padding: 0pt 0pt 0pt 2.5pt;
 }

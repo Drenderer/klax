@@ -86,7 +86,7 @@ repo_url: https://github.com/Drenderer/klax
 repo_name: Drenderer/klax
 
 nav:
-  - Home: index.md
+  - Klax: index.md
   - Examples:
       - examples/isotropic_hyperelasticity.ipynb
   - API Reference: 

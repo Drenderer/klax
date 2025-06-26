@@ -2,8 +2,8 @@
 <img src="docs/assets/logo.png" alt="logo" width="200">
 </div>
 
-A lightweight machine learning package for computational mechanics.
--------------------------------------------------------------------
+A lightweight machine learning package for computational mechanics built on JAX.
+--------------------------------------------------------------------------------
 
 ## Documentation
 
