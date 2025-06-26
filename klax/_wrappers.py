@@ -39,14 +39,14 @@
 """``Unwrappables`` and ``Constraints`` modified and extended from paramax."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, override, Self, TypeVar, TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Self, TypeVar, override
 
 import equinox as eqx
 import jax
-from jax import lax
 import jax.numpy as jnp
+from jax import lax
 from jaxtyping import Array, PyTree
-
 
 T = TypeVar("T")
 

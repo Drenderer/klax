@@ -18,22 +18,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import cast, Literal
-
 from collections.abc import Sequence
+from typing import Literal, cast
 
 import equinox as eqx
-from jax.nn.initializers import Initializer, zeros
 import jax.numpy as jnp
 import jax.random as jrandom
+from jax.nn.initializers import Initializer, zeros
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
 from .._wrappers import (
     Constraint,
+    ContainsUnwrappables,
     Unwrappable,
     contains_unwrappables,
-    ContainsUnwrappables,
 )
 
 

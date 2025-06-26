@@ -13,7 +13,8 @@
 # limitations under the License.
 
 import typing
-from typing import Any, Protocol, Sequence
+from collections.abc import Sequence
+from typing import Any, Protocol
 
 import jax
 import jax.numpy as jnp

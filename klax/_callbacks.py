@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC
-from collections.abc import Callable
 import datetime
 import importlib
+import pickle
 import time
+from abc import ABC
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Self
 
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
-import pickle
-from pathlib import Path
 
 
 class CallbackArgs:

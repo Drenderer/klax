@@ -15,23 +15,24 @@
 from math import prod
 
 import equinox as eqx
+import jax
+import jax.numpy as jnp
+import jax.random as jr
+import pytest
+
 from klax import (
+    NonNegative,
+    NonTrainable,
+    Parameterize,
+    SkewSymmetric,
+    Symmetric,
     apply,
     contains_constraints,
     contains_unwrappables,
-    NonNegative,
-    NonTrainable,
-    non_trainable,
-    Parameterize,
-    Symmetric,
-    SkewSymmetric,
-    unwrap,
     finalize,
+    non_trainable,
+    unwrap,
 )
-import jax
-import jax.random as jr
-import jax.numpy as jnp
-import pytest
 
 
 def test_nested_unwrap():

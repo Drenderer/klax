@@ -17,15 +17,16 @@ This module implements methods for handling data, such as batching and splitting
 """
 
 import typing
-from typing import Any, Generator, Protocol, Sequence
 import warnings
+from collections.abc import Generator, Sequence
+from typing import Any, Protocol
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jaxtyping import PRNGKeyArray, PyTree
 import numpy as np
+from jaxtyping import PRNGKeyArray, PyTree
 
 
 def broadcast_and_get_batch_size(

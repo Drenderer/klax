@@ -16,9 +16,8 @@ import typing
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
 import pytest
-
+from jaxtyping import Array
 
 typing.TESTING = True  # pyright: ignore
 
@@ -53,9 +52,11 @@ def getzerowrap():
 
 @pytest.fixture
 def getarraywrap():
-    import equinox as eqx
-    import klax
     from typing import Self
+
+    import equinox as eqx
+
+    import klax
 
     class Wrapper(klax.Constraint):
         """A dummy wrapper that multiplies the parameter by 2 using the apply functionality."""

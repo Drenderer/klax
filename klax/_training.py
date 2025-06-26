@@ -16,12 +16,13 @@
 This module implements a basic training loop.
 """
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import equinox as eqx
 import jax
-from jaxtyping import PRNGKeyArray, PyTree
 import optax
+from jaxtyping import PRNGKeyArray, PyTree
 
 from ._callbacks import (
     Callback,
@@ -29,12 +30,12 @@ from ._callbacks import (
     HistoryCallback,
 )
 from ._datahandler import (
-    batch_data,
     BatchGenerator,
+    batch_data,
     broadcast_and_get_batch_size,
 )
 from ._losses import Loss, mse
-from ._wrappers import unwrap, apply
+from ._wrappers import apply, unwrap
 
 
 def fit[T: eqx.Module, H: Callback](

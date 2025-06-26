@@ -15,11 +15,12 @@
 import sys
 import time
 
-import klax
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import pytest
+
+import klax
 
 
 def test_callbackargs(getkey, getmodel, getloss):

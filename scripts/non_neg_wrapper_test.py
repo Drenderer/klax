@@ -23,7 +23,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 
-from klax import fit, NonNegative, apply, finalize
+from klax import NonNegative, apply, finalize, fit
 
 
 # %% Define a simple model

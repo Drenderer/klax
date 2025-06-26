@@ -17,17 +17,17 @@ Implementation of convex neural networks.
 """
 
 from collections.abc import Callable, Sequence
-from typing import cast, Literal
+from typing import Literal, cast
 
 import equinox as eqx
 import jax
-from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jrandom
+from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
 from .._wrappers import NonNegative
-from ._linear import Linear, InputSplitLinear
+from ._linear import InputSplitLinear, Linear
 
 
 class FICNN(eqx.Module, strict=True):

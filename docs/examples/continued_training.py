@@ -26,7 +26,6 @@ from matplotlib import pyplot as plt
 import klax
 from klax import HistoryCallback
 
-
 key = jr.key(0)
 data_key, model_key, train1_key, train2_key = jr.split(key, 4)
 

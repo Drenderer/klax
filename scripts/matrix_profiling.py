@@ -3,16 +3,16 @@ Comparison of SPDMatrix to an alternative implementation
 """
 
 # %% Imports
+import timeit
+from collections.abc import Callable, Sequence
+from typing import Any, Literal
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 from jax.nn.initializers import Initializer, he_normal, zeros
-
-from typing import Literal, Sequence, Any, Callable
-from jaxtyping import PRNGKeyArray, Array
-
-import timeit
+from jaxtyping import Array, PRNGKeyArray
 
 from klax.nn import MLP
 

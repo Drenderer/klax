@@ -12,17 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Self
+
 import equinox as eqx
-import klax
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
-from jaxtyping import Array
 import optax
 import pytest
-from typing import Self
+from jaxtyping import Array
 
-from klax import Unwrappable, Constraint
+import klax
+from klax import Constraint, Unwrappable
 
 
 def test_training(getkey):

@@ -17,21 +17,22 @@ Implementation on (constrained) matrix-valued functions:
 A: R^n |-> R^(..., N, M)
 """
 
+from collections.abc import Callable, Sequence
+from typing import Any, Literal, cast
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, he_normal, zeros, variance_scaling
+from jax.nn.initializers import Initializer, he_normal, variance_scaling, zeros
+from jaxtyping import Array, PRNGKeyArray
 
-from typing import Literal, Sequence, Any, Callable, cast
-from jaxtyping import PRNGKeyArray, Array
-
-from . import MLP
 from .._misc import default_floating_dtype
 from .._wrappers import (
+    ContainsUnwrappables,
     SkewSymmetric,
     contains_unwrappables,
-    ContainsUnwrappables,
 )
+from . import MLP
 
 type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
 

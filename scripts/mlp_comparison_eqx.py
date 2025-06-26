@@ -7,16 +7,13 @@ Compare the klax.nn.MLP implementaiton with eqx.nn.MLP
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jax.nn.initializers import variance_scaling
-
 from equinox.nn import MLP as EqxMLP
-
-from klax.nn import MLP as KlaxMLP
-from klax import fit, finalize
-from klax import HistoryCallback
-
-from matplotlib import pyplot as plt
+from jax.nn.initializers import variance_scaling
 from jaxtyping import Array
+from matplotlib import pyplot as plt
+
+from klax import HistoryCallback, finalize, fit
+from klax.nn import MLP as KlaxMLP
 
 
 # Callback for recording predictions during training

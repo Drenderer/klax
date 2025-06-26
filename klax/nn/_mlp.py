@@ -18,18 +18,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Callable
-from typing import Literal, Sequence
+from collections.abc import Callable, Sequence
+from typing import Literal
 
 import equinox as eqx
 import jax
-from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jrandom
+from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from ._linear import Linear
 from .._wrappers import Constraint, Unwrappable
+from ._linear import Linear
 
 
 class MLP(eqx.Module, strict=True):

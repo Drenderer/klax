@@ -63,3 +63,22 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 79
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+
+[tool.ruff.lint]
+# See https://docs.astral.sh/ruff/rules/ for the meaning of all rules.
+extend-select = [
+    # pydocstyle
+    #"D",
+    # pycodestyle
+    "E",
+    # isort
+    "I",
+    # pep8-naming
+    "N",
+    # pyupgrade
+    "UP",
+]

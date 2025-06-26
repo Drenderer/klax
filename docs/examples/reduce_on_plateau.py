@@ -19,19 +19,16 @@ reduce the learning rate when the training loss plateaus. A custom callback is u
 track the learning rate scale during training.
 """
 
+import equinox as eqx
 import jax
 import jax.random as jr
-import equinox as eqx
-
 import optax
-from optax import tree_utils as otu
-from optax import contrib
-
 from matplotlib import pyplot as plt
+from optax import contrib
+from optax import tree_utils as otu
 
 import klax
 from klax import HistoryCallback
-
 
 key = jr.key(0)
 

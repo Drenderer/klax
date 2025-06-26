@@ -4,29 +4,25 @@ Testing the computational performance of FICNN and comparing it to alternative i
 
 # %% Imports
 
+import timeit
 from collections.abc import Callable, Sequence
 from typing import (
     Literal,
     Self,
 )
 
-import timeit
-
-from matplotlib import pyplot as plt
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jr
+from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
+from matplotlib import pyplot as plt
 
 import klax
+from klax import Constraint, HistoryCallback, NonNegative, fit
 from klax._misc import default_floating_dtype
 from klax.nn import FICNN, MLP, Linear
-from klax import fit
-from klax import HistoryCallback
-from klax import Constraint, NonNegative
 
 
 # %% Custom code for timeing code

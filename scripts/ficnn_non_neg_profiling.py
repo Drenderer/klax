@@ -7,26 +7,24 @@ multiple different implementations of a non-negative constraint.
 from collections.abc import Callable, Sequence
 from typing import Literal, cast
 
-from matplotlib import pyplot as plt
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jr
-from jaxtyping import Array, PRNGKeyArray
 import optax
+from jax.nn.initializers import Initializer, he_normal, zeros
+from jaxtyping import Array, PRNGKeyArray
+from matplotlib import pyplot as plt
 
-from klax._misc import default_floating_dtype
-from klax.nn import Linear, InputSplitLinear
 from klax import (
-    fit,
-    Unwrappable,
     NonNegative,
+    Unwrappable,
     finalize,
+    fit,
     split_data,
 )
-
+from klax._misc import default_floating_dtype
+from klax.nn import InputSplitLinear, Linear
 
 # %% FICNN implementation where the wrapper can be chosen
 

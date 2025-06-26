@@ -12,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import klax
-from klax.nn import Linear, InputSplitLinear, MLP, FICNN
-from jax.nn.initializers import uniform, he_normal
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import pytest
+from jax.nn.initializers import he_normal, uniform
 
+import klax
 from klax.nn import (
-    Matrix,
+    FICNN,
+    MLP,
     ConstantMatrix,
-    SkewSymmetricMatrix,
     ConstantSkewSymmetricMatrix,
-    SPDMatrix,
     ConstantSPDMatrix,
+    InputSplitLinear,
+    Linear,
+    Matrix,
+    SkewSymmetricMatrix,
+    SPDMatrix,
 )
 
 
