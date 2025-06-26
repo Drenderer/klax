@@ -256,8 +256,8 @@ class SkewSymmetricMatrix(eqx.Module):
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
-                "The last two dimensions in shape must be equal for " \
-                    "skew-symmetric matrices."
+                "The last two dimensions in shape must be equal for "
+                "skew-symmetric matrices."
             )
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -425,8 +425,8 @@ class SPDMatrix(eqx.Module):
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
-                "The last two dimensions in shape must be equal for " \
-                    "symmetric matrices."
+                "The last two dimensions in shape must be equal for "
+                "symmetric matrices."
             )
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -509,7 +509,7 @@ class ConstantSPDMatrix(eqx.Module):
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
-                "The last two dimensions in shape must be equal for " \
+                "The last two dimensions in shape must be equal for "
                 "symmetric matrices."
             )
 

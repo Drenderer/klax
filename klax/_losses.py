@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import typing
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Any, Protocol
 
@@ -23,67 +24,60 @@ from jaxtyping import PyTree, Scalar
 
 @typing.runtime_checkable
 class Loss(Protocol):
-    """A callable loss object."""
+    """An abstract callable loss object.
 
+    It can be used to build custom losses that can be passed to [`klax.fit`][].
+
+    Example:
+        A simple custom loss that computes the mean squared error between
+        the predicted values `y_pred` and true values `y` for in inputs `x` may
+        be implemented as follows:
+
+        ```python
+        >>> def mse(model, data, batch_axis=0):
+        ...    x, y = data
+        ...    if isinstance(batch_axis, tuple):
+        ...        in_axes = batch_axis[0]
+        ...    else:
+        ...        in_axes = batch_axis
+        ...    y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
+        ...    return jnp.mean(jnp.square(y_pred - y))
+        ```
+
+        Note that, since we a aim to provide a maximum of flexibility the users
+        have to take care of applying `jax.vmap` to the model themselves.
+
+    """
+
+    @abstractmethod
     def __call__(
         self,
         model: PyTree,
         data: PyTree,
         batch_axis: int | None | Sequence[Any],
     ) -> Scalar:
-        raise NotImplementedError
+        """Abstract method to compute the loss for a given model and data.
 
+        Args:
+            model: The model parameters or structure to evaluate the loss.
+            data: The input data or structure used for loss computation.
+            batch_axis: Specifies the axis or axes corresponding to the batch
+                dimension in the data. Can be an integer, None, or a sequence
+                of values.
 
-# def make_batched_xy_loss(loss_core: Callable[[Array, Array], Scalar]) -> Loss:
-#    """Returns an object of type ``Loss`` for paired data of the form (x, y).
-#
-#    The retured function, first applies ``jax.vmap`` to the passed model. Then
-#    `x` is passed to the mapped model to optain `y_pred`. Lastly `y_pred` and
-#    `y` are passed to the ``loss_core`` function to compute the final loss.
-#
-#    Example:
-#        The function may be used as a decorator in the following way:
-#
-#        >>> import jax.numpy as jnp
-#        >>> from klax.losses import make_batched_xy_loss
-#        >>>
-#        >>> def model(x):
-#        ...     return 2 * x
-#        ...
-#        >>> @make_batched_xy_loss
-#        ... def loss(y_pred, y):
-#        ...     return jnp.mean((y_pred - y)**2)
-#        ...
-#        >>> x = jnp.array([1., 1.])
-#        >>> y = jnp.array([2., 2.])
-#        >>> loss(model, (x, y))
-#        Array(0., dtype=float32)
-#
-#    Args:
-#        loss_core: The loss function taking the predicted output the ground
-#            truth as two separate inputs.
-#
-#    Returns:
-#        A callable ``Loss`` object that applies ``jax.vmap`` to a model and
-#        computed the loss value using the ``loss_core`` function.
-#    """
-#
-#    def loss(
-#        model: PyTree, data: PyTree, batch_axis: int | None | Sequence[Any] = 0
-#    ) -> Scalar:
-#        x, y = data
-#        if isinstance(batch_axis, tuple):
-#            in_axes = batch_axis[0]
-#        else:
-#            in_axes = batch_axis
-#        y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
-#        return loss_core(y_pred, y)
-#
-#    return loss
+        Returns:
+            Scalar: The computed loss value.
+
+        """
+        ...
 
 
 class MSE(Loss):
-    """Mean squared error for data of shape (x, y)."""
+    """Mean squared error for a tuple of data `(x, y)`.
+
+    The inputs `x` and the outputs `y` are expected to have the same batch axis
+    and equal length along that axis.
+    """
 
     def __call__(
         self,
@@ -104,7 +98,11 @@ mse = MSE()
 
 
 class MAE(Loss):
-    """Mean absolute error for data of shape (x, y)."""
+    """Mean absolute error for a tuple of data `(x, y)`.
+
+    The inputs `x` and the outputs `y` are expected to have the same batch axis
+    and equal length along that axis.
+    """
 
     def __call__(
         self,

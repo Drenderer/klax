@@ -14,7 +14,6 @@ title: Loss functions
         members:
             - __call__
 
----
 
 ::: klax.mse
 
@@ -25,6 +24,5 @@ title: Loss functions
         members:
             - __call__
 
----
 
 ::: klax.mae

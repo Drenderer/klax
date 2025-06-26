@@ -1,5 +1,4 @@
-"""Testing the computational performance of FICNN and comparing it to alternative implementations.
-"""
+"""Testing the computational performance of FICNN and comparing it to alternative implementations."""
 
 # %% Imports
 
