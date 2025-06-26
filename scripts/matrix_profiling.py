@@ -1,6 +1,4 @@
-"""
-Comparison of SPDMatrix to an alternative implementation
-"""
+"""Comparison of SPDMatrix to an alternative implementation."""
 
 # %% Imports
 import timeit
@@ -189,7 +187,8 @@ class AlternativeSPDMatrix(eqx.Module):
 class OriginalSkewSymmetricMatrix(eqx.Module):
     """*Skew-symmetric matrix-valued function.*
     Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a skew-symmetric matrix."""
+    are transformed to a skew-symmetric matrix.
+    """
 
     func: MLP
     shape: tuple[int] = eqx.field(static=True)
@@ -210,8 +209,7 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
-        Args:
+        """Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
             shape: The matrix shape. The output from the module will be a
@@ -242,6 +240,7 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
         Note:
             Note that `in_size` also supports the string `"scalar"` as a special
             value. In this case the input to the module should be of shape `()`.
+
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
@@ -293,7 +292,8 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
 class AlternativeSkewSymmetricMatrix(eqx.Module):
     """*Skew-symmetric matrix-valued function.*
     Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a skew-symmetric matrix."""
+    are transformed to a skew-symmetric matrix.
+    """
 
     func: MLP
     shape: tuple[int] = eqx.field(static=True)
@@ -313,8 +313,7 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
-        Args:
+        """Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
             shape: The matrix shape. The output from the module will be a
@@ -345,6 +344,7 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
         Note:
             Note that `in_size` also supports the string `"scalar"` as a special
             value. In this case the input to the module should be of shape `()`.
+
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape

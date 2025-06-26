@@ -35,10 +35,10 @@ from ._linear import Linear
 class MLP(eqx.Module, strict=True):
     """Standard Multi-Layer Perceptron; also known as a feed-forward network.
 
-
     This class is modified form [`equinox.nn.MLP`](https://docs.kidger.site/equinox/api/nn/mlp/#equinox.nn.MLP)
     to allow for custom initialization and different node numbers in the hidden
     layers. Hence, it may also be used for ecoder/decoder tasks.
+
     """
 
     layers: tuple[Linear, ...]
@@ -67,17 +67,18 @@ class MLP(eqx.Module, strict=True):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize MLP.
+
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_features,)`.
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                Defaults to he_normal().
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                Defaults to zeros.
+            weight_init: The weight initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to he_normal().)
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to zeros.)
             activation: The activation function after each hidden layer.
                 (Defaults to `jax.nn.softplus`).
             final_activation: The activation function after the output layer.
@@ -91,15 +92,17 @@ class MLP(eqx.Module, strict=True):
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
-            value. In this case the input to the module should be of shape `()`.
+            Note that `in_size` also supports the string `"scalar"` as a
+            special value. In this case the input to the module should be of
+            shape `()`.
 
             Likewise `out_size` can also be a string `"scalar"`, in which case
             the output from the module will have shape `()`.
+
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
@@ -131,8 +134,8 @@ class MLP(eqx.Module, strict=True):
             )
         )
 
-        # In case `activation` or `final_activation` are learnt, then make a separate
-        # copy of their weights for every neuron.
+        # In case `activation` or `final_activation` are learnt, then make a
+        # separate copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
             activations.append(
@@ -147,7 +150,8 @@ class MLP(eqx.Module, strict=True):
             )()
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """
+        """Forward pass through MLP.
+
         Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
                 `in_size="scalar"`.)
@@ -157,6 +161,7 @@ class MLP(eqx.Module, strict=True):
         Returns:
             A JAX array with shape `(out_size,)`. (Or shape `()` if
             `out_size="scalar"`.)
+
         """
         for i, (layer, activation) in enumerate(
             zip(self.layers[:-1], self.activations)

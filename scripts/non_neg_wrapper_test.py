@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Testing if the non-negative wrapper can recover from a negative initial value.
+"""Tests if the non-negative wrapper can recover from a negative initial value.
+
 I.e., if the gradients vanish when the weights are negative or zero.
 """
 

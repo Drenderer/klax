@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-# Reduce on plateau example
+"""# Reduce on plateau example
 This example demonstrates how to use the `reduce_on_plateau` function from `optax` to
 reduce the learning rate when the training loss plateaus. A custom callback is used to
 track the learning rate scale during training.

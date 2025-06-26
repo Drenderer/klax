@@ -252,8 +252,8 @@ def test_ficnn(getkey, use_passthrough, non_decreasing):
     if non_decreasing:
         grad_fun = jax.vmap(jax.grad(ficnn))
         assert jnp.all(grad_fun(x) >= 0)
-    # Assert convexity:
-    # Check that the Hessian is positive definite but allow for small numerical errors
+    # Assert convexity: Check that the Hessian is positive definite but allow
+    # for small numerical errors
     hessian_fun = jax.vmap(jax.hessian(ficnn))
     assert jnp.all(jnp.linalg.eigvals(hessian_fun(x)) > -1e-6)
 

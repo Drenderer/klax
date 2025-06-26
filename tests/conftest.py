@@ -28,8 +28,8 @@ jax.config.update("jax_numpy_rank_promotion", "raise")
 
 @pytest.fixture
 def getkey():
-    # Delayed import so that jaxtyping can transform the AST of Equinox before it is
-    # imported, but conftest.py is ran before then.
+    # Delayed import so that jaxtyping can transform the AST of Equinox before
+    # it is imported, but conftest.py is ran before then.
     import equinox.internal as eqxi
 
     return eqxi.GetKey()
@@ -59,7 +59,7 @@ def getarraywrap():
     import klax
 
     class Wrapper(klax.Constraint):
-        """A dummy wrapper that multiplies the parameter by 2 using the apply functionality."""
+        """A constraint that multiplies the parameter by 2 when applied."""
 
         parameter: Array
 

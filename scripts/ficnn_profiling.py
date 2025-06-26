@@ -1,5 +1,4 @@
-"""
-Testing the computational performance of FICNN and comparing it to alternative implementations.
+"""Testing the computational performance of FICNN and comparing it to alternative implementations.
 """
 
 # %% Imports
@@ -185,8 +184,7 @@ class HalfConstrainedFICNN(eqx.Module):
             )()
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """
-        Args:
+        """Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
                 `in_size="scalar"`.)
             key: Ignored; provided for compatibility with the rest of the
@@ -195,8 +193,8 @@ class HalfConstrainedFICNN(eqx.Module):
         Returns:
             A JAX array with shape `(out_size,)`. (Or shape `()` if
             `out_size="scalar"`.)
-        """
 
+        """
         y = self.layers[0](x)
 
         for i, (layer, activation) in enumerate(

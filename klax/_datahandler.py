@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module implements methods for handling data, such as batching and splitting.
-"""
+"""Implements methods for handling data, such as batching and splitting."""
 
 import typing
 import warnings
@@ -32,14 +30,16 @@ from jaxtyping import PRNGKeyArray, PyTree
 def broadcast_and_get_batch_size(
     data: PyTree[Any], batch_axis: PyTree[int | None]
 ) -> tuple[PyTree[int | None], int]:
-    """Given a `batch_axis` prefix of data, broadcast `batch_axis` to
-    the same structure as `data` and compute the batch size.
+    """Broadcast `batch_axis` to the same structure as `data` and get size.
+
+    `batch_axis` prefix of need to be a prefix of the `data` PyTree.
 
     Args:
         data: PyTree of data.
-        batch_axis: PyTree of the batch axis indices. `None` is used to indicate
-            that the corresponding leaf or subtree in data does not have a batch axis.
-            `batch_axis` must have the same structure as `data` or have `data` as a prefix.
+        batch_axis: PyTree of the batch axis indices. `None` is used to
+            indicate that the corresponding leaf or subtree in data does not
+            have a batch axis. `batch_axis` must have the same structure as
+            `data` or have `data` as a prefix.
 
     Raises:
         ValueError: If `batch_axis` is not a prefix of `data`.
@@ -48,8 +48,8 @@ def broadcast_and_get_batch_size(
 
     Returns:
         Tuple of the broadcasted `batch_axis` and the `batch_size`.
-    """
 
+    """
     try:
         batch_axis = jax.tree.map(
             lambda a, d: jax.tree.map(eqx.if_array(a), d),
@@ -96,8 +96,7 @@ def batch_data(
     *,
     key: PRNGKeyArray,
 ) -> Generator[PyTree[Any], None, None]:
-    """Returns a `Generator` that yields randomly chosen subsets of data
-    without replacement.
+    """Create a `Generator` that draws subsets of data without replacement.
 
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
     passed, leaves without batch dimension can be specified.
@@ -128,22 +127,24 @@ def batch_data(
         data: The data that shall be batched. It can be any `PyTree` with
             `ArrayLike` leaves.
         batch_size: The number of examples in a batch.
-        batch_mask: The `PyTree` denoting, which leaves of `data` have batch
-            dimension. `batch_mask` must have the same structure as `data`,
-            where the leaves are replaced with values of type `bool`. `True`
-            indicates that the corresponding leaf in `data` has batch dimension.
-            If `False`, the corresponding leaf will be returned unchanged by the
-            `Generator`. (Defaults to `None`, meaning all leaves in `data` have
-            batch dimension.)
-        key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
-            (Keyword only argument.)
+        batch_axis: The `PyTree` denoting the batch axis of every leaf.
+            `batch_axis` must have the same structure as `data`,
+            where the leaves are replaced with values of type `int`
+            corresponding to the axis along which the batches for the leaf
+            shall be created. `True`
+            indicates that the corresponding leaf in `data` has batch
+            dimension. (Defaults to 0, meaning all leaves in `data` are
+            batched along their first dimension.)
+        key: A `jax.random.PRNGKey` used to provide randomness for batch
+            generation. (Keyword only argument.)
 
     Note:
         Note that the batch axis for all batched leaves must correspond to the
         first array axis.
 
     Returns:
-        A `Generator` that yields a random batch of data every time is is called.
+        A `Generator` that yields a random batch of data every time is is
+        called.
 
     Yields:
         A `PyTree[ArrayLike]` with the same structure as `data`. Where all
@@ -152,13 +153,13 @@ def batch_data(
     Note:
         Note that if the size of the dataset is smaller than `batch_size`, the
         obtained batches will have dataset size.
-    """
 
+    """
     batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
 
-    # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so for
-    # fast model training steps this actually makes a huge difference! However,
-    # be aware that this is likely only true if JAX runs on CPU.
+    # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
+    # for fast model training steps this actually makes a huge difference!
+    # However, ware that this is likely only true if JAX runs on CPU.
     data = jax.tree.map(
         lambda x, a: x if a is None else np.array(x),
         data,
@@ -193,13 +194,15 @@ def split_data(
     *,
     key: PRNGKeyArray,
 ) -> tuple[PyTree[Any], ...]:
-    """Partitions a data `PyTree` along a batch axis into multiple randomly drawn subsets
-    with provided proportions. Useful for splitting data into training and test sets.
+    """Split a `PyTree` of data into multiply randomly drawn subsets.
+
+    This function is useful for splitting into training and test datasets. The
+    axis of the split if controlled by the `batch_axis` argument, which
+    specifies the batch axis for each leaf in `data`.
 
     Example:
-        This is an example for a nested `PyTree` of data, where the elements x and y
-        have batch dimension along different axes.
-
+        This is an example for a nested PyTree` of data, where the elements x
+        and y have batch dimension along different axes.
 
         ```python
         >>> import klax
@@ -219,19 +222,22 @@ def split_data(
         ```
 
     Args:
-        data: Data that shall be split. It can be any `PyTree` at least one `ArrayLike` leaf.
-        proportions: Proportions of the split that will be applied to the data, e.g.,
-        `(80, 20)` for a 80% to 20% split. The proportions must be non-negative.
-        batch_axis: PyTree of the batch axis indices. `None` is used to indicate
-            that the corresponding leaf or subtree in data does not have a batch axis.
-            `batch_axis` must have the same structure as `data` or have `data` as a prefix.
-            (Defaults to 0)
+        data: Data that shall be split. It can be any `PyTree` at least one
+            `ArrayLike` leaf.
+        proportions: Proportions of the split that will be applied to the data,
+            e.g., `(80, 20)` for a 80% to 20% split. The proportions must be
+            non-negative.
+        batch_axis: PyTree of the batch axis indices. `None` is used to
+            indicate that the corresponding leaf or subtree in data does not
+            have a batch axis. `batch_axis` must have the same structure as
+            `data` or have `data` as a prefix. (Defaults to 0)
         key: A `jax.random.PRNGKey` used to provide randomness to the split.
             (Keyword only argument.)
+
     Returns:
         Tuple of `PyTrees`.
-    """
 
+    """
     props = jnp.array(proportions, dtype=float)
     if props.ndim != 1:
         raise ValueError("Proportions must be a 1D Sequence.")

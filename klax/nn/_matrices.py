@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Implementation on (constrained) matrix-valued functions:
-A: R^n |-> R^(..., N, M)
+"""Implementations of (constrained) matrix-valued functions.
+
+The functions have the form:
+    A: R^n |-> R^(..., N, M)
 """
 
 from collections.abc import Callable, Sequence
@@ -28,18 +29,17 @@ from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
 from .._wrappers import (
-    ContainsUnwrappables,
+    ContainsUnwrappablesError,
     SkewSymmetric,
     contains_unwrappables,
 )
-from . import MLP
+from ._mlp import MLP
 
 type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
 
 
 class Matrix(eqx.Module):
-    """
-    An unconstrained matrix-valued function based on an MLP.
+    """An unconstrained matrix-valued function based on an MLP.
 
     The MLP maps to a vector of elements which is transformed into a matrix.
     """
@@ -62,20 +62,21 @@ class Matrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize the `Matrix`.
+
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a
-                Array with the specified `shape`. For square matrices a single
+            shape: The matrix shape. The output from the module will be a Array
+                with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[k,]`, where `k=max(8, in_size`).)
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `he_normal()`)
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `zeros`)
+            width_sizes: The sizes of each hidden layer of the underlying MLP
+                in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
+            weight_init: The weight initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to ReLU).
             final_activation: The activation function after the output layer.
@@ -87,12 +88,14 @@ class Matrix(eqx.Module):
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
-            value. In this case the input to the module should be of shape `()`.
+            Note that `in_size` also supports the string `"scalar"` as a
+            special value. In this case the input to the module should be of
+            shape `()`.
+
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
@@ -118,13 +121,15 @@ class Matrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        """
+        """Forward pass through `Matrix`.
+
         Args:
             x: The input. Should be a JAX array of shape ``(in_size,)``. (Or
                 shape ``()`` if ``in_size="scalar"``.)
 
         Returns:
             A JAX array of shape ``shape``.
+
         """
         return self.mlp(x).reshape(self.shape)
 
@@ -149,31 +154,36 @@ class ConstantMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize the `ConstantMatrix`.
+
         Args:
-            shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
+            shape: The matrix shape. The output from the module will be a Array
+                with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-            init: The array initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
+            init: The array initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to
+                `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
+
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         self.shape = shape if isinstance(shape, tuple) else (shape, shape)
         self.array = init(key, self.shape, dtype)
 
     def __call__(self, x: Array) -> Array:
-        """
+        """Forward pass through `ConstantMatrix`.
+
         Args:
             x: Ignored; provided for compatibility with the rest of the
                 Matrix-valued function API.
 
         Returns:
             A JAX array of shape ``shape``.
+
         """
         return self.array
 
@@ -203,20 +213,21 @@ class SkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize the `SkewSymmetricMatrix`.
+
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
+            shape: The matrix shape. The output from the module will be a Array
+                with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[k,]`, where `k=max(8, in_size`).)
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `he_normal()`)
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `zeros`)
+            width_sizes: The sizes of each hidden layer of the underlying MLP
+                in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
+            weight_init: The weight initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to `softplus`).
             final_activation: The activation function after the output layer.
@@ -228,12 +239,14 @@ class SkewSymmetricMatrix(eqx.Module):
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
-            value. In this case the input to the module should be of shape `()`.
+            Note that `in_size` also supports the string `"scalar"` as a
+            special value. In this case the input to the module should be of
+            shape `()`.
+
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
@@ -243,7 +256,8 @@ class SkewSymmetricMatrix(eqx.Module):
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
-                "The last two dimensions in shape must be equal for skew-symmetric matrices."
+                "The last two dimensions in shape must be equal for " \
+                    "skew-symmetric matrices."
             )
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -263,16 +277,18 @@ class SkewSymmetricMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        """
+        """Forward pass through `SkewSymmetricMatrix`.
+
         Args:
             x: The input. Should be a JAX array of shape ``(in_size,)``. (Or
                 shape ``()`` if ``in_size="scalar"``.)
 
         Returns:
             A JAX array of shape ``shape``.
+
         """
-        A = self.mlp(x).reshape(self.shape)
-        return A - A.mT
+        matrix = self.mlp(x).reshape(self.shape)
+        return matrix - matrix.mT
 
 
 class ConstantSkewSymmetricMatrix(eqx.Module):
@@ -295,20 +311,21 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
-        Initializes the object
+        """Initialize the `ConstantSkewSymmetricMatrix`.
 
         Args:
-            shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
+            shape: The matrix shape. The output from the module will be a Array
+                with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-            init: The array initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
+            init: The array initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to
+                `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
+
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         self.shape = shape if isinstance(shape, tuple) else (shape, shape)
@@ -316,16 +333,18 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         self.array = SkewSymmetric(array)
 
     def __call__(self, x: Array) -> Array:
-        """
+        """Forward pass through `ConstantSkewSymmetricMatrix`.
+
         Args:
             x: Ignored; provided for compatibility with the rest of the
                 Matrix-valued function API.
 
         Returns:
             A JAX array of shape ``shape``.
+
         """
         if contains_unwrappables(self):
-            raise ContainsUnwrappables(
+            raise ContainsUnwrappablesError(
                 "Model must be finalized before calling, see `klax.finalize`."
             )
         array = cast(Array, self.array)
@@ -359,24 +378,25 @@ class SPDMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize the `SPDMatrix`.
+
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
+            shape: The matrix shape. The output from the module will be a Array
+                with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
-                (Defaults to `[k,]`, where `k=max(8, in_size`).)
-            epsilon: Small value that is added to the diagonal of the output matrix
-                to ensure positive definiteness. If only positive semi-definiteness is
-                required set `epsilon = 0.`
+            width_sizes: The sizes of each hidden layer of the underlying MLP
+                in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
+            epsilon: Small value that is added to the diagonal of the output
+                matrix to ensure positive definiteness. If only positive
+                semi-definiteness is required set `epsilon = 0.`
                 (Defaults to `1e-6`)
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `he_normal()`)
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `zeros`)
+            weight_init: The weight initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to `softplus`)
             final_activation: The activation function after the output layer.
@@ -388,12 +408,14 @@ class SPDMatrix(eqx.Module):
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
-            value. In this case the input to the module should be of shape `()`.
+            Note that `in_size` also supports the string `"scalar"` as a
+            special value. In this case the input to the module should be of
+            shape `()`.
+
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
@@ -403,7 +425,8 @@ class SPDMatrix(eqx.Module):
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
-                "The last two dimensions in shape must be equal for symmetric matrices."
+                "The last two dimensions in shape must be equal for " \
+                    "symmetric matrices."
             )
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -424,18 +447,20 @@ class SPDMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        """
+        """Forward pass through `SPDMatrix`.
+
         Args:
             x: The input. Should be a JAX array of shape ``(in_size,)``. (Or
                 shape ``()`` if ``in_size="scalar"``.)
 
         Returns:
             A JAX array of shape ``shape``.
+
         """
-        L = self.mlp(x).reshape(self.shape)
-        A = L @ jnp.conjugate(L.mT)
-        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
-        return A + self.epsilon * identity
+        y = self.mlp(x).reshape(self.shape)
+        a_matrix = y @ jnp.conjugate(y.mT)
+        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), a_matrix.shape)
+        return a_matrix + self.epsilon * identity
 
 
 class ConstantSPDMatrix(eqx.Module):
@@ -445,7 +470,7 @@ class ConstantSPDMatrix(eqx.Module):
     with the matrix-valued function interface.
     """
 
-    B_matrix: Array
+    b_matrix: Array
     shape: AtLeast2DTuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
 
@@ -460,45 +485,49 @@ class ConstantSPDMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """
-        Initializes the object
+        """Initialize the `ConstantSPDMatrix`.
 
         Args:
             shape: The matrix shape. The output from the module will be a
                 Array with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-            epsilon: Small value that is added to the diagonal of the output matrix
-                to ensure positive definiteness. If only positive semi-definiteness is
-                required set `epsilon = 0.`
+            epsilon: Small value that is added to the diagonal of the output
+                matrix to ensure positive definiteness. If only positive
+                semi-definiteness is required set `epsilon = 0.`
                 (Defaults to `1e-6`)
-            init: The initializer of type `jax.nn.initializers.Initializer` for the
-                constant matrix `B` that produces the module's output via `A = B@B*`.
-                (Defaults to `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
+            init: The initializer of type `jax.nn.initializers.Initializer` for
+                the constant matrix `B` that produces the module's output via
+                `A = B@B*`. (Defaults to `variance_scaling(scale=1,
+                mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
+
         """
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
-                "The last two dimensions in shape must be equal for symmetric matrices."
+                "The last two dimensions in shape must be equal for " \
+                "symmetric matrices."
             )
 
         self.shape = shape
         self.epsilon = epsilon
-        self.B_matrix = init(key, shape, dtype)
+        self.b_matrix = init(key, shape, dtype)
 
     def __call__(self, x: Array) -> Array:
-        """
+        """Forward pass through `ConstantSPDMatrix`.
+
         Args:
             x: Ignored; provided for compatibility with the rest of the
-                Matrix-valued function API.
+                matrix-valued function API.
 
         Returns:
             A JAX array of shape ``shape``.
+
         """
-        A = self.B_matrix @ jnp.conjugate(self.B_matrix.mT)
-        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
-        return A + self.epsilon * identity
+        a_matrix = self.b_matrix @ jnp.conjugate(self.b_matrix.mT)
+        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), a_matrix.shape)
+        return a_matrix + self.epsilon * identity

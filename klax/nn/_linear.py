@@ -30,7 +30,7 @@ from jaxtyping import Array, PRNGKeyArray
 from .._misc import default_floating_dtype
 from .._wrappers import (
     Constraint,
-    ContainsUnwrappables,
+    ContainsUnwrappablesError,
     Unwrappable,
     contains_unwrappables,
 )
@@ -39,7 +39,9 @@ from .._wrappers import (
 class Linear(eqx.Module, strict=True):
     """Performs a linear transformation.
 
-    This class is modified from [`equinox.nn.Linear`](https://docs.kidger.site/equinox/api/nn/linear/#equinox.nn.Line(https://docs.kidger.site/equinox/api/nn/linear/#equinox.nn.Linear)) to allow for custom initialization.
+    This class is modified from
+    [`equinox.nn.Linear`](https://docs.kidger.site/equinox/api/nn/linear/#equinox.nn.Linear)
+    to allow for custom initialization.
     """
 
     weight: Array | Unwrappable[Array]
@@ -61,22 +63,27 @@ class Linear(eqx.Module, strict=True):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize the linear layer.
+
         Args:
-            in_features: The input size. The input to the layer should be a vector of
-                shape `(in_features,)`
-            out_features: The output size. The output from the layer will be a vector
-                of shape `(out_features,)`.
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+            in_features: The input size. The input to the layer should be a
+                vector of shape `(in_features,)`
+            out_features: The output size. The output from the layer will be a
+                vector of shape `(out_features,)`.
+            weight_init: The weight initializer of type
+                `jax.nn.initializers.Initializer`.
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wrap: An optional wrapper that can be passed to enforce weight constraints.
-            bias_wrap: An optional wrapper that can be passed to enforce bias constraints.
+            weight_wrap: An optional wrapper that can be passed to enforce
+                weight constraints.
+            bias_wrap: An optional wrapper that can be passed to enforce bias
+                constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
-                Defaults to either `jax.numpy.float32` or `jax.numpy.float64` depending
-                on whether JAX is in 64-bit mode.
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
             Note that `in_features` also supports the string `"scalar"` as a
@@ -91,6 +98,7 @@ class Linear(eqx.Module, strict=True):
 
             Likewise, some `jax.nn.initializers.Initialzers`s do not work when
             `dtype` is `jax.numpy.complex64`.
+
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         wkey, bkey = jrandom.split(key, 2)
@@ -111,7 +119,8 @@ class Linear(eqx.Module, strict=True):
         self.use_bias = use_bias
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """
+        """Forward pass of the linear transformation.
+
         Args:
             x: The input. Should be a JAX array of shape `(in_features,)`. (Or
                 shape `()` if `in_features="scalar"`.)
@@ -119,9 +128,9 @@ class Linear(eqx.Module, strict=True):
                 Equinox API. (Keyword only argument.)
 
         Note:
-            If you want to use higher order tensors as inputs (for example featuring "
-            "batch dimensions) then use `jax.vmap`. For example, for an input `x` of "
-            "shape `(batch, in_features)`, using
+            If you want to use higher order tensors as inputs (for example
+            featuring batch dimensions) then use `jax.vmap`. For example, for
+            an input `x` of shape `(batch, in_features)`, using
 
             ```python
             >>> import jax
@@ -132,20 +141,26 @@ class Linear(eqx.Module, strict=True):
             >>> key = jrandom.PRNGKey(0)
             >>> keys = jrandom.split(key)
             >>> x = jrandom.uniform(keys[0], (10,))
-            >>> linear = klax.nn.Linear("scalar", "scalar", he_normal(), key=keys[1])
+            >>> linear = klax.nn.Linear(
+            >>>     "scalar",
+            >>>     "scalar",
+            >>>     he_normal(),
+            >>>     key=keys[1]
+            >>> )
             >>> jax.vmap(linear)(x).shape
             (10,)
             ```
 
-            will produce the appropriate output of shape `(batch, out_features)`.
+            will produce the appropriate output of shape
+            `(batch, out_features)`.
 
         Returns:
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
-        """
 
+        """
         if contains_unwrappables(self):
-            raise ContainsUnwrappables(
+            raise ContainsUnwrappablesError(
                 "Model must be finalized before calling, see `klax.finalize`."
             )
         if self.in_features == "scalar":
@@ -160,15 +175,22 @@ class Linear(eqx.Module, strict=True):
             x = x + self.bias
         if self.out_features == "scalar":
             assert jnp.shape(x) == (1,), (
-                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(x)}."
+                f"Output shape mismatch: expected (1,) for scalar output but "
+                f"got {jnp.shape(x)}."
             )
             x = jnp.squeeze(x)
         return x
 
 
 class InputSplitLinear(eqx.Module, strict=True):
-    """Performs a linear transformation for multiple inputs ``x_1, ..., x_n``
-    as ``y = x_1 @ W_1 + x_2 @ W_2 + ... +x_n @ W_n + b``
+    """Performs a linear transformation for multiple inputs.
+
+    The transformation is of the form:
+    `y = x_1 @ W_1 + x_2 @ W_2 + ... + x_n @ W_n + b`
+
+    for
+
+    `x_1, ..., x_n`.
 
     This layer is useful for formulating transformations with multiple
     inputs where different inputs require different weight constraints
@@ -200,43 +222,48 @@ class InputSplitLinear(eqx.Module, strict=True):
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize the input split linear layer.
+
         Args:
             in_features: The input sizes of each input. The n-th input to the
-                layer should be a vectors of shape `(in_features[n],)`
+                layer should be a vector of shape `(in_features[n],)`
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
             weight_inits: Weight initializer or sequence of weight initializers
-                of type `jax.nn.initializers.Initializer`. By specifying a sequence
-                it is possible to apply a different initializer to each weight matrix.
-                The sequence must have the same length as in_features.
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
+                of type `jax.nn.initializers.Initializer`. By specifying a
+                sequence it is possible to apply a different initializer to
+                each weight matrix. The sequence must have the same length as
+                in_features.
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`.
             use_bias: Whether to add on a bias as well.
-            weight_wraps: One or a list/tuple of wrappers that can be passed to enforce weight
-                constraints. By specifying a sequence it is possible to apply a
-                different wrapper to each weight matrix. The sequence must have the
-                same length as in_features.
-            bias_wrap: An optional wrapper that can be passed to enforce bias constraints.
+            weight_wraps: One or a list/tuple of wrappers that can be passed to
+                enforce weight constraints. By specifying a sequence it is
+                possible to apply a different wrapper to each weight matrix.
+                The sequence must have the same length as in_features.
+            bias_wrap: An optional wrapper that can be passed to enforce bias
+                constraints.
             dtype: The dtype to use for the weight and the bias in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_features` also supports the
-            string `"scalar"` as a special value. In this case the respective
-            input to the layer should be of shape `()`.
+            Note that `in_features` also supports the string `"scalar"` as a
+            special value. In this case the respective input to the layer
+            should
+            be of shape `()`.
 
             Likewise `out_features` can also be a string `"scalar"`, in which
             case the output from the layer will have shape `()`.
 
             Further note that, some `jax.nn.initializers.Initializer`s do not
-            work if one of `in_features` or `out_features`
-            is zero.
+            work if one of `in_features` or `out_features` is zero.
 
             Likewise, some `jax.nn.initializers.Initialzer`s do not work when
             `dtype` is `jax.numpy.complex64`.
+
         """
         dtype = default_floating_dtype() if dtype is None else dtype
 
@@ -244,16 +271,18 @@ class InputSplitLinear(eqx.Module, strict=True):
         _num_inputs = len(in_features)
         if isinstance(weight_inits, Sequence):
             assert len(weight_inits) == _num_inputs, (
-                "The length of the weight_inits is unequal to the length of in_features. "
-                f"Expected length {_num_inputs} but is {len(weight_inits)}."
+                "The length of the weight_inits is unequal to the length of "
+                "in_features. Expected length "
+                f"{_num_inputs} but is {len(weight_inits)}."
             )
         else:
             weight_inits = _num_inputs * (weight_inits,)
 
         if isinstance(weight_wraps, Sequence):
             assert len(weight_wraps) == _num_inputs, (
-                "The length of the weight_wraps is unequal to the length of in_features. "
-                f"Expected length {_num_inputs} but is {len(weight_wraps)}."
+                "The length of the weight_wraps is unequal to the length of "
+                "in_features. Expected length "
+                f"{_num_inputs} but is {len(weight_wraps)}."
             )
         else:
             weight_wraps = _num_inputs * (weight_wraps,)
@@ -288,25 +317,28 @@ class InputSplitLinear(eqx.Module, strict=True):
         self._num_inputs = _num_inputs
 
     def __call__(self, *xs: Array, key: PRNGKeyArray | None = None) -> Array:
-        """
+        """Forward pass of the linear transformation.
+
         Args:
-            xs: The inputs. Should be n JAX arrays x_i of shape `(in_features[i],)`. (Or
-                shape `()` if `in_features[i]="scalar"`.)
+            xs: The inputs. Should be n JAX arrays x_i of shape
+                `(in_features[i],)`. (Or shape `()` if
+                `in_features[i]="scalar"`.)
             key: Ignored; provided for compatibility with the rest of the
                 Equinox API. (Keyword only argument.)
 
         Returns:
             A JAX array of shape `(out_features,)`. (Or shape `()` if
             `out_features="scalar"`.)
-        """
 
+        """
         if contains_unwrappables(self):
-            raise ContainsUnwrappables(
+            raise ContainsUnwrappablesError(
                 "Model must be finalized before calling, see `klax.finalize`."
             )
         if len(xs) != self._num_inputs:
             raise ValueError(
-                f"Number of call arguments ({len(xs)}) does not match the number of inputs ({self._num_inputs})"
+                f"Number of call arguments ({len(xs)}) does not match the "
+                f"number of inputs ({self._num_inputs})"
             )
 
         def mult(weight, in_feature, x):
@@ -327,7 +359,8 @@ class InputSplitLinear(eqx.Module, strict=True):
             y = y + self.bias
         if self.out_features == "scalar":
             assert jnp.shape(y) == (1,), (
-                f"Output shape mismatch: expected (1,) for scalar output but got {jnp.shape(y)}."
+                f"Output shape mismatch: expected (1,) for scalar output but "
+                f"got {jnp.shape(y)}."
             )
             y = jnp.squeeze(y)
         return y

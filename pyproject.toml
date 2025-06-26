@@ -70,15 +70,23 @@ quote-style = "double"
 
 [tool.ruff.lint]
 # See https://docs.astral.sh/ruff/rules/ for the meaning of all rules.
-extend-select = [
-    # pydocstyle
-    #"D",
-    # pycodestyle
-    "E",
-    # isort
-    "I",
-    # pep8-naming
-    "N",
-    # pyupgrade
-    "UP",
+select = [
+    "D", # pydocstyle
+    "E", # pycodestyle
+    "I", # isort
+    "N", # pep8-naming
+    "UP", # pyupgrade
+]
+ignore = [
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D107", # Mising docstring in `__init__`
+    #"E501", # During development, we allow long lines.
+    "E402",
+    "E731",
+    "E741",
+    "UP038"
 ]
