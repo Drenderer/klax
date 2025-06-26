@@ -4,6 +4,7 @@ theme:
   logo: assets/logo_minimal.png
   features:
     - header.autohide
+    - navigation.footer
     - search.suggest
     - search.highlight
     - toc.integrate # Table of contents is integrated on the left
