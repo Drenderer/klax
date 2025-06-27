@@ -1,9 +1,5 @@
 # Klax
 
-<!-- A lightweight machine learning package for computational mechanics. -->
-
-<!-- # Klax -->
-
 A lightweight machine learning package for computational mechanics built on JAX.
 
 ---
@@ -60,4 +56,4 @@ Klax is built on top of several powerful frameworks:
 [JAX](https://docs.jax.dev/en/latest/) - For automatic differentiation and acceleration </br>
 [Equinox](https://docs.kidger.site/equinox/) - For neural network primitives </br>
 [Optax](https://optax.readthedocs.io/en/latest/) - For optimization utilities </br>
-[Paramax](https://https://danielward27.github.io/paramax/#) - For constraints. (We decided to include due to the need for non-differentable parameter constraints.)
+[Paramax](https://https://danielward27.github.io/paramax/#) - For constraints (We decided to embed Paramax directly into Klax due to the need for non-differentiable constraints).
