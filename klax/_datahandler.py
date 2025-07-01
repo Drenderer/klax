@@ -99,7 +99,8 @@ def batch_data(
     """Create a `Generator` that draws subsets of data without replacement.
 
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
-    passed, leaves without batch dimension can be specified.
+    passed, batch axes (including `None` for no batching) can be specified for 
+    every leaf individualy.
 
     Example:
         This is an example for a nested `PyTree`, where the elements x and y
@@ -128,12 +129,9 @@ def batch_data(
             `ArrayLike` leaves.
         batch_size: The number of examples in a batch.
         batch_axis: The `PyTree` denoting the batch axis of every leaf.
-            `batch_axis` must have the same structure as `data`,
-            where the leaves are replaced with values of type `int`
-            corresponding to the axis along which the batches for the leaf
-            shall be created. `True`
-            indicates that the corresponding leaf in `data` has batch
-            dimension. (Defaults to 0, meaning all leaves in `data` are
+            `batch_axis` must have the same structure as
+            `data` or have `data` as a prefix.
+            (Defaults to 0, meaning all leaves in `data` are
             batched along their first dimension.)
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation. (Keyword only argument.)
@@ -159,7 +157,7 @@ def batch_data(
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
     # for fast model training steps this actually makes a huge difference!
-    # However, ware that this is likely only true if JAX runs on CPU.
+    # However, be aware that this is likely only true if JAX runs on CPU.
     data = jax.tree.map(
         lambda x, a: x if a is None else np.array(x),
         data,
