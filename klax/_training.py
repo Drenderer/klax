@@ -66,7 +66,7 @@ def fit[T: eqx.Module, H: Callback](
             arrays in `data`. `batch_axis` must be a prefix of `data`. By
             specifying `batch_axis` as a `PyTree` it is possible to specify
             different batch axes for different leaves of `data`. (Defaults to
-            `0`, meaning the first axis of arrays in `data` are batch
+            `0`, meaning the first axes of arrays in `data` are batch
             dimensions.)
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
