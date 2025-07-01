@@ -130,9 +130,10 @@ def batch_data(
         data: The data that shall be batched. It can be any `PyTree` with
             `ArrayLike` leaves.
         batch_size: The number of examples in a batch.
-        batch_axis: The `PyTree` denoting the batch axis of every leaf.
-            `batch_axis` must have the same structure as
-            `data` or have `data` as a prefix.
+        batch_axis: PyTree of the batch axis indices. `None` is used to
+            indicate that the corresponding leaf or subtree in data does not
+            have a batch axis. `batch_axis` must have the same structure as
+            `data` or have `data` as a prefix. 
             (Defaults to 0, meaning all leaves in `data` are
             batched along their first dimension.)
         key: A `jax.random.PRNGKey` used to provide randomness for batch
@@ -197,8 +198,7 @@ def split_data(
     specifies the batch axis for each leaf in `data`.
 
     Example:
-        This is an example for a nested PyTree` of data, where the elements x
-        and y have batch dimension along different axes.
+        This is an example for a nested PyTree` of data.
 
         ```python
         >>> import klax
@@ -218,8 +218,7 @@ def split_data(
         ```
 
     Args:
-        data: Data that shall be split. It can be any `PyTree` at least one
-            `ArrayLike` leaf.
+        data: Data that shall be split. It can be any `PyTree`.
         proportions: Proportions of the split that will be applied to the data,
             e.g., `(80, 20)` for a 80% to 20% split. The proportions must be
             non-negative.
