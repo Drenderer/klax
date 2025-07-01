@@ -187,9 +187,7 @@ class InputSplitLinear(eqx.Module, strict=True):
 
     The transformation is of the form:
     `y = x_1 @ W_1 + x_2 @ W_2 + ... + x_n @ W_n + b`
-
     for
-
     `x_1, ..., x_n`.
 
     This layer is useful for formulating transformations with multiple
