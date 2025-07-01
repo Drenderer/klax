@@ -26,4 +26,10 @@ title: Callbacks
 ::: klax.HistoryCallback
     options:
         members:
-            
+            - __init__
+            - __call__
+            - load
+            - save 
+            - plot
+            - on_training_start
+            - on_training_end

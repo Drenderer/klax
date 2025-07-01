@@ -70,9 +70,8 @@ def fit[T: eqx.Module, H: Callback](
             dimensions.)
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
-            to None. Keyword only argument)
-        steps: Number of gradient updates to apply. (Defaults to 1000. Keyword
-            only argument)
+            to None.)
+        steps: Number of gradient updates to apply. (Defaults to 1000.)
         loss_fn: The loss function with call signature
             `(model: PyTree, data: PyTree, batch_axis: int | None |
             Sequence[Any]) -> float`. (Defaults to `mse`.)

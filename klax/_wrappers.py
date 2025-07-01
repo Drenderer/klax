@@ -308,7 +308,7 @@ class Symmetric(Unwrappable[Array]):
 
 
 class Constraint(Unwrappable[Array], ABC):
-    """An abstract constraint around `jax.Array`s.
+    """An abstract constraint around a `jax.Array`.
 
     A [`klax.Constraint`][] is an extended version of [`klax.Unwrappable`][],
     that marks an array in a PyTree as constrained. It implements the known
@@ -382,7 +382,7 @@ def apply(tree: PyTree):
         >>> import jax.numpy as jnp
         >>> params = klax.NonNegative(-1 * jnp.ones(3))
         >>> klax.apply(("abc", 1, params))
-        ('abc', 1, Array([0., 0., 0.], dtype=float32))
+        ('abc', 1, NonNegative(parameter=Array([0., 0., 0.], dtype=float32)))
         ```
 
     """

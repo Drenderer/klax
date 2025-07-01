@@ -178,7 +178,7 @@ class HistoryCallback(Callback):
     """
 
     log_every: int
-    steps: list
+    steps: list #: List of steps at which the losses were recorded.
     loss: list
     val_loss: list
     last_start_time: float  # start time of the last training
