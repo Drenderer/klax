@@ -93,6 +93,7 @@ def batch_data(
     data: PyTree[Any],
     batch_size: int = 32,
     batch_axis: PyTree[int | None] = 0,
+    convert_to_numpy: bool = True,
     *,
     key: PRNGKeyArray,
 ) -> Generator[PyTree[Any], None, None]:
@@ -134,6 +135,9 @@ def batch_data(
             If `False`, the corresponding leaf will be returned unchanged by the
             `Generator`. (Defaults to `None`, meaning all leaves in `data` have
             batch dimension.)
+        convert_to_numpy: If `True`, batched data leafs will be converted to 
+            Numpy arrays before batching. This is useful for performance 
+            reasons, as Numpy's slicing is much faster than JAX's.
         key: A `jax.random.PRNGKey` used to provide randomness for batch generation.
             (Keyword only argument.)
 
@@ -158,12 +162,13 @@ def batch_data(
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so for
     # fast model training steps this actually makes a huge difference! However,
     # be aware that this is likely only true if JAX runs on CPU.
-    data = jax.tree.map(
-        lambda x, a: x if a is None else np.array(x),
-        data,
-        batch_axis,
-        is_leaf=lambda x: x is None,
-    )
+    if convert_to_numpy:
+        data = jax.tree.map(
+            lambda x, a: x if a is None else np.array(x),
+            data,
+            batch_axis,
+            is_leaf=lambda x: x is None,
+        )
 
     # Reduce batch size if the dataset has less examples than batch size
     batch_size = min(batch_size, dataset_size)
