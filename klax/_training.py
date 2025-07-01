@@ -30,7 +30,7 @@ from ._callbacks import (
 from ._datahandler import (
     BatchGenerator,
     batch_data,
-    broadcast_and_get_batch_size,
+    broadcast_and_get_size,
 )
 from ._losses import Loss, mse
 from ._wrappers import apply, unwrap
@@ -114,7 +114,7 @@ def fit[T: eqx.Module, H: Callback](
     # that only leafs of type ArrayLike are vmapped. Thus it is possible to
     # have data like `(str, array)` ans still use `batch_axis=0` instead of
     # `batch_axis=(None, 0)`.
-    batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
+    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
     # the loss evaluation for the loss history.

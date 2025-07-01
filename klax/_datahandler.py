@@ -27,12 +27,10 @@ import numpy as np
 from jaxtyping import PRNGKeyArray, PyTree
 
 
-def broadcast_and_get_batch_size(
+def broadcast_and_get_size(
     data: PyTree[Any], batch_axis: PyTree[int | None]
 ) -> tuple[PyTree[int | None], int]:
     """Broadcast `batch_axis` to the same structure as `data` and get size.
-
-    `batch_axis` prefix of need to be a prefix of the `data` PyTree.
 
     Args:
         data: PyTree of data.
@@ -47,9 +45,9 @@ def broadcast_and_get_batch_size(
         ValueError: If not all batch axes have the same size.
 
     Returns:
-        Tuple of the broadcasted `batch_axis` and the `batch_size`.
+        Tuple of the broadcasted `batch_axis` and the `dataset_size`.
 
-    """
+    """ 
     try:
         batch_axis = jax.tree.map(
             lambda a, d: jax.tree.map(eqx.if_array(a), d),
@@ -71,7 +69,7 @@ def broadcast_and_get_batch_size(
         raise ValueError("At least one leaf must have a batch dimension.")
     dataset_size = dataset_sizes[0]
     if not all(b == dataset_size for b in dataset_sizes):
-        raise ValueError("All batched arrays must have equal batch dimension.")
+        raise ValueError("All batched arrays must have equal batch size.")
 
     return batch_axis, dataset_size
 
@@ -101,6 +99,10 @@ def batch_data(
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
     passed, batch axes (including `None` for no batching) can be specified for 
     every leaf individualy.
+    A generator is returned that indefinetly yields batches of data with size 
+    `batch_size`. Examples are drawn without replacement until the remaining
+    dataset is smaller than `batch_size`, at which point the dataset will be 
+    reshuffeld and the process starts over.
 
     Example:
         This is an example for a nested `PyTree`, where the elements x and y
@@ -149,7 +151,7 @@ def batch_data(
         obtained batches will have dataset size.
 
     """
-    batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
+    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
     # for fast model training steps this actually makes a huge difference!
@@ -239,7 +241,7 @@ def split_data(
         raise ValueError("Proportions must be non-negative.")
     props = props / jnp.sum(props)
 
-    batch_axis, dataset_size = broadcast_and_get_batch_size(data, batch_axis)
+    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
 
     indices = jnp.arange(dataset_size)
     perm = jr.permutation(key, indices)
