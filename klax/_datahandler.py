@@ -136,10 +136,6 @@ def batch_data(
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation. (Keyword only argument.)
 
-    Note:
-        Note that the batch axis for all batched leaves must correspond to the
-        first array axis.
-
     Returns:
         A `Generator` that yields a random batch of data every time is is
         called.
