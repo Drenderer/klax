@@ -45,6 +45,8 @@ uv add "klax @ git+https://github.com/Drenderer/klax.git@main"
 
 ## Getting Started
 
+If you're new to the JAX ecosystem, we recommend looking at [Quickstart](https://docs.jax.dev/en/latest/quickstart.html), which provides a concise overview of JAX's core functionality.
+
 As the contents of the documentation are still rudimentary, we recommend checking out [Equinox](https://docs.kidger.site/equinox/) and [Paramax](https://danielward27.github.io/paramax/#) and taking a look at our examples [Examples](./examples/isotropic_hyperelasticity.ipynb).
 
 ## Citation
