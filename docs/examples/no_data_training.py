@@ -1,5 +1,19 @@
-"""
-# No Data Training Example
+# Copyright 2025 The Klax Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""No Data Training Example.
+
 This example demonstrates how to train a model without any data.
 This is useful for training PINNs or other models that do not require data.
 """
@@ -7,11 +21,11 @@ This is useful for training PINNs or other models that do not require data.
 # %% Imports
 import equinox as eqx
 import jax
-from jax import vmap, grad
-import jax.random as jr
 import jax.numpy as jnp
-from jaxtyping import PRNGKeyArray, Array
+import jax.random as jr
 import optax
+from jax import grad, vmap
+from jaxtyping import Array, PRNGKeyArray
 from matplotlib import pyplot as plt
 
 import klax
@@ -36,11 +50,12 @@ class PINN(eqx.Module):
 
     @staticmethod
     def residural_loss(model, batch, batch_axis):
-        """Here we define a loss function that penalizes the
+        """Residual loss definition.
+        
+        We define a loss function that penalizes the
         residual of the ODE u_x + u = 0 and violations
         of the boundary conditions u(0) = 1.
         """
-
         xs = jax.lax.stop_gradient(model.xs)
 
         # ODE residual
@@ -77,7 +92,7 @@ history.plot()
 
 
 def solution(x):
-    """True solution of the ODE u_x + u = 0 with u(0) = 1."""
+    """Return the true solution of the ODE u_x + u = 0 with u(0) = 1."""
     return jnp.exp(-x)
 
 
