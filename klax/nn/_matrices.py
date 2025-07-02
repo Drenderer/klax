@@ -50,7 +50,7 @@ class Matrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | AtLeast2DTuple[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
@@ -70,7 +70,6 @@ class Matrix(eqx.Module):
             shape: The matrix shape. The output from the module will be an
                 array with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-                (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
             weight_init: The weight initializer of type
@@ -201,7 +200,7 @@ class SkewSymmetricMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | AtLeast2DTuple[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
@@ -221,7 +220,6 @@ class SkewSymmetricMatrix(eqx.Module):
             shape: The matrix shape. The output from the module will be a Array
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-                (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
             weight_init: The weight initializer of type
@@ -365,7 +363,7 @@ class SPDMatrix(eqx.Module):
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | AtLeast2DTuple[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
         epsilon: float = 1e-6,
         width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
@@ -386,7 +384,6 @@ class SPDMatrix(eqx.Module):
             shape: The matrix shape. The output from the module will be a Array
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
-                (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
             epsilon: Small value that is added to the diagonal of the output
