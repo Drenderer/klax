@@ -64,12 +64,12 @@ def test_batch_data(getkey):
         generator = batch_data(data, batch_axis=batch_axis, key=getkey())
         next(generator)
 
-    # Different batch dimensions
+    # Different batch sizes
     x = jrandom.uniform(getkey(), (10,))
     y = jrandom.uniform(getkey(), (5,))
     data = (x, y)
     with pytest.raises(
-        ValueError, match="All batched arrays must have equal batch dimension."
+        ValueError, match="All batched arrays must have equal batch size."
     ):
         generator = batch_data(data, key=getkey())
         next(generator)
