@@ -12,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import klax
-from klax.nn import Linear, InputSplitLinear, MLP, FICNN
-from jax.nn.initializers import uniform, he_normal
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import pytest
+from jax.nn.initializers import he_normal, uniform
 
+import klax
 from klax.nn import (
-    Matrix,
+    FICNN,
+    MLP,
     ConstantMatrix,
-    SkewSymmetricMatrix,
     ConstantSkewSymmetricMatrix,
-    SPDMatrix,
     ConstantSPDMatrix,
+    InputSplitLinear,
+    Linear,
+    Matrix,
+    SkewSymmetricMatrix,
+    SPDMatrix,
 )
 
 
@@ -52,7 +55,9 @@ def test_linear(getkey, getzerowrap):
     assert linear(x).shape == (4,)
 
     # All keyword arguments
-    linear = Linear(in_features=3, out_features=4, weight_init=uniform(), key=getkey())
+    linear = Linear(
+        in_features=3, out_features=4, weight_init=uniform(), key=getkey()
+    )
     x = jrandom.normal(getkey(), (3,))
     assert linear(x).shape == (4,)
 
@@ -67,7 +72,12 @@ def test_linear(getkey, getzerowrap):
 
     # Wrappers
     linear = Linear(
-        3, 4, uniform(), weight_wrap=getzerowrap, bias_wrap=getzerowrap, key=getkey()
+        3,
+        4,
+        uniform(),
+        weight_wrap=getzerowrap,
+        bias_wrap=getzerowrap,
+        key=getkey(),
     )
     x = jrandom.normal(getkey(), (3,))
     assert jnp.all(klax.finalize(linear)(x) == 0.0)
@@ -116,7 +126,9 @@ def test_is_linear(getkey):
     assert is_linear(x0, x1, x2).shape == (4,)
 
     # Scalar shapes
-    is_linear = InputSplitLinear(("scalar", 2), 3, (uniform(), uniform()), key=getkey())
+    is_linear = InputSplitLinear(
+        ("scalar", 2), 3, (uniform(), uniform()), key=getkey()
+    )
     y = jrandom.normal(getkey(), ())
     z = jrandom.normal(getkey(), (2,))
     assert is_linear(y, z).shape == (3,)
@@ -173,21 +185,43 @@ def test_mlp(getkey):
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [True, True, True]
 
     mlp = MLP(
-        2, 3, 2 * [8], uniform(), use_bias=False, use_final_bias=True, key=getkey()
+        2,
+        3,
+        2 * [8],
+        uniform(),
+        use_bias=False,
+        use_final_bias=True,
+        key=getkey(),
     )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
-    assert [mlp.layers[i].use_bias for i in range(0, 3)] == [False, False, True]
+    assert [mlp.layers[i].use_bias for i in range(0, 3)] == [
+        False,
+        False,
+        True,
+    ]
 
     mlp = MLP(
-        2, 3, 2 * [8], uniform(), use_bias=True, use_final_bias=False, key=getkey()
+        2,
+        3,
+        2 * [8],
+        uniform(),
+        use_bias=True,
+        use_final_bias=False,
+        key=getkey(),
     )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
     assert [mlp.layers[i].use_bias for i in range(0, 3)] == [True, True, False]
 
     mlp = MLP(
-        2, 3, [4, 8], uniform(), use_bias=True, use_final_bias=False, key=getkey()
+        2,
+        3,
+        [4, 8],
+        uniform(),
+        use_bias=True,
+        use_final_bias=False,
+        key=getkey(),
     )
     x = jrandom.normal(getkey(), (2,))
     assert mlp(x).shape == (3,)
@@ -198,7 +232,9 @@ def test_mlp(getkey):
 @pytest.mark.parametrize("use_passthrough", [True, False])
 @pytest.mark.parametrize("non_decreasing", [True, False])
 def test_ficnn(getkey, use_passthrough, non_decreasing):
-    x = jrandom.normal(getkey(), (100, 2))  # Sample 100 random evaluation points
+    x = jrandom.normal(
+        getkey(), (100, 2)
+    )  # Sample 100 random evaluation points
     ficnn = klax.finalize(
         FICNN(
             2,
@@ -216,69 +252,62 @@ def test_ficnn(getkey, use_passthrough, non_decreasing):
     if non_decreasing:
         grad_fun = jax.vmap(jax.grad(ficnn))
         assert jnp.all(grad_fun(x) >= 0)
-    # Assert convexity:
-    # Check that the Hessian is positive definite but allow for small numerical errors
+    # Assert convexity: Check that the Hessian is positive definite but allow
+    # for small numerical errors
     hessian_fun = jax.vmap(jax.hessian(ficnn))
-    assert jnp.all(jnp.linalg.eigvals(hessian_fun(x)) > -1e-6)   
+    assert jnp.all(jnp.linalg.eigvals(hessian_fun(x)) > -1e-6)
 
 
 def test_matrices(getkey):
     x = jrandom.normal(getkey(), (4,))
 
-    m = Matrix(4, key=getkey())
-    assert klax.finalize(m)(x).shape == (4, 4)
-    m = Matrix(4, (1, 2, 3, 4), key=getkey())
-    assert klax.finalize(m)(x).shape == (1, 2, 3, 4)
-    m = Matrix('scalar', (5, 3, 4), key=getkey())
-    assert klax.finalize(m)(0.).shape == (5, 3, 4)
+    m = Matrix(4, (1, 2, 3), [8], key=getkey())
+    assert m(x).shape == (1, 2, 3)
+    m = Matrix(in_size="scalar", shape=(5, 3), width_sizes=[8], key=getkey())
+    assert m(jnp.array(0.0)).shape == (5, 3)
 
     m = ConstantMatrix(4, key=getkey())
-    assert klax.finalize(m)(x).shape == (4, 4)
-    m = ConstantMatrix((1, 2, 3, 4), key=getkey())
-    assert klax.finalize(m)(x).shape == (1, 2, 3, 4)
+    assert m(x).shape == (4, 4)
+    m = ConstantMatrix(shape=(1, 2, 3), key=getkey())
+    assert m(x).shape == (1, 2, 3)
 
-    m = SkewSymmetricMatrix(4, key=getkey())
-    output = klax.finalize(m)(x)
-    assert output.shape == (4, 4)
+    m = SkewSymmetricMatrix(4, (2, 3, 3), [8], key=getkey())
+    output = m(x)
+    assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
-    m = SkewSymmetricMatrix(4, (1, 2, 4, 4), key=getkey())
-    output = klax.finalize(m)(x)
-    assert output.shape == (1, 2, 4, 4)
-    assert jnp.allclose(output, -jnp.matrix_transpose(output))
-    m = SkewSymmetricMatrix('scalar', (5, 3, 3), key=getkey())
-    assert klax.finalize(m)(0.).shape == (5, 3, 3)
+    m = SkewSymmetricMatrix(
+        in_size="scalar", shape=(5, 3, 3), width_sizes=[8], key=getkey()
+    )
+    assert klax.finalize(m)(0.0).shape == (5, 3, 3)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
 
     m = ConstantSkewSymmetricMatrix(4, key=getkey())
     output = klax.finalize(m)(x)
     assert output.shape == (4, 4)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
-    m = ConstantSkewSymmetricMatrix((1, 2, 4, 4), key=getkey())
+    m = ConstantSkewSymmetricMatrix((2, 3, 3), key=getkey())
     output = klax.finalize(m)(x)
-    assert output.shape == (1, 2, 4, 4)
+    assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
 
-    m = SPDMatrix(4, key=getkey())
-    output = klax.finalize(m)(x)
-    assert output.shape == (4, 4)
+    m = SPDMatrix(4, (2, 3, 3), [8], dtype=jnp.complex64, key=getkey())
+    output = m(x)
+    assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
-    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
-    m = SPDMatrix(4, (1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
-    output = klax.finalize(m)(x)
-    assert output.shape == (1, 2, 4, 4)
-    assert jnp.allclose(output, jnp.conjugate(output.mT))
-    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
-    m = SPDMatrix('scalar', (5, 3, 3), key=getkey())
-    assert klax.finalize(m)(0.).shape == (5, 3, 3)
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.0)
+    m = SPDMatrix(
+        in_size="scalar", shape=(5, 3, 3), width_sizes=[8], key=getkey()
+    )
+    assert m(jnp.array(0.0)).shape == (5, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
 
     m = ConstantSPDMatrix(4, key=getkey())
-    output = klax.finalize(m)(x)
+    output = m(x)
     assert output.shape == (4, 4)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
-    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
-    m = ConstantSPDMatrix((1, 2, 4, 4), dtype=jnp.complex64, key=getkey())
-    output = klax.finalize(m)(x)
-    assert output.shape == (1, 2, 4, 4)
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.0)
+    m = ConstantSPDMatrix((2, 3, 3), dtype=jnp.complex64, key=getkey())
+    output = m(x)
+    assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
-    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.)
+    assert jnp.all(jnp.linalg.eigvalsh(output) > 0.0)

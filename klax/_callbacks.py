@@ -12,32 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-from abc import ABC
-from collections.abc import Callable
 import datetime
 import importlib
+import pickle
 import time
+from abc import ABC
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Self
 
 import jax
 from jaxtyping import PyTree, PyTreeDef, Scalar
-import pickle
-from pathlib import Path
 
 
 class CallbackArgs:
-    """
-    A callback argument designed to work in conjunction with :func:`fit`.
+    """A callback argument designed to work in conjunction with [`klax.fit`][].
 
-    This class should not be instantiated directly.
-    An instance of this class is passed to every callback object in the fit function.
-    When writing a custom callback, use the properties of this class to access the
-    current model, optimizer state, training data, and validation data during training.
+    This class should not be instantiated directly. An instance of this class
+    is passed to every callback object in the fit function. When writing a
+    custom callback, use the properties of this class to access the current
+    model, optimizer state, training data, and validation data during training.
 
     This class implements cached and lazy-evaluated values via property
-    methods. This means that properties like ``loss`` are only calculated
-    if they are used and are stored such that they are not calculated multiple
+    methods. This means that properties like ``loss`` are only calculated if
+    they are used and are stored such that they are not calculated multiple
     times.
     """
 
@@ -61,16 +59,18 @@ class CallbackArgs:
         data: PyTree,
         val_data: PyTree | None = None,
     ):
-        """
+        """Initialize the callback arguments object.
+
         Args:
-            get_loss: Function that takes a model and a batch of data and
-                returns the loss.
-            treedef_model: Tree structure of the model.
-            treedef_opt_state: Tree structure of the :py:mod:`optax` optimizer.
-            data: PyTree of the training data.
-            val_data: PyTree of the validation data. If None, no validation
-                loss is calculated and the property :py:attr:`val_loss` will
-                return None.
+        get_loss: Function that takes a model and a batch of data and
+            returns the loss.
+        treedef_model: Tree structure of the model.
+        treedef_opt_state: Tree structure of the :py:mod:`optax` optimizer.
+        data: PyTree of the training data.
+        val_data: PyTree of the validation data. If None, no validation
+            loss is calculated and the property :py:attr:`val_loss` will
+            return None.
+
         """
         self.data = data
         self.val_data = val_data
@@ -79,15 +79,16 @@ class CallbackArgs:
         self._treedef_opt_state = treedef_opt_state
 
     def update(self, flat_model: PyTree, flat_opt_state: PyTree, step: int):
-        """
-        Updates the callback arguments object with the current model and optimizer state.
+        """Update the object with the current model and optimizer state.
 
-        This method is called repeatedly in :py:func:`klax.fit`.
+        This method is called repeatedly in [`klax.fit`][].
 
         Args:
-            flat_model: Flattened ``PyTree`` of the model.
-            flat_opt_state: Flattened ``PyTree`` of the :py:mod:`optax` optimizer.
+            flat_model: Flattened PyTree of the model.
+            flat_opt_state: Flattened PyTree of the `optax`
+                optimizer.
             step: Current step-count of the training.
+
         """
         self._flat_model = flat_model
         self._flat_opt_state = flat_opt_state
@@ -99,7 +100,7 @@ class CallbackArgs:
 
     @staticmethod
     def _lazy_evaluated_and_cached(fun: Callable[[Any], Any]) -> property:
-        """Turns a public method into a property.
+        """Turn a public method into a property.
 
         The return value of ``fun`` is stored in the ``_cache`` dictionary of
         the current object using the function name as key. If the name is
@@ -111,6 +112,7 @@ class CallbackArgs:
 
         Returns:
             Wrapped method as a property.
+
         """
         attr_name = fun.__name__
 
@@ -126,7 +128,9 @@ class CallbackArgs:
     @_lazy_evaluated_and_cached
     def model(self):
         """Lazy-evaluated and cached model."""
-        return jax.tree_util.tree_unflatten(self._treedef_model, self._flat_model)
+        return jax.tree_util.tree_unflatten(
+            self._treedef_model, self._flat_model
+        )
 
     @_lazy_evaluated_and_cached
     def opt_state(self):
@@ -149,19 +153,21 @@ class CallbackArgs:
 
 
 class Callback(ABC):
-    """An abstract callback. Inherit from this class to create a custom
-    callback."""
+    """An abstract callback.
+
+    Inherit from this class to create a custom callback.
+    """
 
     def __call__(self, cbargs: CallbackArgs) -> bool | None:
-        """Called after each step during training."""
+        """Call after each step during training."""
         pass
 
     def on_training_end(self, cbargs: CallbackArgs) -> None:
-        """Called when training ends."""
+        """Call when training ends."""
         pass
 
     def on_training_start(self, cbargs: CallbackArgs) -> None:
-        """Called when training starts."""
+        """Call when training starts."""
         pass
 
 
@@ -172,7 +178,7 @@ class HistoryCallback(Callback):
     """
 
     log_every: int
-    steps: list
+    steps: list  #: List of steps at which the losses were recorded.
     loss: list
     val_loss: list
     last_start_time: float  # start time of the last training
@@ -183,13 +189,14 @@ class HistoryCallback(Callback):
     last_opt_state: PyTree | None = None
 
     def __init__(self, log_every: int = 100, verbose: bool = True):
-        """
+        """Initialize the `HistoryCallback`.
+
         Args:
-            log_every: Amount of steps after which the training
-                and validation losses are logged.
-                (Defaults to 100.)
-            verbose: If true prints the training progress and losses.
-                (Defaults to True.)
+        log_every: Amount of steps after which the training and validation
+            losses are logged. (Defaults to 100.)
+        verbose: If true prints the training progress and losses.
+            (Defaults to True.)
+
         """
         self.log_every = log_every
         self.verbose = verbose
@@ -198,11 +205,14 @@ class HistoryCallback(Callback):
         self.val_loss = []
 
     def __repr__(self):
-        """Returns a string representation of the HistoryCallback."""
-        return f"HistoryCallback(log_every={self.log_every}, verbose={self.verbose})"
+        """Return a string representation of the HistoryCallback."""
+        return (
+            f"HistoryCallback(log_every={self.log_every}, "
+            f"verbose={self.verbose})"
+        )
 
     def __call__(self, cbargs: CallbackArgs):
-        """Records the losses and step count.
+        """Record the losses and step count.
 
         Called at each step during training.
         """
@@ -219,20 +229,20 @@ class HistoryCallback(Callback):
                 print(message)
 
     def on_training_start(self, cbargs: CallbackArgs):
-        """Initializes the training start time.
+        """Initialize the training start time.
 
         Called at beginning of training.
         """
         self.last_start_time = cbargs.time_on_last_update
-        if (
-            self.steps
-        ):  # If there are already steps, we assume that this is a continuation of a training.
+        if self.steps:
+            # If there are already steps, we assume that this is a continuation
+            # of a training.
             self.step_offset = self.steps[-1]
         else:
             self(cbargs)
 
     def on_training_end(self, cbargs: CallbackArgs):
-        """Records the training end time and the last optimizer state.
+        """Record the training end time and the last optimizer state.
 
         Called at end of training.
         """
@@ -240,27 +250,35 @@ class HistoryCallback(Callback):
         self.training_time += self.last_end_time - self.last_start_time
         self.last_opt_state = cbargs.opt_state
         if self.verbose:
-            print(f"Training took: {datetime.timedelta(seconds=self.training_time)}")
+            print(
+                f"Training took: {
+                    datetime.timedelta(seconds=self.training_time)
+                }"
+            )
 
-    def plot(self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}):
-        """Plots the recorded training and validation losses.
+    def plot(
+        self,
+        *,
+        ax: Any = None,
+        loss_options: dict = {},
+        val_loss_options: dict = {},
+    ):
+        """Plot the recorded training and validation losses.
 
         Note:
             This method requires matplotlib.
 
         Args:
-            ax: Matplotlib axes to plot into. If ``None`` then a new
-                axis is created.
-                (Defaults to None.)
+            ax: Matplotlib axes to plot into. If ``None`` then a new axis is
+                created. (Defaults to None.)
             loss_options: Dictionary of keyword arguments passed to
-                matplotlibs ``plot`` for the training loss.
-                (Defaults to {}.)
+                matplotlibs ``plot`` for the training loss. (Defaults to {}.)
             val_loss_options: Dictionary of keyword arguments passed to
-                matplotlibs ``plot`` for the validation loss.
-                (Defaults to {}.)
+                matplotlibs ``plot`` for the validation loss. (Defaults to {}.)
 
         Raises:
             ImportError: _description_
+
         """
         module_name = "matplotlib.pyplot"
         try:
@@ -275,8 +293,8 @@ class HistoryCallback(Callback):
                 )
                 ax.grid(True)
 
-            # Rename the color option to "c", if it exists. Otherwise "c" and "color" are
-            # both passed to plot, which causes an error.
+            # Rename the color option to "c", if it exists. Otherwise "c" and
+            # "color" are both passed to plot, which causes an error.
             if "color" in loss_options:
                 loss_options["c"] = loss_options.pop("color")
             if "color" in val_loss_options:
@@ -284,7 +302,8 @@ class HistoryCallback(Callback):
 
             loss_options = dict(label="Loss", ls="-", c="black") | loss_options
             val_loss_options = (
-                dict(label="Validation loss", ls="--", c="red") | val_loss_options
+                dict(label="Validation loss", ls="--", c="red")
+                | val_loss_options
             )
             ax.plot(self.steps, self.loss, **loss_options)
             if any(x is not None for x in self.val_loss):
@@ -298,7 +317,10 @@ class HistoryCallback(Callback):
             )
 
     def save(
-        self, filename: str | Path, overwrite: bool = False, create_dir: bool = True
+        self,
+        filename: str | Path,
+        overwrite: bool = False,
+        create_dir: bool = True,
     ) -> None:
         """Save the HistoryCallback instance to a file using pickle.
 
@@ -307,12 +329,13 @@ class HistoryCallback(Callback):
             overwrite: If True, overwrite the file if it already exists.
                 If False, raise a FileExistsError if the file exists.
                 (Defaults to False.)
-            create_dir: If True, create the parent directory if it does not exist.
-                (Defaults to True.)
+            create_dir: If True, create the parent directory if it does not
+                exist. (Defaults to True.)
 
         Raises:
             FileExistsError: If the file already exists and overwrite is False.
             ValueError: If the provided path is not a valid file path.
+
         """
         filename = Path(filename)
 
@@ -322,7 +345,8 @@ class HistoryCallback(Callback):
 
         if filename.exists() and not overwrite:
             raise FileExistsError(
-                f"The file '{filename}' already exists. Use overwrite=True to overwrite it."
+                f"The file '{filename}' already exists. Use overwrite=True to "
+                f"overwrite it."
             )
 
         if create_dir:
@@ -332,17 +356,19 @@ class HistoryCallback(Callback):
             pickle.dump(self, f)
 
     @staticmethod
-    def load(filename: str | Path) -> HistoryCallback:
-        """Load a HistoryCallback instance from a file.
+    def load(filename: str | Path) -> "HistoryCallback":
+        """Load a `HistoryCallback` instance from a file.
 
         Args:
             filename: The file path from which the instance should be loaded.
 
         Returns:
-            The loaded HistoryCallback instance.
+            The loaded `HistoryCallback` instance.
 
         Raises:
-            ValueError: If the file is not a valid pickle file or does not contain a HistoryCallback instance.
+            ValueError: If the file is not a valid pickle file or does not
+                contain a `HistoryCallback` instance.
+
         """
         filename = Path(filename)
 
@@ -351,7 +377,8 @@ class HistoryCallback(Callback):
 
         if not isinstance(obj, HistoryCallback):
             raise ValueError(
-                f"The file '{filename}' does not contain a valid HistoryCallback instance."
+                f"The file '{filename}' does not contain a valid "
+                f"HistoryCallback instance."
             )
 
         return obj

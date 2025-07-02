@@ -7,10 +7,10 @@ name = "klax"
 version = "0.1.0"
 description = "A lightweight machine learning package for computational mechanics."
 readme = "README.md"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 authors = [
     { name = "Fabian Roth", email = "roth@cps.tu-darmstadt.de" },
-    { name = "Jasper Schommartz", email = "schommartz@cps.tu-darmstadt.de" }
+    { name = "Jasper Schommartz", email = "schommartz@cps.tu-darmstadt.de" },
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -37,21 +37,17 @@ Repository = "https://github.com/Drenderer/klax"
 Issues = "https://github.com/Drenderer/klax/issues"
 
 [project.optional-dependencies]
-plot = [
-    "matplotlib>=3.10.3",
-]
+plot = ["matplotlib>=3.10.3"]
 docs = [
-    "myst-nb>=1.2.0",
-    "sphinx>=8.2.3",
-    "sphinx-autodoc-typehints>=3.2.0",
-    "sphinx-book-theme>=1.1.4",
+    "hippogriffe>=0.2.2",
+    "mkdocs>=1.6.1",
+    "mkdocs-ipynb>=0.1.1",
+    "mkdocs-material>=9.6.14",
+    "mkdocstrings-python>=1.16.12",
 ]
 
 [dependency-groups]
-dev = [
-    "pytest>=8.3.5",
-    "ruff>=0.11.10",
-]
+dev = ["pytest>=8.3.5", "ruff>=0.11.10"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["klax"]
@@ -62,3 +58,30 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 79
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+
+[tool.ruff.lint]
+# See https://docs.astral.sh/ruff/rules/ for the meaning of all rules.
+select = [
+    "D",  # pydocstyle
+    "E",  # pycodestyle
+    "I",  # isort
+    "N",  # pep8-naming
+    "UP", # pyupgrade
+]
+ignore = [
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D107",  # Mising docstring in `__init__`
+    "E501",  # During development, we allow long lines.
+    "E402",
+    "E731",
+    "E741",
+    "UP038",
+]

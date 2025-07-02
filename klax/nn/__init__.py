@@ -12,30 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ._icnn import FICNN as FICNN
 from ._linear import (
-    Linear as Linear,
     InputSplitLinear as InputSplitLinear,
 )
-from ._mlp import MLP as MLP
-from ._icnn import FICNN as FICNN
+from ._linear import (
+    Linear as Linear,
+)
 from ._matrices import (
-    Matrix as Matrix,
     ConstantMatrix as ConstantMatrix,
-    SkewSymmetricMatrix as SkewSymmetricMatrix,
+)
+from ._matrices import (
     ConstantSkewSymmetricMatrix as ConstantSkewSymmetricMatrix,
-    SPDMatrix as SPDMatrix,
+)
+from ._matrices import (
     ConstantSPDMatrix as ConstantSPDMatrix,
 )
-
-__all__ = [
-    "Linear",
-    "InputSplitLinear",
-    "MLP", 
-    "FICNN",
-    "Matrix",
-    "ConstantMatrix",
-    "SkewSymmetricMatrix",
-    "ConstantSkewSymmetricMatrix",
-    "SPDMatrix",
-    "ConstantSPDMatrix"
-]
+from ._matrices import (
+    Matrix as Matrix,
+)
+from ._matrices import (
+    SkewSymmetricMatrix as SkewSymmetricMatrix,
+)
+from ._matrices import (
+    SPDMatrix as SPDMatrix,
+)
+from ._mlp import MLP as MLP
