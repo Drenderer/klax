@@ -12,7 +12,6 @@ theme:
     repo: fontawesome/brands/github
   favicon: assets/favicon.ico
   palette:
-
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
       toggle:
@@ -27,7 +26,7 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    
+
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
@@ -40,18 +39,20 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+strict: true # Do not allow warnings during the build process
+
 markdown_extensions:
   - admonition
   - pymdownx.superfences # Apperently enables type annotations
   - toc:
-      permalink: "¤"  # Adds a clickable permalink to each section heading
+      permalink: "¤" # Adds a clickable permalink to each section heading
       toc_depth: 4
 
 plugins:
   - ipynb
   # We add this package to show the base classes in the same line, which saves
   # some space, and to show the [source] button to the right of the member.
-  - hippogriffe: 
+  - hippogriffe:
       show_bases: true
       show_source_links: all
       extra_public_objects:
@@ -90,12 +91,12 @@ nav:
   - Klax: index.md
   - Examples:
       - examples/isotropic_hyperelasticity.ipynb
-  - API Reference: 
-    - api/training.md
-    - api/wrappers.md
-    - api/losses.md
-    - api/callbacks.md
-    - Neural Networks:
-      - api/nn/linear.md
-      - api/nn/mlp.md
-      - api/nn/matrices.md
+  - API Reference:
+      - api/training.md
+      - api/wrappers.md
+      - api/losses.md
+      - api/callbacks.md
+      - Neural Networks:
+          - api/nn/linear.md
+          - api/nn/mlp.md
+          - api/nn/matrices.md

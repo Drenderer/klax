@@ -178,7 +178,7 @@ class HistoryCallback(Callback):
     """
 
     log_every: int
-    steps: list #: List of steps at which the losses were recorded.
+    steps: list  #: List of steps at which the losses were recorded.
     loss: list
     val_loss: list
     last_start_time: float  # start time of the last training
@@ -255,7 +255,11 @@ class HistoryCallback(Callback):
             )
 
     def plot(
-        self, *, ax=None, loss_options: dict = {}, val_loss_options: dict = {}
+        self,
+        *,
+        ax: Any = None,
+        loss_options: dict = {},
+        val_loss_options: dict = {},
     ):
         """Plot the recorded training and validation losses.
 

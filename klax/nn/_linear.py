@@ -59,7 +59,7 @@ class Linear(eqx.Module, strict=True):
         use_bias: bool = True,
         weight_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
-        dtype=None,
+        dtype: type | None = None,
         *,
         key: PRNGKeyArray,
     ):

@@ -60,7 +60,7 @@ class FICNN(eqx.Module, strict=True):
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
         use_final_bias: bool = True,
-        dtype=None,
+        dtype: type | None = None,
         *,
         key: PRNGKeyArray,
     ):
