@@ -1,33 +1,26 @@
-"""
-Testing the computational performance of FICNN and comparing it to alternative implementations.
-"""
+"""Testing the computational performance of FICNN and comparing it to alternative implementations."""
 
 # %% Imports
 
-from __future__ import annotations
+import timeit
 from collections.abc import Callable, Sequence
 from typing import (
     Literal,
     Self,
 )
 
-import timeit
-
-from matplotlib import pyplot as plt
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jr
+from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
+from matplotlib import pyplot as plt
 
 import klax
+from klax import Constraint, HistoryCallback, NonNegative, fit
 from klax._misc import default_floating_dtype
 from klax.nn import FICNN, MLP, Linear
-from klax import fit
-from klax import HistoryCallback
-from klax import Constraint, NonNegative
 
 
 # %% Custom code for timeing code
@@ -190,8 +183,7 @@ class HalfConstrainedFICNN(eqx.Module):
             )()
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """
-        Args:
+        """Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
                 `in_size="scalar"`.)
             key: Ignored; provided for compatibility with the rest of the
@@ -200,8 +192,8 @@ class HalfConstrainedFICNN(eqx.Module):
         Returns:
             A JAX array with shape `(out_size,)`. (Or shape `()` if
             `out_size="scalar"`.)
-        """
 
+        """
         y = self.layers[0](x)
 
         for i, (layer, activation) in enumerate(

@@ -15,11 +15,12 @@
 import sys
 import time
 
-import klax
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 import pytest
+
+import klax
 
 
 def test_callbackargs(getkey, getmodel, getloss):
@@ -89,13 +90,15 @@ def test_history_callback(getkey, getmodel, getloss, tmp_path):
     opt_state = (None, (1, 3.14))  # Dummy opt state for testing
     flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
 
-    cbargs = klax.CallbackArgs(getloss, treedef_model, treedef_opt_state, (x, x), None)
+    cbargs = klax.CallbackArgs(
+        getloss, treedef_model, treedef_opt_state, (x, x), None
+    )
     history = klax.HistoryCallback(2)
 
     # On training start update
     cbargs.update(flat_model, flat_opt_state, 0)
     history.on_training_start(cbargs)
-    time.sleep(1e-6) # Sleep to ensure that training time is greater than 0
+    time.sleep(1e-6)  # Sleep to ensure that training time is greater than 0
 
     # First update
     cbargs.update(flat_model, flat_opt_state, 1)

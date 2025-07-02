@@ -18,28 +18,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-from collections.abc import Callable
-from typing import Literal, Sequence
+from collections.abc import Callable, Sequence
+from typing import Literal
 
 import equinox as eqx
 import jax
-from jax.nn.initializers import Initializer, zeros, he_normal
 import jax.random as jrandom
+from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
 from .._misc import default_floating_dtype
-from ._linear import Linear
 from .._wrappers import Constraint, Unwrappable
+from ._linear import Linear
 
 
 class MLP(eqx.Module, strict=True):
     """Standard Multi-Layer Perceptron; also known as a feed-forward network.
 
+    This class is modified form [`equinox.nn.MLP`](https://docs.kidger.site/equinox/api/nn/mlp/#equinox.nn.MLP)
+    to allow for custom initialization and different node numbers in the hidden
+    layers. Hence, it may also be used for ecoder/decoder tasks.
 
-    This class is modified form `eqx.nn.MLP` to allow for custom initialization
-    and different node numbers in the hidden layers. Hence, it may also be used
-    for ecoder/decoder tasks.
     """
 
     layers: tuple[Linear, ...]
@@ -64,21 +63,22 @@ class MLP(eqx.Module, strict=True):
         use_final_bias: bool = True,
         weight_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
-        dtype=None,
+        dtype: type | None = None,
         *,
         key: PRNGKeyArray,
     ):
-        """
+        """Initialize MLP.
+
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_features,)`.
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                Defaults to he_normal().
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                Defaults to zeros.
+            weight_init: The weight initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to he_normal().)
+            bias_init: The bias initializer of type
+                `jax.nn.initializers.Initializer`. (Defaults to zeros.)
             activation: The activation function after each hidden layer.
                 (Defaults to `jax.nn.softplus`).
             final_activation: The activation function after the output layer.
@@ -87,22 +87,22 @@ class MLP(eqx.Module, strict=True):
                 (Defaults to `True`.)
             use_final_bias: Whether to add on a bias to the final layer.
                 (Defaults to `True`.)
-            weight_warp: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that is passed to all weights.
-            bias_warp: An optional :class:`klax.Constraint` (or more generally a
-                :class:`klax.Unwrappable`) that is passed to all biases.
+            weight_wrap: An optional wrapper that is passed to all weights.
+            bias_wrap: An optional wrapper that is passed to all biases.
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
-            value. In this case the input to the module should be of shape `()`.
+            Note that `in_size` also supports the string `"scalar"` as a
+            special value. In this case the input to the module should be of
+            shape `()`.
 
             Likewise `out_size` can also be a string `"scalar"`, in which case
             the output from the module will have shape `()`.
+
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         width_sizes = tuple(width_sizes)
@@ -129,14 +129,18 @@ class MLP(eqx.Module, strict=True):
                 dtype=dtype,
                 key=key,
             )
-            for sin, sout, ub, key in zip(in_sizes, out_sizes, use_biases, keys)
+            for sin, sout, ub, key in zip(
+                in_sizes, out_sizes, use_biases, keys
+            )
         )
 
-        # In case `activation` or `final_activation` are learnt, then make a separate
-        # copy of their weights for every neuron.
+        # In case `activation` or `final_activation` are learnt, then make a
+        # separate copy of their weights for every neuron.
         activations = []
         for width in width_sizes:
-            activations.append(eqx.filter_vmap(lambda: activation, axis_size=width)())
+            activations.append(
+                eqx.filter_vmap(lambda: activation, axis_size=width)()
+            )
         self.activations = tuple(activations)
         if out_size == "scalar":
             self.final_activation = final_activation
@@ -146,7 +150,8 @@ class MLP(eqx.Module, strict=True):
             )()
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """
+        """Forward pass through MLP.
+
         Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
                 `in_size="scalar"`.)
@@ -156,6 +161,7 @@ class MLP(eqx.Module, strict=True):
         Returns:
             A JAX array with shape `(out_size,)`. (Or shape `()` if
             `out_size="scalar"`.)
+
         """
         for i, (layer, activation) in enumerate(
             zip(self.layers[:-1], self.activations)

@@ -12,31 +12,77 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from . import nn as nn
 from ._callbacks import (
     Callback as Callback,
+)
+from ._callbacks import (
     CallbackArgs as CallbackArgs,
+)
+from ._callbacks import (
     HistoryCallback as HistoryCallback,
 )
 from ._datahandler import (
-    batch_data as batch_data,
     BatchGenerator as BatchGenerator,
+)
+from ._datahandler import (
+    batch_data as batch_data,
+)
+from ._datahandler import (
     split_data as split_data,
 )
-from ._losses import Loss as Loss, mse as mse, mae as mae
-from . import nn as nn
+from ._losses import (
+    MAE as MAE,
+)
+from ._losses import (
+    MSE as MSE,
+)
+from ._losses import (
+    Loss as Loss,
+)
+from ._losses import (
+    mae as mae,
+)
+from ._losses import (
+    mse as mse,
+)
 from ._training import fit as fit
 from ._wrappers import (
-    apply as apply,
     Constraint as Constraint,
-    contains_constraints as contains_constraints,
-    contains_unwrappables as contains_unwrappables,
-    finalize as finalize,
-    Parameterize as Parameterize,
+)
+from ._wrappers import (
     NonNegative as NonNegative,
+)
+from ._wrappers import (
     NonTrainable as NonTrainable,
-    non_trainable as non_trainable,
+)
+from ._wrappers import (
+    Parameterize as Parameterize,
+)
+from ._wrappers import (
     SkewSymmetric as SkewSymmetric,
+)
+from ._wrappers import (
     Symmetric as Symmetric,
-    unwrap as unwrap,
+)
+from ._wrappers import (
     Unwrappable as Unwrappable,
+)
+from ._wrappers import (
+    apply as apply,
+)
+from ._wrappers import (
+    contains_constraints as contains_constraints,
+)
+from ._wrappers import (
+    contains_unwrappables as contains_unwrappables,
+)
+from ._wrappers import (
+    finalize as finalize,
+)
+from ._wrappers import (
+    non_trainable as non_trainable,
+)
+from ._wrappers import (
+    unwrap as unwrap,
 )

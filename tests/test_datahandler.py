@@ -19,6 +19,7 @@ import pytest
 
 from klax import batch_data, split_data
 
+
 def test_batch_data(getkey):
     # Sequence with one element
     x = jrandom.uniform(getkey(), (10,))
@@ -63,12 +64,12 @@ def test_batch_data(getkey):
         generator = batch_data(data, batch_axis=batch_axis, key=getkey())
         next(generator)
 
-    # Different batch dimensions
+    # Different batch sizes
     x = jrandom.uniform(getkey(), (10,))
     y = jrandom.uniform(getkey(), (5,))
     data = (x, y)
     with pytest.raises(
-        ValueError, match="All batched arrays must have equal batch dimension."
+        ValueError, match="All batched arrays must have equal batch size."
     ):
         generator = batch_data(data, key=getkey())
         next(generator)
@@ -85,7 +86,10 @@ def test_split_data(getkey):
     data = (
         jrandom.uniform(getkey(), (batch_size, 2)),
         [
-            jrandom.uniform(getkey(), (3, batch_size, 2)), 100., 'test', None,
+            jrandom.uniform(getkey(), (3, batch_size, 2)),
+            100.0,
+            "test",
+            None,
         ],
     )
     proportions = (2, 1, 1)
@@ -99,10 +103,10 @@ def test_split_data(getkey):
 
     # One-element data structure
     data = np.arange(10)
-    s, = split_data(data, (1.,), key=getkey())
+    (s,) = split_data(data, (1.0,), key=getkey())
     assert np.array_equal(data, np.sort(s))
 
     # Negative proportion
     data = np.arange(10)
     with pytest.raises(ValueError):
-        split_data(data, (-1.,), key=getkey())
+        split_data(data, (-1.0,), key=getkey())
