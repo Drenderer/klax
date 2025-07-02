@@ -79,7 +79,7 @@ class CallbackArgs:
         self._treedef_opt_state = treedef_opt_state
 
     def update(self, flat_model: PyTree, flat_opt_state: PyTree, step: int):
-        """Update the callback arguments object with the current model and optimizer state.
+        """Update the object with the current model and optimizer state.
 
         This method is called repeatedly in [`klax.fit`][].
 
@@ -251,7 +251,9 @@ class HistoryCallback(Callback):
         self.last_opt_state = cbargs.opt_state
         if self.verbose:
             print(
-                f"Training took: {datetime.timedelta(seconds=self.training_time)}"
+                f"Training took: {
+                    datetime.timedelta(seconds=self.training_time)
+                }"
             )
 
     def plot(
