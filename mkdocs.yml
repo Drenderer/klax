@@ -91,6 +91,7 @@ nav:
   - Klax: index.md
   - Examples:
       - examples/isotropic_hyperelasticity.ipynb
+      - examples/training_without_data.ipynb
   - API Reference:
       - api/training.md
       - api/wrappers.md
