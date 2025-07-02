@@ -15,13 +15,15 @@ Klax provides specialized machine learning architectures, constraints, and train
 - **Neural Networks**: Implementations of Input Convex Neural Networks (ICNNs), matrix-valued neural networks, MLPs with custom initialization, and more.
 - **JAX Compatibility**: Seamless integration with JAX's automatic differentiation and acceleration
 - **Parameter Constraints**: Differentiable and non-differentiable parameter constraints through [`klax.Unwrappable`][] and [`klax.Constraint`][]
-- **Customizable Training**: Methods and APIs for customized calibrations on arbitrary PyTree data structures through [`klax.fit`][], [`klax.Loss`][], and [`klax.Callback`][]
+- **Customizable Training**: Methods and APIs for customized calibrations on arbitrary PyTree data structures through [`klax.fit`][], [`klax.Loss`][], and [`klax.Callback`][].
 
 Klax is designed to be minimally intrusive - all models inherit directly from [`equinox.Module`](https://docs.kidger.site/equinox/api/module/module/#equinox.Module) without additional abstraction layers. This ensures full compatibility with the JAX/Equinox ecosystem while adding mechanical engineering-specific functionality.
 
 The constraint system is derived from Paramax's [`paramax.AbstractUnwrappable`](https://danielward27.github.io/paramax/api/wrappers.html#paramax.wrappers.AbstractUnwrappable), extending it to support non-differentiable parameter constraints such as ReLU-based non-negativity constraints.
 
 The provided calibration utilities ([`klax.fit`][], [`klax.Loss`][], [`klax.Callback`][]) are designed to operate on arbitrarily shaped PyTrees of data, fully utilizing the flexibility of JAX and Equinox. While they cover most common machine learning use cases, as well as our specialized requirements, they remain entirely optional. The core building blocks of Klax work seamlessly in custom training loops.
+
+Currently Klax's training utilities are built around Optax, but different optimization libraries could be supported in the future if desired.
 
 ## Installation
 
@@ -47,7 +49,7 @@ uv add "klax @ git+https://github.com/Drenderer/klax.git@main"
 
 If you're new to the JAX ecosystem, we recommend looking at [Quickstart](https://docs.jax.dev/en/latest/quickstart.html), which provides a concise overview of JAX's core functionality.
 
-As the contents of the documentation are still rudimentary, we recommend checking out [Equinox](https://docs.kidger.site/equinox/) and [Paramax](https://danielward27.github.io/paramax/#) and taking a look at our examples [Examples](./examples/isotropic_hyperelasticity.ipynb).
+As the contents of the documentation are still rudimentary, we recommend checking out [Equinox](https://docs.kidger.site/equinox/) and [Paramax](https://danielward27.github.io/paramax/#) and taking a look at our [examples](./examples/isotropic_hyperelasticity.ipynb).
 
 ## Citation
 
