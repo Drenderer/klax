@@ -43,7 +43,6 @@ def broadcast_and_get_batch_size(
 
     Raises:
         ValueError: If `batch_axis` is not a prefix of `data`.
-        ValueError: If no leaf in `data` has a batch axis.
         ValueError: If not all batch axes have the same size.
 
     Returns:
@@ -72,7 +71,7 @@ def broadcast_and_get_batch_size(
         dataset_size = 1
     else:
         if not all(b == dataset_sizes[0] for b in dataset_sizes[1:]):
-            raise ValueError("All batched arrays must have equal batch axis dimension.")
+            raise ValueError("All batched arrays must have equal batch sizes.")
         dataset_size = dataset_sizes[0]
 
     return batch_axis, dataset_size
