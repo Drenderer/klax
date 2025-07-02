@@ -15,7 +15,6 @@
 from typing import Self
 
 import equinox as eqx
-import equinox.internal as eqxi
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
@@ -129,7 +128,7 @@ def test_training(getkey):
         optax.lion(1.0),
         optax.nadam(1.0),
         optax.nadamw(1.0),
-        optax.noisy_sgd(1.0, key=eqxi.GetKey()()[0]),
+        optax.noisy_sgd(1.0),
         optax.novograd(1.0),
         optax.optimistic_gradient_descent(1.0),
         optax.optimistic_adam(1.0),
