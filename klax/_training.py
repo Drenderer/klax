@@ -103,8 +103,7 @@ def fit[T: eqx.Module, H: Callback](
         the first axes of any `jax.Array`
 
     Returns:
-        A tuple of the trained model and a history dictionary containing the
-        loss history.
+        A tuple of the trained model and the loss history.
 
     """
     # Braodcast the batch_axis to the data. While this happens again in the
