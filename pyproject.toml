@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "klax"
 version = "0.1.0"
-description = "A lightweight machine learning pacakge for computational mechanics."
+description = "A lightweight machine learning package for computational mechanics."
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [
-    { name = "Drenderer", email = "some@email.com" },
-    { name = "jaosch", email = "jasper.schommartz@gmail.com" }
+    { name = "Fabian Roth", email = "roth@cps.tu-darmstadt.de" },
+    { name = "Jasper Schommartz", email = "schommartz@cps.tu-darmstadt.de" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -34,13 +34,14 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/Drenderer/klax"
-Issues = "https://github.com/jaosch/feap-caller/klax"
+Issues = "https://github.com/Drenderer/klax/issues"
 
 [project.optional-dependencies]
 plot = [
     "matplotlib>=3.10.3",
 ]
 docs = [
+    "myst-nb>=1.2.0",
     "sphinx>=8.2.3",
     "sphinx-autodoc-typehints>=3.2.0",
     "sphinx-book-theme>=1.1.4",

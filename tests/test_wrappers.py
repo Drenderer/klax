@@ -99,9 +99,9 @@ def test_skewsymmetric(getkey):
 
 
 test_cases = {
-    "NonTrainable": lambda key: NonTrainable(jr.normal(key, 10)),
-    "Parameterize-exp": lambda key: Parameterize(jnp.exp, jr.normal(key, 10)),
-    "NonNegative": lambda key: NonNegative(jr.normal(key, 10)),
+    "NonTrainable": lambda key: NonTrainable(jr.normal(key, (10,))),
+    "Parameterize-exp": lambda key: Parameterize(jnp.exp, jr.normal(key, (10,))),
+    "NonNegative": lambda key: NonNegative(jr.normal(key, (10,))),
 }
 
 

@@ -48,7 +48,7 @@ def fit[
     optimizer: optax.GradientTransformation = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    history: H | None = None,
+    history: HistoryCallback | H | None = None,
     callbacks: Iterable[Callback] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[T, HistoryCallback | H]:
