@@ -67,8 +67,8 @@ class Matrix(eqx.Module):
         Args:
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a Array
-                with the specified `shape`. For square matrices a single
+            shape: The matrix shape. The output from the module will be an
+                array with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
             width_sizes: The sizes of each hidden layer of the underlying MLP
