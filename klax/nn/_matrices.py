@@ -51,7 +51,7 @@ class Matrix(eqx.Module):
         self,
         in_size: int | Literal["scalar"],
         shape: int | AtLeast2DTuple[int],
-        width_sizes: Sequence[int] | None = None,
+        width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -71,7 +71,7 @@ class Matrix(eqx.Module):
                 array with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             width_sizes: The sizes of each hidden layer of the underlying MLP
-                in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
+                in a list.
             weight_init: The weight initializer of type
                 `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
@@ -98,9 +98,6 @@ class Matrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [max(8, in_size_)] if width_sizes is None else width_sizes
-        )
         shape = shape if isinstance(shape, tuple) else (shape, shape)
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -201,7 +198,7 @@ class SkewSymmetricMatrix(eqx.Module):
         self,
         in_size: int | Literal["scalar"],
         shape: int | AtLeast2DTuple[int],
-        width_sizes: Sequence[int] | None = None,
+        width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -221,7 +218,7 @@ class SkewSymmetricMatrix(eqx.Module):
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             width_sizes: The sizes of each hidden layer of the underlying MLP
-                in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
+                in a list.
             weight_init: The weight initializer of type
                 `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
@@ -248,9 +245,6 @@ class SkewSymmetricMatrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [max(8, in_size_)] if width_sizes is None else width_sizes
-        )
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -364,8 +358,8 @@ class SPDMatrix(eqx.Module):
         self,
         in_size: int | Literal["scalar"],
         shape: int | AtLeast2DTuple[int],
+        width_sizes: Sequence[int],
         epsilon: float = 1e-6,
-        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
         bias_init: Initializer = zeros,
         activation: Callable = jax.nn.softplus,
@@ -385,7 +379,7 @@ class SPDMatrix(eqx.Module):
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             width_sizes: The sizes of each hidden layer of the underlying MLP
-                in a list. (Defaults to `[k,]`, where `k=max(8, in_size`).)
+                in a list.
             epsilon: Small value that is added to the diagonal of the output
                 matrix to ensure positive definiteness. If only positive
                 semi-definiteness is required set `epsilon = 0.`
@@ -416,9 +410,6 @@ class SPDMatrix(eqx.Module):
         """
         in_size_ = 1 if in_size == "scalar" else in_size
         shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [max(8, in_size_)] if width_sizes is None else width_sizes
-        )
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -522,7 +513,7 @@ class ConstantSPDMatrix(eqx.Module):
                 matrix-valued function API.
 
         Returns:
-            A JAX array of shape ``shape``.
+            A JAX array of shape `shape`.
 
         """
         a_matrix = self.b_matrix @ jnp.conjugate(self.b_matrix.mT)

@@ -261,21 +261,23 @@ def test_ficnn(getkey, use_passthrough, non_decreasing):
 def test_matrices(getkey):
     x = jrandom.normal(getkey(), (4,))
 
-    m = Matrix(4, (1, 2, 3), key=getkey())
+    m = Matrix(4, (1, 2, 3), [8], key=getkey())
     assert m(x).shape == (1, 2, 3)
-    m = Matrix("scalar", (5, 3), key=getkey())
+    m = Matrix(in_size="scalar", shape=(5, 3), width_sizes=[8], key=getkey())
     assert m(jnp.array(0.0)).shape == (5, 3)
 
     m = ConstantMatrix(4, key=getkey())
     assert m(x).shape == (4, 4)
-    m = ConstantMatrix((1, 2, 3), key=getkey())
+    m = ConstantMatrix(shape=(1, 2, 3), key=getkey())
     assert m(x).shape == (1, 2, 3)
 
-    m = SkewSymmetricMatrix(4, (2, 3, 3), key=getkey())
+    m = SkewSymmetricMatrix(4, (2, 3, 3), [8], key=getkey())
     output = m(x)
     assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
-    m = SkewSymmetricMatrix("scalar", (5, 3, 3), key=getkey())
+    m = SkewSymmetricMatrix(
+        in_size="scalar", shape=(5, 3, 3), width_sizes=[8], key=getkey()
+    )
     assert klax.finalize(m)(0.0).shape == (5, 3, 3)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
 
@@ -288,12 +290,14 @@ def test_matrices(getkey):
     assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, -jnp.matrix_transpose(output))
 
-    m = SPDMatrix(4, (2, 3, 3), dtype=jnp.complex64, key=getkey())
+    m = SPDMatrix(4, (2, 3, 3), [8], dtype=jnp.complex64, key=getkey())
     output = m(x)
     assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
     assert jnp.all(jnp.linalg.eigvalsh(output) > 0.0)
-    m = SPDMatrix("scalar", (5, 3, 3), key=getkey())
+    m = SPDMatrix(
+        in_size="scalar", shape=(5, 3, 3), width_sizes=[8], key=getkey()
+    )
     assert m(jnp.array(0.0)).shape == (5, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
 
