@@ -7,10 +7,10 @@ name = "klax"
 version = "0.1.0"
 description = "A lightweight machine learning package for computational mechanics."
 readme = "README.md"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 authors = [
     { name = "Fabian Roth", email = "roth@cps.tu-darmstadt.de" },
-    { name = "Jasper Schommartz", email = "schommartz@cps.tu-darmstadt.de" }
+    { name = "Jasper Schommartz", email = "schommartz@cps.tu-darmstadt.de" },
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -37,9 +37,7 @@ Repository = "https://github.com/Drenderer/klax"
 Issues = "https://github.com/Drenderer/klax/issues"
 
 [project.optional-dependencies]
-plot = [
-    "matplotlib>=3.10.3",
-]
+plot = ["matplotlib>=3.10.3"]
 docs = [
     "hippogriffe>=0.2.2",
     "mkdocs>=1.6.1",
@@ -49,10 +47,7 @@ docs = [
 ]
 
 [dependency-groups]
-dev = [
-    "pytest>=8.3.5",
-    "ruff>=0.11.10",
-]
+dev = ["pytest>=8.3.5", "ruff>=0.11.10"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["klax"]
@@ -71,22 +66,22 @@ quote-style = "double"
 [tool.ruff.lint]
 # See https://docs.astral.sh/ruff/rules/ for the meaning of all rules.
 select = [
-    "D", # pydocstyle
-    "E", # pycodestyle
-    "I", # isort
-    "N", # pep8-naming
+    "D",  # pydocstyle
+    "E",  # pycodestyle
+    "I",  # isort
+    "N",  # pep8-naming
     "UP", # pyupgrade
 ]
 ignore = [
-    "D100", # Missing docstring in public module
-    "D101", # Missing docstring in public class
-    "D102", # Missing docstring in public method
-    "D103", # Missing docstring in public function
-    "D104", # Missing docstring in public package
-    "D107", # Mising docstring in `__init__`
-    #"E501", # During development, we allow long lines.
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D107",  # Mising docstring in `__init__`
+    "E501",  # During development, we allow long lines.
     "E402",
     "E731",
     "E741",
-    "UP038"
+    "UP038",
 ]
