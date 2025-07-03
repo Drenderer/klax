@@ -58,18 +58,15 @@ def test_batch_data(getkey):
     x = jrandom.uniform(getkey(), (10,))
     data = (x,)
     batch_axis = None
-    with pytest.raises(
-        ValueError, match="At least one leaf must have a batch dimension."
-    ):
-        generator = batch_data(data, batch_axis=batch_axis, key=getkey())
-        next(generator)
+    generator = batch_data(data, batch_axis=batch_axis, key=getkey())
+    assert next(generator) == data
 
     # Different batch sizes
     x = jrandom.uniform(getkey(), (10,))
     y = jrandom.uniform(getkey(), (5,))
     data = (x, y)
     with pytest.raises(
-        ValueError, match="All batched arrays must have equal batch size."
+        ValueError, match="All batched arrays must have equal batch sizes."
     ):
         generator = batch_data(data, key=getkey())
         next(generator)

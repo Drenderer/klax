@@ -41,7 +41,6 @@ def broadcast_and_get_size(
 
     Raises:
         ValueError: If `batch_axis` is not a prefix of `data`.
-        ValueError: If no leaf in `data` has a batch axis.
         ValueError: If not all batch axes have the same size.
 
     Returns:
@@ -55,8 +54,10 @@ def broadcast_and_get_size(
             data,
             is_leaf=lambda x: x is None,
         )
-    except ValueError:
-        raise ValueError("batch_axis must be a prefix of data.")
+    except ValueError as e:
+        raise ValueError(
+            f"batch_axis must be a prefix of data. Original message: {e}"
+        )
 
     dataset_sizes = jax.tree.map(
         lambda a, d: None if a is None else d.shape[a],
@@ -66,10 +67,12 @@ def broadcast_and_get_size(
     )
     dataset_sizes = jax.tree.leaves(dataset_sizes)
     if len(dataset_sizes) == 0:
-        raise ValueError("At least one leaf must have a batch dimension.")
-    dataset_size = dataset_sizes[0]
-    if not all(b == dataset_size for b in dataset_sizes):
-        raise ValueError("All batched arrays must have equal batch size.")
+        # No leaf in data has a batch dimension -> singelton data set
+        dataset_size = 1
+    else:
+        if not all(b == dataset_sizes[0] for b in dataset_sizes[1:]):
+            raise ValueError("All batched arrays must have equal batch sizes.")
+        dataset_size = dataset_sizes[0]
 
     return batch_axis, dataset_size
 
@@ -91,6 +94,7 @@ def batch_data(
     data: PyTree[Any],
     batch_size: int = 32,
     batch_axis: PyTree[int | None] = 0,
+    convert_to_numpy: bool = True,
     *,
     key: PRNGKeyArray,
 ) -> Generator[PyTree[Any], None, None]:
@@ -136,6 +140,9 @@ def batch_data(
             `data` or have `data` as a prefix. 
             (Defaults to 0, meaning all leaves in `data` are
             batched along their first dimension.)
+        convert_to_numpy: If `True`, batched data leafs will be converted to 
+            Numpy arrays before batching. This is useful for performance 
+            reasons, as Numpy's slicing is much faster than JAX's.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation. (Keyword only argument.)
 
@@ -157,12 +164,13 @@ def batch_data(
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
     # for fast model training steps this actually makes a huge difference!
     # However, be aware that this is likely only true if JAX runs on CPU.
-    data = jax.tree.map(
-        lambda x, a: x if a is None else np.array(x),
-        data,
-        batch_axis,
-        is_leaf=lambda x: x is None,
-    )
+    if convert_to_numpy:
+        data = jax.tree.map(
+            lambda x, a: x if a is None else np.array(x),
+            data,
+            batch_axis,
+            is_leaf=lambda x: x is None,
+        )
 
     # Reduce batch size if the dataset has less examples than batch size
     batch_size = min(batch_size, dataset_size)

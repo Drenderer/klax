@@ -43,10 +43,16 @@ strict: true # Do not allow warnings during the build process
 
 markdown_extensions:
   - admonition
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.superfences # Apperently enables type annotations
   - toc:
       permalink: "¤" # Adds a clickable permalink to each section heading
       toc_depth: 4
+
+extra_javascript:
+  - javascript/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 plugins:
   - ipynb
@@ -91,6 +97,7 @@ nav:
   - Klax: index.md
   - Examples:
       - examples/isotropic_hyperelasticity.ipynb
+      - examples/training_without_data.ipynb
   - API Reference:
       - api/training.md
       - api/wrappers.md
