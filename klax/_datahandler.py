@@ -46,7 +46,7 @@ def broadcast_and_get_size(
     Returns:
         Tuple of the broadcasted `batch_axis` and the `dataset_size`.
 
-    """ 
+    """
     try:
         batch_axis = jax.tree.map(
             lambda a, d: jax.tree.map(eqx.if_array(a), d),
@@ -101,11 +101,11 @@ def batch_data(
     """Create a `Generator` that draws subsets of data without replacement.
 
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
-    passed, batch axes (including `None` for no batching) can be specified for 
+    passed, batch axes (including `None` for no batching) can be specified for
     every leaf individualy.
-    A generator is returned that indefinetly yields batches of data with size 
+    A generator is returned that indefinetly yields batches of data with size
     `batch_size`. Examples are drawn without replacement until the remaining
-    dataset is smaller than `batch_size`, at which point the dataset will be 
+    dataset is smaller than `batch_size`, at which point the dataset will be
     reshuffeld and the process starts over.
 
     Example:
@@ -137,11 +137,11 @@ def batch_data(
         batch_axis: PyTree of the batch axis indices. `None` is used to
             indicate that the corresponding leaf or subtree in data does not
             have a batch axis. `batch_axis` must have the same structure as
-            `data` or have `data` as a prefix. 
+            `data` or have `data` as a prefix.
             (Defaults to 0, meaning all leaves in `data` are
             batched along their first dimension.)
-        convert_to_numpy: If `True`, batched data leafs will be converted to 
-            Numpy arrays before batching. This is useful for performance 
+        convert_to_numpy: If `True`, batched data leafs will be converted to
+            Numpy arrays before batching. This is useful for performance
             reasons, as Numpy's slicing is much faster than JAX's.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation. (Keyword only argument.)

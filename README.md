@@ -68,4 +68,22 @@ uv sync
 
 For more information on uv, visit the [uv documentation](https://docs.astral.sh/uv/). Note, that klax does not add `.python-version` and `uv.lock` files to VCS, as it is generally not recommended for libraries. See [this](https://stackoverflow.com/questions/61037557/should-i-commit-lock-file-changes-separately-what-should-i-write-for-the-commi) discussion on Stack Overflow for reference.
 
+
+### Setting up pre-commit
+
+First make sure pre-commit is installed
+```bash
+uv sync --all-extras --all-groups
+```
+
+Then install the git hook scripts
+```bash
+pre-commit install
+```
+
+(optional) Run against all the files. It's usually a good idea to run the hooks against all of the files when adding new hooks (usually pre-commit will only run on the changed files during git hooks)
+```bash
+pre-commit run --all-files
+```
+
 ## Related
