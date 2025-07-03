@@ -7,7 +7,9 @@ A lightweight machine learning package for computational mechanics built on JAX.
 
 ## Documentation
 
-To preview the documentation run
+Check out klax's [documentation and examples](https://drenderer.github.io/klax/).
+
+To host the documentation locally run
 
 ```bash
 mkdocs serve
