@@ -54,8 +54,10 @@ def broadcast_and_get_size(
             data,
             is_leaf=lambda x: x is None,
         )
-    except ValueError:
-        raise ValueError("batch_axis must be a prefix of data.")
+    except ValueError as e:
+        raise ValueError(
+            f"batch_axis must be a prefix of data. Original message: {e}"
+        )
 
     dataset_sizes = jax.tree.map(
         lambda a, d: None if a is None else d.shape[a],
