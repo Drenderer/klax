@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     strategy:
@@ -27,12 +30,14 @@ jobs:
       run: |
         uv sync --extra docs
 
-    - name: Build MkDocs site
-      run: |
-        uv run mkdocs build
+    # - name: Build MkDocs site
+    #   run: |
+    #     uv run mkdocs build
 
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./site
+      run: |
+        uv run mkdocs gh-deploy --force
+      # uses: peaceiris/actions-gh-pages@v4
+      # with:
+      #   github_token: ${{ secrets.GITHUB_TOKEN }}
+      #   publish_dir: ./site
