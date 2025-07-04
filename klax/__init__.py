@@ -46,6 +46,12 @@ from ._losses import (
 from ._losses import (
     mse as mse,
 )
+from ._serialization import (
+    text_deserialize_filter_spec as text_deserialize_filter_spec,
+)
+from ._serialization import (
+    text_serialize_filter_spec as text_serialize_filter_spec,
+)
 from ._training import fit as fit
 from ._wrappers import (
     Constraint as Constraint,
