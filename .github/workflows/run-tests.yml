@@ -1,0 +1,36 @@
+name: Run tests
+
+on:
+  pull_request:
+
+jobs:
+  run-tests:
+    strategy:
+      matrix:
+        python-version: [ 3.12 ]
+        os: [ ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv and set the Python version
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras --all-groups
+
+      - name: Check with pre-commit
+        uses: pre-commit/action@3.0.1
+
+      - name: Test with pytest
+        run: |
+          uv run pytest
+
+      - name: Try building the docs
+        run: |
+          uv run mkdocs build
