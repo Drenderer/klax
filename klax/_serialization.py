@@ -16,7 +16,6 @@
 
 from typing import Any, BinaryIO
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -50,7 +49,7 @@ def text_serialize_filter_spec(f: BinaryIO, x: Any) -> None:
         f.write(f"{str(x)}\n".encode())
     elif isinstance(x, jax.Array | np.ndarray):
         arr = x.flatten()
-        f.write(f"{' '.join(str(float(v)) for v in arr)}\n".encode())
+        np.savetxt(f, arr[None])
     else:
         pass
 
@@ -85,16 +84,16 @@ def text_deserialize_filter_spec(f: BinaryIO, x: Any) -> Any:
         ```
 
     """
-    line = f.readline().decode().strip()
+    line = f.readline().decode()
     if isinstance(x, (bool, complex, float, int, np.generic)):
         return type(x)(line)
     elif isinstance(x, (jax.Array, jax.ShapeDtypeStruct)):
-        return jnp.array(
-            [float(v) for v in line.split()], dtype=x.dtype
+        return jnp.fromstring(
+            line, dtype=x.dtype, sep=" ", count=x.size
         ).reshape(x.shape)
     elif isinstance(x, np.ndarray):
-        return np.array(
-            [float(v) for v in line.split()], dtype=x.dtype
+        return np.fromstring(
+            line, dtype=x.dtype, sep=" ", count=x.size
         ).reshape(x.shape)
     else:
         return x
