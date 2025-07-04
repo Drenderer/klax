@@ -103,6 +103,7 @@ nav:
       - api/wrappers.md
       - api/losses.md
       - api/callbacks.md
+      - api/serialization.md
       - Neural Networks:
           - api/nn/linear.md
           - api/nn/mlp.md

@@ -23,11 +23,27 @@ import numpy as np
 
 
 def text_serialize_filter_spec(f: BinaryIO, x: Any) -> None:
-    """Filter speficivation for serializing a leaf to text.
+    """Filter specification for serializing a leaf to text.
 
     Args:
         f: File-like object to write to.
         x: The leaf to save in the file.
+
+    Example:
+        Serializing a model to a text file.
+
+        ```python
+        >>> import equinox as eqx
+        >>> import jax.numpy as jnp
+        >>> import klax
+        >>>
+        >>> tree = (jnp.array([1, 2, 3]), [3, 4, 5])
+        >>> eqx.tree_serialize_leaves(
+        ...     "some_txt_file.txt",
+        ...     tree,
+        ...     filter_spec=klax.text_serialize_filter_spec
+        ... )
+        ```
 
     """
     if isinstance(x, (bool, complex, float, int, np.generic)):
@@ -40,11 +56,33 @@ def text_serialize_filter_spec(f: BinaryIO, x: Any) -> None:
 
 
 def text_deserialize_filter_spec(f: BinaryIO, x: Any) -> Any:
-    """Filter speficication for deserializing a leaf from text.
+    """Filter specification for deserializing a leaf from text.
+
+    This function can be used to deserialized leafs that have been serialized
+    using [`klax.text_serialize_filter_spec`][].
 
     Args:
         f: File-like object to read from.
         x: The leaf for which to load data from the file.
+
+    Example:
+        ```python
+        >>> import equinox as eqx
+        >>> import jax.numpy as jnp
+        >>> import klax
+        >>>
+        >>> tree = (jnp.array([1, 2, 3]), [3, 4, 5])
+        >>> eqx.tree_serialize_leaves(
+        ...     "some_txt_file.txt",
+        ...     tree,
+        ...     filter_spec=klax.text_serialize_filter_spec
+        ... )
+        >>> loaded_tree = eqx.tree_deserialize_leaves(
+        ...     "some_txt_file.txt",
+        ...     tree,
+        ...     filter_spec=klax.text_deserialize_filter_spec
+        ... )
+        ```
 
     """
     line = f.readline().decode().strip()
