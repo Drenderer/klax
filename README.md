@@ -3,23 +3,29 @@
 </div>
 
 A lightweight machine learning package for computational mechanics built on JAX.
---------------------------------------------------------------------------------
 
-## Documentation
+---
 
-Check out klax's [documentation and examples](https://drenderer.github.io/klax/).
+Check out the [Documentation](https://drenderer.github.io/klax/) for examples and reference material.
 
-To host the documentation locally run
+## What is Klax?
 
-```bash
-mkdocs serve
-```
+Klax provides specialized machine learning architectures, constraints, and training utilities for mechanics and physics applications. Built on top of [JAX](https://docs.jax.dev/en/latest/), [Equinox](https://docs.kidger.site/equinox/), and [Optax](https://optax.readthedocs.io/en/latest/), it offers:
 
-To build it run
+- **Special Neural Networks**: Implementations of, e.g.,  Input Convex Neural Networks (ICNNs), matrix-valued neural networks, MLPs with custom initialization, and more.
+- **JAX Compatibility**: Seamless integration with JAX's automatic differentiation and acceleration.
+- **Parameter Constraints**: Differentiable and non-differentiable parameter constraints through [`klax.Unwrappable`](https://drenderer.github.io/klax/api/wrappers/#klax.Unwrappable) and [`klax.Constraint`](https://drenderer.github.io/klax/api/wrappers/#klax.Constraint)
+- **Customizable Training**: Methods and APIs for customized calibrations on arbitrary PyTree data structures through [`klax.fit`](https://drenderer.github.io/klax/api/training/#klax.fit), [`klax.Loss`](https://drenderer.github.io/klax/api/losses/#klax.Loss), and [`klax.Callback`](https://drenderer.github.io/klax/api/callbacks/#klax.Callback).
 
-```bash
-mkdocs build
-```
+Klax is designed to be minimally intrusive - all models inherit directly from [`equinox.Module`](https://docs.kidger.site/equinox/api/module/module/#equinox.Module) without additional abstraction layers. This ensures full compatibility with the JAX/Equinox ecosystem.
+
+The constraint system is derived from Paramax's [`paramax.AbstractUnwrappable`](https://danielward27.github.io/paramax/api/wrappers.html#paramax.wrappers.AbstractUnwrappable), extending it to support non-differentiable/zero-gradient parameter constraints such as ReLU-based non-negativity constraints.
+
+The provided calibration utilities ([`klax.fit`](https://drenderer.github.io/klax/api/training/#klax.fit), [`klax.Loss`](https://drenderer.github.io/klax/api/losses/#klax.Loss), [`klax.Callback`](https://drenderer.github.io/klax/api/callbacks/#klax.Callback)) are designed to operate on arbitrarily shaped PyTrees of data, fully utilizing the flexibility of JAX and Equinox. While they cover most common machine learning use cases, as well as our specialized requirements, they remain entirely optional. The core building blocks of Klax work seamlessly in custom training loops.
+
+Currently Klax's training utilities are built around Optax, but different optimization libraries could be supported in the future if desired.
+
+If you like using Klax, feel free to leave a GitHub star and create a PR if there is a feature that you think could benefit others too.
 
 ## Installation
 
@@ -51,6 +57,20 @@ uv sync --all-extras --all-groups
 ```
 
 from the project root. This will create a virtual environment with all the rependencies required for development and [install klax in editable mode](https://docs.astral.sh/uv/concepts/projects/config/#editable-mode).
+
+### Building the docs
+
+To preview the documentation locally, run
+
+```bash
+uv run mkdocs serve
+```
+
+To build the static site, run
+
+```bash
+uv run mkdocs build
+```
 
 ### Updating pyproject.toml versions
 
