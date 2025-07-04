@@ -25,7 +25,7 @@ jobs:
           uv sync --all-extras --all-groups
 
       - name: Check with pre-commit
-        uses: pre-commit/action@3.0.1
+        uses: pre-commit/action@v3.0.1
 
       - name: Test with pytest
         run: |
