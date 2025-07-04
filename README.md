@@ -25,7 +25,7 @@ The provided calibration utilities ([`klax.fit`](https://drenderer.github.io/kla
 
 Currently Klax's training utilities are built around Optax, but different optimization libraries could be supported in the future if desired.
 
-If you like using Klax, feel free to leave a GitHub star and create a PR if there is a feature that you think could benefit others too.
+If you like using Klax, feel free to leave a GitHub star, and if there is a machine learning architecture that you think should be included in Klax, please consider making a PR.
 
 ## Installation
 
