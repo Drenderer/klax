@@ -24,15 +24,15 @@ jobs:
         run: |
           uv sync --all-extras --all-groups
 
-      # - name: Check with pre-commit
-      #   run: |
-      #     uv run pre-commit install
-      #     uv run pre-commit run --all-files
+      - name: Check with pre-commit
+        run: |
+          uv run pre-commit install
+          uv run pre-commit run --all-files
 
       - name: Test with pytest
         run: |
           uv run --frozen pytest
 
-      # - name: Try building the docs
-      #   run: |
-      #     uv run mkdocs build
+      - name: Try building the docs
+        run: |
+          uv run mkdocs build
