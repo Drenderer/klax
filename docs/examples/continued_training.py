@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""# Continued trainig example
+"""Continued trainig example.
+
 This example demonstrates how to continue a training session.
 It shows how to initialize the optax initializer state with a previous training session's final state,
 and how to use the `HistoryCallback` to add the training history to the subsequent training sessions.
