@@ -107,7 +107,7 @@ class HalfConstrainedFICNN(eqx.Module):
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -183,7 +183,9 @@ class HalfConstrainedFICNN(eqx.Module):
             )()
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """Args:
+        """Forward pass through HalfConstrainedFICNN.
+
+        Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
                 `in_size="scalar"`.)
             key: Ignored; provided for compatibility with the rest of the

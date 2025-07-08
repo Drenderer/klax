@@ -16,7 +16,7 @@ from klax.nn import MLP
 
 
 # %% Custom code for timeing code
-def format_time(seconds: float) -> str:
+def format_time(seconds: float | Array) -> str:
     units = [
         ("s", 1),
         ("ms", 1e-3),
@@ -50,21 +50,23 @@ def time_code(func, msg=""):
 
 # %% Define implementations
 
+type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
+
 
 class OriginalSPDMatrix(eqx.Module):
     func: MLP
-    shape: tuple[int] = eqx.field(static=True)
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
     _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of lower triangular matrices
 
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | tuple[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
+        width_sizes: Sequence[int],
         epsilon: float = 1e-6,
-        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -73,16 +75,7 @@ class OriginalSPDMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [
-                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
-            ]
-            if width_sizes is None
-            else width_sizes
-        )
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for symmetric matrices."
@@ -115,27 +108,27 @@ class OriginalSPDMatrix(eqx.Module):
 
     def __call__(self, x: Array) -> Array:
         elements = self.func(x).reshape(*self.shape[:-2], -1)
-        L = jnp.einsum(
+        l_matrix = jnp.einsum(
             "ijk,...k->...ij", jax.lax.stop_gradient(self._tensor), elements
         )
-        A = L @ jnp.conjugate(L.mT)
-        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
-        return A + self.epsilon * identity
+        a_matrix = l_matrix @ jnp.conjugate(l_matrix.mT)
+        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), a_matrix.shape)
+        return a_matrix + self.epsilon * identity
 
 
 class AlternativeSPDMatrix(eqx.Module):
     func: MLP
-    shape: tuple[int] = eqx.field(static=True)
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
 
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | tuple[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
+        width_sizes: Sequence[int],
         epsilon: float = 1e-6,
-        width_sizes: Sequence[int] | None = None,
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -144,16 +137,7 @@ class AlternativeSPDMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [
-                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
-            ]
-            if width_sizes is None
-            else width_sizes
-        )
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for symmetric matrices."
@@ -178,29 +162,30 @@ class AlternativeSPDMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        L = self.func(x).reshape(self.shape)
-        A = L @ jnp.conjugate(L.mT)
-        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), A.shape)
-        return A + self.epsilon * identity
+        l_matrix = self.func(x).reshape(self.shape)
+        a_matrix = l_matrix @ jnp.conjugate(l_matrix.mT)
+        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), a_matrix.shape)
+        return a_matrix + self.epsilon * identity
 
 
 class OriginalSkewSymmetricMatrix(eqx.Module):
-    """*Skew-symmetric matrix-valued function.*
-    Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a skew-symmetric matrix.
+    """*Skew-symmetric matrix-valued function*.
+
+    Wrapper around a_matrix `MLP` that maps the input to a_matrix vector of elements that
+    are transformed to a_matrix skew-symmetric matrix.
     """
 
     func: MLP
-    shape: tuple[int] = eqx.field(static=True)
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
     _tensor: Array  # Not learnable transform tensor from the vector-space of components to the space of skew-symmetric matrices
 
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | tuple[int] | None = None,
-        width_sizes: Sequence[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
+        width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -209,14 +194,16 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """Args:
-            in_size: The input size. The input to the module should be a vector
+        """Initialize the `SkewSymmetricMatrix`.
+
+        Args:
+            in_size: The input size. The input to the module should be a_matrix vector
                 of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
-                integer N can be used as a shorthand for (N, N).
+            shape: The matrix shape. The output from the module will be a_matrix
+                Array with sthe specified `shape`. For square matrices a_matrix single
+                integer N can be used as a_matrix shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
+            width_sizes: The sizes of each hidden layer of the underlying MLP in a_matrix list.
                 (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or
                 equal to `in_size`.)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
@@ -227,31 +214,22 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
                 (Defaults to `softplus`).
             final_activation: The activation function after the output layer.
                 (Defaults to the identity.)
-            use_bias: Whether to add on a bias to internal layers.
+            use_bias: Whether to add on a_matrix bias to internal layers.
                 (Defaults to `True`.)
-            use_final_bias: Whether to add on a bias to the final layer.
+            use_final_bias: Whether to add on a_matrix bias to the final layer.
                 (Defaults to `True`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+            key: a_matrix `jax.random.PRNGKey` used to provide randomness for parameter
                 initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
+            Note that `in_size` also supports the string `"scalar"` as a_matrix special
             value. In this case the input to the module should be of shape `()`.
 
         """
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [
-                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
-            ]
-            if width_sizes is None
-            else width_sizes
-        )
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for skew-symmetric matrices."
@@ -290,21 +268,22 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
 
 
 class AlternativeSkewSymmetricMatrix(eqx.Module):
-    """*Skew-symmetric matrix-valued function.*
-    Wrapper around a `MLP` that maps the input to a vector of elements that
-    are transformed to a skew-symmetric matrix.
+    """*Skew-symmetric matrix-valued function*.
+
+    Wrapper around a_matrix `MLP` that maps the input to a_matrix vector of elements that
+    are transformed to a_matrix skew-symmetric matrix.
     """
 
     func: MLP
-    shape: tuple[int] = eqx.field(static=True)
+    shape: AtLeast2DTuple[int] = eqx.field(static=True)
 
     def __init__(
         self,
         in_size: int | Literal["scalar"],
-        shape: int | tuple[int] | None = None,
-        width_sizes: Sequence[int] | None = None,
+        shape: int | AtLeast2DTuple[int],
+        width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -313,14 +292,16 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """Args:
-            in_size: The input size. The input to the module should be a vector
+        """Initialize the `SkewSymmetricMatrix`.
+
+        Args:
+            in_size: The input size. The input to the module should be a_matrix vector
                 of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
-                integer N can be used as a shorthand for (N, N).
+            shape: The matrix shape. The output from the module will be a_matrix
+                Array with sthe specified `shape`. For square matrices a_matrix single
+                integer N can be used as a_matrix shorthand for (N, N).
                 (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a list.
+            width_sizes: The sizes of each hidden layer of the underlying MLP in a_matrix list.
                 (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or
                 equal to `in_size`.)
             weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
@@ -331,31 +312,22 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
                 (Defaults to `softplus`).
             final_activation: The activation function after the output layer.
                 (Defaults to the identity.)
-            use_bias: Whether to add on a bias to internal layers.
+            use_bias: Whether to add on a_matrix bias to internal layers.
                 (Defaults to `True`.)
-            use_final_bias: Whether to add on a bias to the final layer.
+            use_final_bias: Whether to add on a_matrix bias to the final layer.
                 (Defaults to `True`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
-            key: A `jax.random.PRNGKey` used to provide randomness for parameter
+            key: a_matrix `jax.random.PRNGKey` used to provide randomness for parameter
                 initialisation. (Keyword only argument.)
 
         Note:
-            Note that `in_size` also supports the string `"scalar"` as a special
+            Note that `in_size` also supports the string `"scalar"` as a_matrix special
             value. In this case the input to the module should be of shape `()`.
 
         """
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
-        width_sizes = (
-            [
-                int(2 ** (jnp.ceil(jnp.log2(in_size_)))),
-            ]
-            if width_sizes is None
-            else width_sizes
-        )
-        shape = shape if isinstance(shape, tuple) else 2 * (shape,)
+        shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
                 "The last two dimensions in shape must be equal for skew-symmetric matrices."
@@ -378,8 +350,8 @@ class AlternativeSkewSymmetricMatrix(eqx.Module):
         )
 
     def __call__(self, x: Array) -> Array:
-        A = self.func(x).reshape(self.shape)
-        return A - A.mT
+        a_matrix = self.func(x).reshape(self.shape)
+        return a_matrix - a_matrix.mT
 
 
 # %% Time the different versions
@@ -393,9 +365,13 @@ N = 50
 x = jr.normal(data_key, (n,))
 X = jr.normal(data_key, (1000, n))
 
-original = OriginalSkewSymmetricMatrix(n, N, key=model_key)
+original = OriginalSkewSymmetricMatrix(
+    n, N, width_sizes=[128, 128], key=model_key
+)
 original(x)
-alternative = AlternativeSkewSymmetricMatrix(n, N, key=model_key)
+alternative = AlternativeSkewSymmetricMatrix(
+    n, N, width_sizes=[128, 128], key=model_key
+)
 alternative(x)
 
 
