@@ -15,7 +15,7 @@
 """Implements a basic training loop."""
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any, overload
 
 import equinox as eqx
 import jax
@@ -36,6 +36,40 @@ from ._losses import Loss, mse
 from ._wrappers import apply, unwrap
 
 
+@overload
+def fit[T: eqx.Module](
+    model: T,
+    data: PyTree[Any],
+    *,
+    batch_size: int = 32,
+    batch_axis: PyTree[int | None] = 0,
+    validation_data: PyTree[Any] = None,
+    steps: int = 1000,
+    loss_fn: Loss = mse,
+    optimizer: optax.GradientTransformation = optax.adam(1e-3),
+    init_opt_state: PyTree[Any] = None,
+    batcher: BatchGenerator = batch_data,
+    history: None = None,
+    callbacks: Iterable[Callback] | None = None,
+    key: PRNGKeyArray,
+) -> tuple[T, HistoryCallback]: ...
+@overload
+def fit[T: eqx.Module, H: Callback](
+    model: T,
+    data: PyTree[Any],
+    *,
+    batch_size: int = 32,
+    batch_axis: PyTree[int | None] = 0,
+    validation_data: PyTree[Any] = None,
+    steps: int = 1000,
+    loss_fn: Loss = mse,
+    optimizer: optax.GradientTransformation = optax.adam(1e-3),
+    init_opt_state: PyTree[Any] = None,
+    batcher: BatchGenerator = batch_data,
+    history: H,
+    callbacks: Iterable[Callback] | None = None,
+    key: PRNGKeyArray,
+) -> tuple[T, H]: ...
 def fit[T: eqx.Module, H: Callback](
     model: T,
     data: PyTree[Any],

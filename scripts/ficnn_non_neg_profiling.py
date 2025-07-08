@@ -1,4 +1,6 @@
-"""This script compares the performance of the FICNN for
+"""Non-negative FICNN profiling script.
+
+This script compares the performance of the FICNN for
 multiple different implementations of a non-negative constraint.
 """
 
@@ -54,7 +56,7 @@ class FICNN(eqx.Module, strict=True):
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -63,7 +65,9 @@ class FICNN(eqx.Module, strict=True):
         *,
         key: PRNGKeyArray,
     ):
-        """Args:
+        """Initialize FICNN.
+
+        Args:
         in_size: The input size. The input to the module should be a vector
             of shape `(in_features,)`.
         out_size: The output size. The output from the module will be a
@@ -93,7 +97,7 @@ class FICNN(eqx.Module, strict=True):
             Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
             depending on whether JAX is in 64-bit mode.
         key: A `jax.random.PRNGKey` used to provide randomness for parameter
-            initialisation. (Keyword only argument.)
+            initialisation. (Keyword only argument.).
 
         """
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -179,11 +183,13 @@ class FICNN(eqx.Module, strict=True):
             )()
 
     def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """Args:
+        """Forward pass through FICNN.
+
+        Args:
             x: A JAX array with shape `(in_size,)`. (Or shape `()` if
                 `in_size="scalar"`.)
             key: Ignored; provided for compatibility with the rest of the
-                Equinox API. (Keyword only argument.)
+                Equinox API. (Keyword only argument.).
 
         Returns:
             A JAX array with shape `(out_size,)`. (Or shape `()` if

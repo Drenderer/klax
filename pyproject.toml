@@ -83,6 +83,8 @@ ignore = [
     "D103",  # Missing docstring in public function
     "D104",  # Missing docstring in public package
     "D107",  # Mising docstring in `__init__`
+    "D203",  # 1 blank line required before class docstring; ignored in favor of D211
+    "D213",  # ignored in favor of D212
     "E501",  # During development, we allow long lines.
     "E402",
     "E731",

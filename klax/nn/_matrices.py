@@ -53,7 +53,7 @@ class Matrix(eqx.Module):
         shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -96,8 +96,6 @@ class Matrix(eqx.Module):
             shape `()`.
 
         """
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
         shape = shape if isinstance(shape, tuple) else (shape, shape)
 
         out_size = int(jnp.prod(jnp.array(shape)))
@@ -200,7 +198,7 @@ class SkewSymmetricMatrix(eqx.Module):
         shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int],
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -243,8 +241,6 @@ class SkewSymmetricMatrix(eqx.Module):
             shape `()`.
 
         """
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -361,7 +357,7 @@ class SPDMatrix(eqx.Module):
         width_sizes: Sequence[int],
         epsilon: float = 1e-6,
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        bias_init: Initializer = zeros,  # type: ignore
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -408,8 +404,6 @@ class SPDMatrix(eqx.Module):
             shape `()`.
 
         """
-        in_size_ = 1 if in_size == "scalar" else in_size
-        shape = in_size_ if shape is None else shape
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
