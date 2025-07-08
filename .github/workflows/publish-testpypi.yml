@@ -1,52 +1,112 @@
-# From here: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
-name: Publish klax to TestPyPI
+name: Publish to TestPyPI
 
-on: push
+on:
+  push:
+    branches:
+      -publish-via-action # IMPORTANT: CHANGE THIS TO "main"
 
 jobs:
-  build:
-    name: Build distribution 📦
+  release-to-testpypi:
+    name: Publish to TestPyPI
     runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-    - name: "Set up Python"
-      uses: actions/setup-python@v5
-      with:
-        python-version-file: "pyproject.toml"
-    - name: Build a binary wheel and a source tarball
-      run: uv build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-
-  publish-to-testpypi:
-    name: Publish klax to TestPyPI
-    if: startsWith(github.ref, 'refs/tags/')  # only publish to Test PyPI on tag pushes
-    needs:
-    - build
-    runs-on: ubuntu-latest
-
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/klax
-
+    environment: testpypi
     permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
+      id-token: write
     steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution 📦 to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
+      - uses: actions/checkout@v4
+
+      - name: Install uv and setup the python version
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install the project
+        run: uv sync --all-groups
+
+      - name: Build wheel
+        run: uv build
+
+      - name: Publish package to TestPyPI
+        run: uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple
+  
+
+  # IMPORTANT: THIS FILE IS CALLED publish-testpypi.yml, CONSIDER PUTTING THIS IN A NEW FILE OR RENAMING
+  # release-to-pypi:
+  #   name: Publish to PyPI
+  #   runs-on: ubuntu-latest
+  #   environment: pypi
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Install uv and setup the python version
+  #       uses: astral-sh/setup-uv@v5
+
+  #     - name: Install the project
+  #       run: uv sync --all-groups
+
+  #     - name: Build wheel
+  #       run: uv build
+
+  #     - name: Publish package to TestPyPI
+  #       run: uv publish
+
+
+
+
+
+
+
+
+
+# From here: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
+# name: Publish klax to TestPyPI
+
+# on: push
+
+# jobs:
+#   build:
+#     name: Build distribution 📦
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         persist-credentials: false
+#     - name: Install uv
+#       uses: astral-sh/setup-uv@v5
+#     - name: "Set up Python"
+#       uses: actions/setup-python@v5
+#       with:
+#         python-version-file: "pyproject.toml"
+#     - name: Build a binary wheel and a source tarball
+#       run: uv build
+#     - name: Store the distribution packages
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: python-package-distributions
+#         path: dist/
+
+#   publish-to-testpypi:
+#     name: Publish klax to TestPyPI
+#     if: startsWith(github.ref, 'refs/tags/')  # only publish to Test PyPI on tag pushes
+#     needs:
+#     - build
+#     runs-on: ubuntu-latest
+
+#     environment:
+#       name: testpypi
+#       url: https://test.pypi.org/p/klax
+
+#     permissions:
+#       id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+#     steps:
+#     - name: Download all the dists
+#       uses: actions/download-artifact@v4
+#       with:
+#         name: python-package-distributions
+#         path: dist/
+#     - name: Publish distribution 📦 to TestPyPI
+#       uses: pypa/gh-action-pypi-publish@release/v1
+#       with:
+#         repository-url: https://test.pypi.org/legacy/
