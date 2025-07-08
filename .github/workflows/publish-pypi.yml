@@ -1,12 +1,15 @@
-name: Publish to TestPyPI
+name: Publish to PyPI
 
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  release-to-testpypi:
-    name: Publish to TestPyPI
+  release-to-pypi:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
-    environment: testpypi
+    environment: pypi
     permissions:
       id-token: write
     steps:
@@ -21,5 +24,5 @@ jobs:
       - name: Build wheel
         run: uv build
 
-      - name: Publish package to TestPyPI
-        run: uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple
+      - name: Publish package to PyPI
+        run: uv publish
