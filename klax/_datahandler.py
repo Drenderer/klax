@@ -100,7 +100,7 @@ def batch_data(
 ) -> Generator[PyTree[Any], None, None]:
     """Create a `Generator` that draws subsets of data without replacement.
 
-    The data can be any `PyTree` with `ArrayLike` leaves. If `batch_mask` is
+    The data can be any `PyTree` with `ArrayLike` leaves. If `batch_axis` is
     passed, batch axes (including `None` for no batching) can be specified for
     every leaf individualy.
     A generator is returned that indefinetly yields batches of data with size
@@ -120,11 +120,11 @@ def batch_data(
         >>> x = jnp.array([1., 2.])
         >>> y = jnp.array([[1.], [2.]])
         >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_mask = (0, {"a": None, "b": 0})
+        >>> batch_axis = (0, {"a": None, "b": 0})
         >>> iter_data = klax.batch_data(
         ...     data,
         ...     32,
-        ...     batch_mask,
+        ...     batch_axis,
         ...     key=jax.random.key(0)
         ... )
         >>>
