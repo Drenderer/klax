@@ -20,9 +20,10 @@ from typing import Literal, cast
 import equinox as eqx
 import jax
 import jax.random as jrandom
-from jax.nn.initializers import Initializer, he_normal, zeros
+from jax.nn.initializers import he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
+from .._initializers import Initializer, hoedt_bias, hoedt_normal
 from .._misc import default_floating_dtype
 from .._wrappers import NonNegative
 from ._linear import InputSplitLinear, Linear
@@ -55,7 +56,9 @@ class FICNN(eqx.Module, strict=True):
         use_passthrough: bool = True,
         non_decreasing: bool = False,
         weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,  # type: ignore
+        bias_init: Initializer = zeros,
+        constrained_weight_init: Initializer | None = hoedt_normal(),
+        constrained_bias_init: Initializer | None = hoedt_bias(),
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -67,8 +70,9 @@ class FICNN(eqx.Module, strict=True):
         """Initialize FICNN.
 
         Warning:
-            Modifying `final_activation` to a non-convex function will break
-            the convexity of the FICNN. Use this parameter with care.
+            Modifying `activation` or `final_activation` to a concave function
+            or a function that isn't non-decreasing will break the convexity of
+            the FICNN. Use these parameters with care.
 
         Args:
             in_size: The input size. The input to the module should be a vector
@@ -83,10 +87,21 @@ class FICNN(eqx.Module, strict=True):
                 function of some other quantity `z`. If the FICNN `f(x(z))` is
                 non-decreasing then f preserves the convexity with respect to
                 `z`. Defaults to False.
-            weight_init: The weight initializer of type
-                `jax.nn.initializers.Initializer`. Defaults to he_normal().
-            bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`. Defaults to zeros.
+            weight_init: The weight initializer of type [`klax.Initializer`][]
+                used for *unconstrained weights*.
+                Defaults to he_normal().
+            bias_init: The bias initializer of type [`klax.Initializer`][] used
+                for the biases of *unconstrained layers*.
+                Defaults to zeros.
+            constrained_weight_init: The weight initializer of type
+                [`klax.Initializer`][] used for *constrained weights*.
+                If None, then `weight_init` is used for constrained weights as well.
+                Defaults to [`klax.hoedt_normal()`][].
+            constrained_bias_init: The bias initializer of type
+                [`klax.Initializer`][] used for the biases of *constrained layers*.
+                If None, then `bias_init` is used for the biases in constrained
+                layers as well.
+                Defaults to zeros.
             activation: The activation function of each hidden layer. To ensure
                 convexity this function must be convex and non-decreasing.
                 Defaults to `jax.nn.softplus`.
@@ -120,6 +135,17 @@ class FICNN(eqx.Module, strict=True):
         use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
         keys = jrandom.split(key, len(in_sizes))
 
+        constrained_weight_init = (
+            weight_init
+            if constrained_weight_init is None
+            else constrained_weight_init
+        )
+        constrained_bias_init = (
+            bias_init
+            if constrained_bias_init is None
+            else constrained_bias_init
+        )
+
         layers = []
         for n, (sin, sout, ub, key) in enumerate(
             zip(in_sizes, out_sizes, use_biases, keys)
@@ -129,7 +155,11 @@ class FICNN(eqx.Module, strict=True):
                     Linear(
                         sin,
                         sout,
-                        weight_init,
+                        (
+                            constrained_weight_init
+                            if non_decreasing
+                            else weight_init
+                        ),
                         bias_init,
                         ub,
                         NonNegative if non_decreasing else None,
@@ -143,7 +173,11 @@ class FICNN(eqx.Module, strict=True):
                         InputSplitLinear(
                             (sin, in_size),
                             sout,
-                            weight_init,
+                            (
+                                constrained_weight_init
+                                if non_decreasing
+                                else (constrained_weight_init, weight_init)
+                            ),
                             bias_init,
                             ub,
                             (
@@ -160,8 +194,8 @@ class FICNN(eqx.Module, strict=True):
                         Linear(
                             sin,
                             sout,
-                            weight_init,
-                            bias_init,
+                            constrained_weight_init,
+                            constrained_bias_init,
                             ub,
                             NonNegative,
                             dtype=dtype,

@@ -24,9 +24,10 @@ from typing import Any, Literal, cast
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.nn.initializers import Initializer, he_normal, variance_scaling, zeros
+from jax.nn.initializers import he_normal, variance_scaling, zeros
 from jaxtyping import Array, PRNGKeyArray
 
+from .._initializers import Initializer, canonicalize_initializer
 from .._misc import default_floating_dtype
 from .._wrappers import (
     ContainsUnwrappablesError,
@@ -73,9 +74,9 @@ class Matrix(eqx.Module):
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list.
             weight_init: The weight initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
+                [`klax.Initializer`][]. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to `zeros`)
+                [`klax.Initializer`][]. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to ReLU).
             final_activation: The activation function after the output layer.
@@ -155,7 +156,7 @@ class ConstantMatrix(eqx.Module):
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             init: The array initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to
+                [`klax.Initializer`][]. (Defaults to
                 `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
@@ -166,7 +167,8 @@ class ConstantMatrix(eqx.Module):
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         self.shape = shape if isinstance(shape, tuple) else (shape, shape)
-        self.array = init(key, self.shape, dtype)
+        init = canonicalize_initializer(init)
+        self.array = init(key, self.shape, fan_in=self.shape[-1], dtype=dtype)
 
     def __call__(self, x: Array) -> Array:
         """Forward pass through `ConstantMatrix`.
@@ -218,9 +220,9 @@ class SkewSymmetricMatrix(eqx.Module):
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list.
             weight_init: The weight initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
+                [`klax.Initializer`][]. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to `zeros`)
+                [`klax.Initializer`][]. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to `softplus`).
             final_activation: The activation function after the output layer.
@@ -306,7 +308,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             init: The array initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to
+                [`klax.Initializer`][]. (Defaults to
                 `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
@@ -317,7 +319,8 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
         """
         dtype = default_floating_dtype() if dtype is None else dtype
         self.shape = shape if isinstance(shape, tuple) else (shape, shape)
-        array = init(key, self.shape, dtype)
+        init = canonicalize_initializer(init)
+        array = init(key, self.shape, fan_in=self.shape[-1], dtype=dtype)
         self.array = SkewSymmetric(array)
 
     def __call__(self, x: Array) -> Array:
@@ -381,9 +384,9 @@ class SPDMatrix(eqx.Module):
                 semi-definiteness is required set `epsilon = 0.`
                 (Defaults to `1e-6`)
             weight_init: The weight initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to `he_normal()`)
+                [`klax.Initializer`][]. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to `zeros`)
+                [`klax.Initializer`][]. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to `softplus`)
             final_activation: The activation function after the output layer.
@@ -477,7 +480,7 @@ class ConstantSPDMatrix(eqx.Module):
                 matrix to ensure positive definiteness. If only positive
                 semi-definiteness is required set `epsilon = 0.`
                 (Defaults to `1e-6`)
-            init: The initializer of type `jax.nn.initializers.Initializer` for
+            init: The initializer of type [`klax.Initializer`][] for
                 the constant matrix `B` that produces the module's output via
                 `A = B@B*`. (Defaults to `variance_scaling(scale=1,
                 mode="fan_avg", distribution="normal")`.)
@@ -497,7 +500,8 @@ class ConstantSPDMatrix(eqx.Module):
 
         self.shape = shape
         self.epsilon = epsilon
-        self.b_matrix = init(key, shape, dtype)
+        init = canonicalize_initializer(init)
+        self.b_matrix = init(key, shape, fan_in=shape[-1], dtype=dtype)
 
     def __call__(self, x: Array) -> Array:
         """Forward pass through `ConstantSPDMatrix`.
