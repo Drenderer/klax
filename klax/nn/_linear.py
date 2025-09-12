@@ -24,9 +24,10 @@ from typing import Literal, cast
 import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jrandom
-from jax.nn.initializers import Initializer, zeros
+from jax.nn.initializers import zeros
 from jaxtyping import Array, PRNGKeyArray
 
+from .._initializers import Initializer, canonicalize_initializer
 from .._misc import default_floating_dtype
 from .._wrappers import (
     Constraint,
@@ -70,10 +71,8 @@ class Linear(eqx.Module, strict=True):
                 vector of shape `(in_features,)`
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
-            weight_init: The weight initializer of type
-                `jax.nn.initializers.Initializer`.
-            bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`.
+            weight_init: The weight initializer of type `Initializer`.
+            bias_init: The bias initializer of type `Initializer`.
             use_bias: Whether to add on a bias as well.
             weight_wrap: An optional wrapper that can be passed to enforce
                 weight constraints.
@@ -105,13 +104,15 @@ class Linear(eqx.Module, strict=True):
         in_features_ = 1 if in_features == "scalar" else in_features
         out_features_ = 1 if out_features == "scalar" else out_features
         wshape = (in_features_, out_features_)
-        weight = weight_init(wkey, wshape, dtype)
+        weight_init = canonicalize_initializer(weight_init)
+        weight = weight_init(wkey, wshape, in_features_, dtype)
         self.weight = weight if weight_wrap is None else weight_wrap(weight)
         bshape = (out_features_,)
         if use_bias is None:
             self.bias = None
         else:
-            bias = bias_init(bkey, bshape, dtype)
+            bias_init = canonicalize_initializer(bias_init)
+            bias = bias_init(bkey, bshape, in_features_, dtype)
             self.bias = bias if bias_wrap is None else bias_wrap(bias)
 
         self.in_features = in_features
@@ -228,12 +229,11 @@ class InputSplitLinear(eqx.Module, strict=True):
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
             weight_inits: Weight initializer or sequence of weight initializers
-                of type `jax.nn.initializers.Initializer`. By specifying a
+                of type `Initializer`. By specifying a
                 sequence it is possible to apply a different initializer to
                 each weight matrix. The sequence must have the same length as
                 in_features.
-            bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`.
+            bias_init: The bias initializer of type `Initializer`.
             use_bias: Whether to add on a bias as well.
             weight_wraps: One or a list/tuple of wrappers that can be passed to
                 enforce weight constraints. By specifying a sequence it is
@@ -246,6 +246,12 @@ class InputSplitLinear(eqx.Module, strict=True):
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
                 parameter initialisation. (Keyword only argument.)
+
+        Note:
+            For klax intializers (such as input-size dependent bias initializers)
+            the `fan_in` argument for the `bias_init` is calculated as the sum
+            of the sizes of all inputs, while for the `weight_inits` the `fan_in`
+            corresponds to the number of `in_features` for this matrix.
 
         Note:
             Note that `in_features` also supports the string `"scalar"` as a
@@ -293,8 +299,10 @@ class InputSplitLinear(eqx.Module, strict=True):
 
         wshapes = ((i_f_, out_features_) for i_f_ in in_features_)
         weights = [
-            init(wkey, wshape, dtype)
-            for init, wkey, wshape in zip(weight_inits, wkeys, wshapes)
+            canonicalize_initializer(init)(wkey, wshape, fan_in, dtype)
+            for init, wkey, wshape, fan_in in zip(
+                weight_inits, wkeys, wshapes, in_features_
+            )
         ]
         weights = [
             w if wrap is None else wrap(w)
@@ -306,7 +314,8 @@ class InputSplitLinear(eqx.Module, strict=True):
         if use_bias is None:
             self.bias = None
         else:
-            bias = bias_init(bkey, bshape, dtype)
+            bias_init = canonicalize_initializer(bias_init)
+            bias = bias_init(bkey, bshape, sum(in_features_), dtype)
             self.bias = bias if bias_wrap is None else bias_wrap(bias)
 
         self.in_features = tuple(in_features)
