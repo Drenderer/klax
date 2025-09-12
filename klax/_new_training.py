@@ -100,7 +100,7 @@ def optax_transform_update_fn_updater(
     value_and_grad_fn: ValueAndGradFn,
 ) -> Updater:
     def wrapper(model, batch, opt_state):
-        value, grad = value_and_grad_fn(model, batch)
+        _, grad = value_and_grad_fn(model, batch)
         updates, opt_state = opt_update(
             grad,
             opt_state,
