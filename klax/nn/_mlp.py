@@ -76,8 +76,8 @@ class MLP(eqx.Module, strict=True):
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
-            weight_init: The weight initializer of type [`klax.Initializer`][].
-            bias_init: The bias initializer of type [`klax.Initializer`][].
+            weight_init: The weight initializer of type `Initializer`.
+            bias_init: The bias initializer of type `Initializer`.
             activation: The activation function after each hidden layer.
             final_activation: The activation function after the output layer.
             use_bias: Whether to add on a bias to internal layers.

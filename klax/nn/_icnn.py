@@ -87,18 +87,18 @@ class FICNN(eqx.Module, strict=True):
                 function of some other quantity `z`. If the FICNN `f(x(z))` is
                 non-decreasing then f preserves the convexity with respect to
                 `z`. Defaults to False.
-            weight_init: The weight initializer of type [`klax.Initializer`][]
+            weight_init: The weight initializer of type `Initializer`
                 used for *unconstrained weights*.
                 Defaults to he_normal().
-            bias_init: The bias initializer of type [`klax.Initializer`][] used
+            bias_init: The bias initializer of type `Initializer` used
                 for the biases of *unconstrained layers*.
                 Defaults to zeros.
             constrained_weight_init: The weight initializer of type
-                [`klax.Initializer`][] used for *constrained weights*.
+                `Initializer` used for *constrained weights*.
                 If None, then `weight_init` is used for constrained weights as well.
-                Defaults to [`klax.hoedt_normal()`][].
+                Defaults to [`klax.hoedt_normal`][].
             constrained_bias_init: The bias initializer of type
-                [`klax.Initializer`][] used for the biases of *constrained layers*.
+                `Initializer` used for the biases of *constrained layers*.
                 If None, then `bias_init` is used for the biases in constrained
                 layers as well.
                 Defaults to zeros.

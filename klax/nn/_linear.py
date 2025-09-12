@@ -71,8 +71,8 @@ class Linear(eqx.Module, strict=True):
                 vector of shape `(in_features,)`
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
-            weight_init: The weight initializer of type [`klax.Initializer`][].
-            bias_init: The bias initializer of type [`klax.Initializer`][].
+            weight_init: The weight initializer of type `Initializer`.
+            bias_init: The bias initializer of type `Initializer`.
             use_bias: Whether to add on a bias as well.
             weight_wrap: An optional wrapper that can be passed to enforce
                 weight constraints.
@@ -229,11 +229,11 @@ class InputSplitLinear(eqx.Module, strict=True):
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
             weight_inits: Weight initializer or sequence of weight initializers
-                of type [`klax.Initializer`][]. By specifying a
+                of type `Initializer`. By specifying a
                 sequence it is possible to apply a different initializer to
                 each weight matrix. The sequence must have the same length as
                 in_features.
-            bias_init: The bias initializer of type [`klax.Initializer`][].
+            bias_init: The bias initializer of type `Initializer`.
             use_bias: Whether to add on a bias as well.
             weight_wraps: One or a list/tuple of wrappers that can be passed to
                 enforce weight constraints. By specifying a sequence it is

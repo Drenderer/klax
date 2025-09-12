@@ -74,9 +74,9 @@ class Matrix(eqx.Module):
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list.
             weight_init: The weight initializer of type
-                [`klax.Initializer`][]. (Defaults to `he_normal()`)
+                `Initializer`. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
-                [`klax.Initializer`][]. (Defaults to `zeros`)
+                `Initializer`. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to ReLU).
             final_activation: The activation function after the output layer.
@@ -156,7 +156,7 @@ class ConstantMatrix(eqx.Module):
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             init: The array initializer of type
-                [`klax.Initializer`][]. (Defaults to
+                `Initializer`. (Defaults to
                 `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
@@ -220,9 +220,9 @@ class SkewSymmetricMatrix(eqx.Module):
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list.
             weight_init: The weight initializer of type
-                [`klax.Initializer`][]. (Defaults to `he_normal()`)
+                `Initializer`. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
-                [`klax.Initializer`][]. (Defaults to `zeros`)
+                `Initializer`. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to `softplus`).
             final_activation: The activation function after the output layer.
@@ -308,7 +308,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
                 with sthe specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             init: The array initializer of type
-                [`klax.Initializer`][]. (Defaults to
+                `Initializer`. (Defaults to
                 `variance_scaling(scale=1, mode="fan_avg", distribution="normal")`.)
             dtype: The dtype to use for all the weights and biases in this MLP.
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
@@ -384,9 +384,9 @@ class SPDMatrix(eqx.Module):
                 semi-definiteness is required set `epsilon = 0.`
                 (Defaults to `1e-6`)
             weight_init: The weight initializer of type
-                [`klax.Initializer`][]. (Defaults to `he_normal()`)
+                `Initializer`. (Defaults to `he_normal()`)
             bias_init: The bias initializer of type
-                [`klax.Initializer`][]. (Defaults to `zeros`)
+                `Initializer`. (Defaults to `zeros`)
             activation: The activation function after each hidden layer.
                 (Defaults to `softplus`)
             final_activation: The activation function after the output layer.
@@ -480,7 +480,7 @@ class ConstantSPDMatrix(eqx.Module):
                 matrix to ensure positive definiteness. If only positive
                 semi-definiteness is required set `epsilon = 0.`
                 (Defaults to `1e-6`)
-            init: The initializer of type [`klax.Initializer`][] for
+            init: The initializer of type `Initializer` for
                 the constant matrix `B` that produces the module's output via
                 `A = B@B*`. (Defaults to `variance_scaling(scale=1,
                 mode="fan_avg", distribution="normal")`.)
