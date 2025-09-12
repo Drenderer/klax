@@ -87,14 +87,36 @@ class UpdaterFactory(Protocol):
     @abstractmethod
     def __call__(
         self,
-        opt_update: Callable,
+        opt_update: optax.TransformUpdateFn | optax.TransformUpdateExtraArgsFn,
         value_fn: ValueFn,
         value_and_grad_fn: ValueAndGradFn,
     ) -> Updater:
         pass
 
 
-def optax_updater(opt_update, value_fn, value_and_grad_fn) -> Updater:
+def optax_transform_update_fn_updater(
+    opt_update: optax.TransformUpdateFn,
+    value_fn: ValueFn,
+    value_and_grad_fn: ValueAndGradFn,
+) -> Updater:
+    def wrapper(model, batch, opt_state):
+        value, grad = value_and_grad_fn(model, batch)
+        updates, opt_state = opt_update(
+            grad,
+            opt_state,
+            eqx.filter(model, eqx.is_inexact_array),
+        )
+        model = eqx.apply_updates(model, updates)
+        return model, opt_state
+
+    return wrapper
+
+
+def optax_transform_update_fn_extra_args_updater(
+    opt_update: optax.TransformUpdateExtraArgsFn,
+    value_fn: ValueFn,
+    value_and_grad_fn: ValueAndGradFn,
+) -> Updater:
     def wrapper(model, batch, opt_state):
         value, grad = value_and_grad_fn(model, batch)
         updates, opt_state = opt_update(
@@ -111,7 +133,7 @@ def optax_updater(opt_update, value_fn, value_and_grad_fn) -> Updater:
     return wrapper
 
 
-def _fit_core[T: eqx.Module](
+def fit_core[T: eqx.Module](
     updater: Updater,
     batcher: Generator[PyTree[Any], None, None],
     state: TrainingState,
@@ -174,7 +196,7 @@ def fit(
     optimizer: optax.GradientTransformation,
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    updater: UpdaterFactory = optax_updater,
+    updater: UpdaterFactory = optax_transform_update_fn_updater,
     key: PRNGKeyArray,
 ):
     state = TrainingState(
@@ -186,7 +208,7 @@ def fit(
         else init_opt_state,
     )
 
-    state = _fit_core(
+    state = fit_core(
         updater(optimizer.update, *loss(batch_axis)),
         batcher(
             data=data, batch_axis=batch_axis, batch_size=batch_size, key=key
@@ -198,6 +220,7 @@ def fit(
 
 
 if __name__ == "__main__":
+    # Test fit
     x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
     y = 2.0 * x + 1.0
     model = eqx.nn.Linear(1, 1, key=eqx.internal.GetKey()())
@@ -205,4 +228,26 @@ if __name__ == "__main__":
         model, (x, y), optimizer=optax.adam(1.0), key=eqx.internal.GetKey()()
     )
     y_pred = jax.vmap(model)(x)
+    assert jnp.allclose(y_pred, y)
+
+    # Test fit_core
+    x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
+    y = 2.0 * x + 1.0
+    model = eqx.nn.Linear(1, 1, key=eqx.internal.GetKey()())
+    batch_axis = 0
+    optimizer = optax.adam(1.0)
+    state = TrainingState(
+        model=model,
+        opt_state=optimizer.init(eqx.filter(model, eqx.is_inexact_array)),
+    )
+    batcher = batch_data(
+        (x, y),
+        batch_size=32,
+        batch_axis=batch_axis,
+        key=eqx.internal.GetKey()(),
+    )
+    loss = mse(batch_axis)
+    updater = optax_transform_update_fn_updater(optimizer.update, *loss)
+    state = fit_core(updater, batcher, state, steps=1000)
+    y_pred = jax.vmap(state.model)(x)
     assert jnp.allclose(y_pred, y)
