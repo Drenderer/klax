@@ -82,35 +82,3 @@ ax.set(
     xlim=[0, 10000],
 )
 ax.legend()
-
-# # Add two zoom-in spy lenses (lower left and lower right)
-
-# # Lower left zoom
-# axins1 = inset_axes(ax, width="30%", height="30%", loc="lower left", borderpad=2)
-# for name, result in results.items():
-#     history = result["history"]
-#     axins1.plot(history.steps, history.loss, label=f"{name} loss")
-#     axins1.plot(history.steps, history.val_loss, ls="--")
-# # Set zoomed region (adjust as needed)
-# axins1.set_xlim(history.steps[0], history.steps[len(history.steps)//10])
-# axins1.set_ylim(min(history.loss[:len(history.steps)//10]), max(history.loss[:len(history.steps)//10]))
-# axins1.set_yscale("log")
-# axins1.set_xticks([])
-# axins1.set_yticks([])
-
-# # Lower right zoom
-# axins2 = inset_axes(ax, width="30%", height="30%", loc="lower right", borderpad=2)
-# for name, result in results.items():
-#     history = result["history"]
-#     axins2.plot(history.steps, history.loss, label=f"{name} loss")
-#     axins2.plot(history.steps, history.val_loss, ls="--")
-# # Set zoomed region (adjust as needed)
-# axins2.set_xlim(history.steps[-len(history.steps)//10], history.steps[-1])
-# axins2.set_ylim(min(history.loss[-len(history.steps)//10:]), max(history.loss[-len(history.steps)//10:]))
-# axins2.set_yscale("log")
-# axins2.set_xticks([])
-# axins2.set_yticks([])
-
-# # Draw lines between main plot and insets
-# mark_inset(ax, axins1, loc1=2, loc2=4, fc="none", ec="0.5")
-# mark_inset(ax, axins2, loc1=1, loc2=3, fc="none", ec="0.5")

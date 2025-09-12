@@ -78,7 +78,7 @@ def hoedt_normal(
     signal propagation through layers with non-negative weights.
 
     Tip:
-        To work properly, this weight initialization needs to be paired with the
+        To work properly, this parameter initialization needs to be paired with the
         [`klax.hoedt_bias`][] initializer for the biases of constrained layers.
 
     Args:
@@ -120,7 +120,7 @@ def hoedt_bias() -> KlaxInitializer:
     a constant value, computed from the number of input features (`fan_in`).
 
     Tip:
-        To work properly, this weight initialization needs to be paired with the
+        To work properly, this parameter initialization needs to be paired with the
         [`klax.hoedt_normal`][] initializer for the positivity constraint weights.
 
     Returns:
