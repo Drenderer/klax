@@ -16,6 +16,7 @@
 
 import typing
 import warnings
+from abc import abstractmethod
 from collections.abc import Generator, Sequence
 from typing import Any, Protocol
 
@@ -25,6 +26,10 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 from jaxtyping import PRNGKeyArray, PyTree
+
+from ._context import TrainingContext
+
+BatchGenerator = Generator[PyTree[Any], TrainingContext, None]
 
 
 def broadcast_and_get_size(
@@ -78,87 +83,28 @@ def broadcast_and_get_size(
 
 
 @typing.runtime_checkable
-class BatchGenerator(Protocol):
+class Batcher(Protocol):
+    @abstractmethod
     def __call__(
         self,
         data: PyTree[Any],
         batch_size: int,
-        batch_axis: PyTree[int | None],
+        batch_axis: int,
         *,
         key: PRNGKeyArray,
-    ) -> Generator[PyTree[Any], None, None]:
-        raise NotImplementedError
+    ) -> BatchGenerator:
+        pass
 
 
 def batch_data(
     data: PyTree[Any],
-    batch_size: int = 32,
-    batch_axis: PyTree[int | None] = 0,
+    batch_size: int,
+    batch_axis: int,
     convert_to_numpy: bool = True,
     *,
-    key: PRNGKeyArray,
-) -> Generator[PyTree[Any], None, None]:
-    """Create a `Generator` that draws subsets of data without replacement.
-
-    The data can be any `PyTree` with `ArrayLike` leaves. If `batch_axis` is
-    passed, batch axes (including `None` for no batching) can be specified for
-    every leaf individualy.
-    A generator is returned that indefinetly yields batches of data with size
-    `batch_size`. Examples are drawn without replacement until the remaining
-    dataset is smaller than `batch_size`, at which point the dataset will be
-    reshuffeld and the process starts over.
-
-    Example:
-        This is an example for a nested `PyTree`, where the elements x and y
-        have batch dimension along the first axis.
-
-        ```python
-        >>> import klax
-        >>> import jax
-        >>> import jax.numpy as jnp
-        >>>
-        >>> x = jnp.array([1., 2.])
-        >>> y = jnp.array([[1.], [2.]])
-        >>> data = (x, {"a": 1.0, "b": y})
-        >>> batch_axis = (0, {"a": None, "b": 0})
-        >>> iter_data = klax.batch_data(
-        ...     data,
-        ...     32,
-        ...     batch_axis,
-        ...     key=jax.random.key(0)
-        ... )
-        >>>
-        ```
-
-    Args:
-        data: The data that shall be batched. It can be any `PyTree` with
-            `ArrayLike` leaves.
-        batch_size: The number of examples in a batch.
-        batch_axis: PyTree of the batch axis indices. `None` is used to
-            indicate that the corresponding leaf or subtree in data does not
-            have a batch axis. `batch_axis` must have the same structure as
-            `data` or have `data` as a prefix.
-            (Defaults to 0, meaning all leaves in `data` are
-            batched along their first dimension.)
-        convert_to_numpy: If `True`, batched data leafs will be converted to
-            Numpy arrays before batching. This is useful for performance
-            reasons, as Numpy's slicing is much faster than JAX's.
-        key: A `jax.random.PRNGKey` used to provide randomness for batch
-            generation. (Keyword only argument.)
-
-    Returns:
-        A `Generator` that yields a random batch of data every time is is
-        called.
-
-    Yields:
-        A `PyTree[ArrayLike]` with the same structure as `data`. Where all
-        batched leaves have `batch_size`.
-
-    Note:
-        Note that if the size of the dataset is smaller than `batch_size`, the
-        obtained batches will have dataset size.
-
-    """
+    key: PRNGKeyArray,  # Only cor compliance with the `Batcher` protocol
+) -> BatchGenerator:
+    """Create a stateful batch generator that uses the step as seed."""
     batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
 
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
@@ -177,6 +123,9 @@ def batch_data(
 
     indices = jnp.arange(dataset_size)
     while True:
+        # Store the training state as received by the `.send(state)` within
+        # the training loop.
+        ctx: TrainingContext = yield
         perm = jr.permutation(key, indices)
         (key,) = jr.split(key, 1)  # Update key
         start, end = 0, batch_size
