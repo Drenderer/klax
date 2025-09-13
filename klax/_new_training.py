@@ -16,9 +16,9 @@
 
 import typing
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator
-from dataclasses import dataclass
-from typing import Any, Protocol
+from collections.abc import Callable, Generator, Iterable
+from dataclasses import dataclass, field
+from typing import Any, Protocol, Self
 
 import equinox as eqx
 import jax
@@ -32,15 +32,17 @@ from ._datahandler import broadcast_and_get_size
 from ._wrappers import apply
 
 
-@dataclass
 class TrainingState:
-    flat_model: PyTree
-    flat_opt_state: PyTree
-    treedef_model: PyTree
-    treedef_opt_state: PyTree
-    step: int = 0
+    _flat_model: PyTree
+    _flat_opt_state: PyTree
+    _treedef_model: PyTree
+    _treedef_opt_state: PyTree
+    _step: int
+    _cache: dict[str, Any] = {}
 
-    def __init__(self, model: PyTree, opt_state: PyTree = None, step: int = 0):
+    def __init__(
+        self, model: PyTree, opt_state: PyTree = None, initial_step: int = 0
+    ):
         # Apply the Constraint in the model to ensure apply-constrains are met
         # initially
         model = apply(model)
@@ -50,49 +52,78 @@ class TrainingState:
         flat_model, treedef_model = jax.tree.flatten(model)
         flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
 
-        self.flat_model = flat_model
-        self.flat_opt_state = flat_opt_state
-        self.treedef_model = treedef_model
-        self.treedef_opt_state = treedef_opt_state
-        self.step = step
+        self._flat_model = flat_model
+        self._flat_opt_state = flat_opt_state
+        self._treedef_model = treedef_model
+        self._treedef_opt_state = treedef_opt_state
+        self._step = initial_step
+
+    @staticmethod
+    def _lazy_chached_property(fun: Callable) -> property:
+        """Turn a public method into a lazily evaluated property.
+
+        The return value of ``fun`` is stored in the ``_cache`` dictionary of
+        the current object using the function name as key. If the name is
+        already in ``_cache`` then the cached value is simply returned,
+        without evaluating ``fun``.
+
+        Args:
+            fun: Method to wrap.
+
+        Returns:
+            Wrapped method as a property.
+
+        """
+        attr_name = fun.__name__
+
+        def wrapper(self: Self):
+            if attr_name not in self._cache:
+                self._cache.setdefault(attr_name, fun(self))
+            return self._cache.get(attr_name)
+
+        wrapper.__doc__ = fun.__doc__
+
+        return property(wrapper)
 
     @property
+    def flat_model(self) -> PyTree:
+        return self._flat_model
+
+    @property
+    def flat_opt_state(self) -> PyTree:
+        return self._flat_opt_state
+
+    @property
+    def step(self) -> int:
+        return self._step
+
+    @_lazy_chached_property
     def model(self) -> PyTree:
         return jax.tree_util.tree_unflatten(
-            self.treedef_model, self.flat_model
+            self._treedef_model, self._flat_model
+        )
+
+    @_lazy_chached_property
+    def opt_state(self) -> PyTree:
+        return jax.tree_util.tree_unflatten(
+            self._treedef_opt_state, self._flat_opt_state
         )
 
     @property
-    def opt_state(self) -> PyTree:
-        return jax.tree_util.tree_unflatten(
-            self.treedef_opt_state, self.flat_opt_state
-        )
+    def treedef_model(self) -> PyTree:
+        return self._treedef_model
 
-    def update(
-        self, flat_model: PyTree, flat_opt_state: PyTree, step: int
-    ) -> None:
-        self.flat_model = flat_model
-        self.flat_opt_state = flat_opt_state
-        self.step = step
+    @property
+    def treedef_opt_state(self) -> PyTree:
+        return self._treedef_opt_state
 
+    def update(self, flat_model: PyTree, flat_opt_state: PyTree):
+        self._flat_model = flat_model
+        self._flat_opt_state = flat_opt_state
+        self._step += self._step
 
-class Callback(ABC):
-    """An abstract callback.
-
-    Inherit from this class to create a custom callback.
-    """
-
-    def __call__(self, state: TrainingState) -> bool | None:
-        """Call after each step during training."""
-        pass
-
-    def on_training_end(self, state: TrainingState) -> None:
-        """Call when training ends."""
-        pass
-
-    def on_training_start(self, state: TrainingState) -> None:
-        """Call when training starts."""
-        pass
+        # Clear cache
+        self._cache.clear()
 
 
 @typing.runtime_checkable
@@ -251,19 +282,102 @@ def stateful_batch_data(
             end = start + batch_size
 
 
+@dataclass
+class EvaluationContext:
+    value_fn: ValueFn
+    data: PyTree[Any]
+    val_data: PyTree[Any] | None = None
+    _cached_step: int | None = None
+    _cache: dict[str, Any] = field(default_factory=dict)
+
+    def _ensure_step(self, state: TrainingState):
+        if self._cached_step != state.step:
+            self._cache.clear()
+            self._cached_step = state.step
+
+    @eqx.filter_jit
+    def _loss_impl(self, model: PyTree, batch: PyTree[Any]):
+        return self.value_fn(model, batch)
+
+    def loss(self, state: TrainingState) -> Scalar:
+        self._ensure_step(state)
+        if "loss" not in self._cache:
+            self._cache["loss"] = self._loss_impl(state.model, self.data)
+        return self._cache["loss"]
+
+    def val_loss(self, state: TrainingState) -> Scalar | None:
+        self._ensure_step(state)
+        if self.val_data is None:
+            return None
+
+        if "val_loss" not in self._cache:
+            self._cache["val_loss"] = self._loss_impl(
+                state.model, self.val_data
+            )
+        return self._cache["val_loss"]
+
+
+@dataclass
+class TrainingContext:
+    state: TrainingState
+    evaluator: EvaluationContext
+
+    @property
+    def model(self) -> PyTree:
+        return self.state.model
+
+    @property
+    def optimizer_state(self) -> PyTree:
+        return self.state.opt_state
+
+    @property
+    def step(self) -> int:
+        return self.state.step
+
+    @property
+    def loss(self) -> Scalar:
+        return self.evaluator.loss(self.state)
+
+    @property
+    def val_loss(self) -> Scalar | None:
+        return self.evaluator.val_loss(self.state)
+
+
+class Callback(ABC):
+    """An abstract callback.
+
+    Inherit from this class to create a custom callback.
+    """
+
+    def __call__(self, ctx: TrainingContext) -> bool | None:
+        """Call after each step during training."""
+        pass
+
+    def on_training_end(self, ctx: TrainingContext) -> None:
+        """Call when training ends."""
+        pass
+
+    def on_training_start(self, ctx: TrainingContext) -> None:
+        """Call when training starts."""
+        pass
+
+
 def fit_core[T: eqx.Module](
     updater: Updater,
     batcher: Generator[PyTree[Any], TrainingState, None],
-    state: TrainingState,
+    ctx: TrainingContext,
     steps: int,
+    callbacks: Iterable[Callback] | None = None,
 ):
     @eqx.filter_jit
     def make_step(batch, flat_model, flat_opt_state):
         # Use the unflatten trick to speed up training,
         # see https://docs.kidger.site/equinox/tricks/
-        model = jax.tree_util.tree_unflatten(state.treedef_model, flat_model)
+        model = jax.tree_util.tree_unflatten(
+            ctx.state.treedef_model, flat_model
+        )
         opt_state = jax.tree_util.tree_unflatten(
-            state.treedef_opt_state, flat_opt_state
+            ctx.state.treedef_opt_state, flat_opt_state
         )
 
         # Compute and apply the parameter updates
@@ -280,14 +394,30 @@ def fit_core[T: eqx.Module](
 
         return flat_model, flat_opt_state
 
-    for state.step in range(state.step, state.step + steps + 1):
+    # Make callbacks iterable
+    callbacks = [] if callbacks is None else list(callbacks)
+
+    for callback in callbacks:
+        callback.on_training_start(ctx)
+
+    for _ in range(steps):
         next(batcher)
-        batch = batcher.send(state)  # Send the state back to the batcher
-        state.flat_model, state.flat_opt_state = make_step(
-            batch, state.flat_model, state.flat_opt_state
+        batch = batcher.send(ctx.state)  # Send the state back to the batcher
+        flat_model, flat_opt_state = make_step(
+            batch, ctx.state.flat_model, ctx.state.flat_opt_state
         )
 
-    return state
+        ctx.state.update(flat_model, flat_opt_state)
+
+        # Run all callbacks and break if any of them request termination of
+        # the training loop.
+        # Note! The square brackets are important. Otherwise the loop is
+        # terminated with the first callback that returns true. But we want
+        # to run all callbacks first and then decide, whether to terminate.
+        if any([callback(ctx) for callback in callbacks]):
+            break
+
+    return ctx
 
 
 def fit(
@@ -296,6 +426,7 @@ def fit(
     *,
     batch_size: int = 32,
     batch_axis: PyTree[int | None] = 0,
+    validation_data: PyTree[Any] = None,
     steps: int = 1_000,
     loss: LossFactory = mse,
     optimizer: optax.GradientTransformation,
@@ -304,6 +435,8 @@ def fit(
     updater: UpdaterFactory = optax_transform_update_fn_updater,
     key: PRNGKeyArray,
 ):
+    value_fn, value_and_grad_fn = loss(batch_axis)
+    evaluator = EvaluationContext(value_fn, data, val_data=validation_data)
     state = TrainingState(
         model=model,
         opt_state=optimizer.init(eqx.filter(model, eqx.is_inexact_array))
@@ -312,16 +445,20 @@ def fit(
         if init_opt_state is None
         else init_opt_state,
     )
+    ctx = TrainingContext(
+        state=state,
+        evaluator=evaluator,
+    )
 
-    state = fit_core(
-        updater(optimizer.update, *loss(batch_axis)),
+    ctx = fit_core(
+        updater(optimizer.update, value_fn, value_and_grad_fn),
         batcher(
             data=data, batch_axis=batch_axis, batch_size=batch_size, key=key
         ),
-        state,
+        ctx,
         steps,
     )
-    return state.model
+    return ctx.state.model
 
 
 if __name__ == "__main__":
@@ -338,12 +475,19 @@ if __name__ == "__main__":
     # Test fit_core
     x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
     y = 2.0 * x + 1.0
+    data = (x, y)
     model = eqx.nn.Linear(1, 1, key=eqx.internal.GetKey()())
     batch_axis = 0
     optimizer = optax.adam(1.0)
+    value_fn, value_and_grad_fn = mse(batch_axis)
+    evaluator = EvaluationContext(value_fn, (x, y))
     state = TrainingState(
         model=model,
         opt_state=optimizer.init(eqx.filter(model, eqx.is_inexact_array)),
+    )
+    ctx = TrainingContext(
+        state=state,
+        evaluator=evaluator,
     )
     batcher = stateful_batch_data(
         (x, y),
@@ -351,9 +495,10 @@ if __name__ == "__main__":
         batch_axis=batch_axis,
         key=eqx.internal.GetKey()(),  # Unused
     )
-    loss = mse(batch_axis)
-    updater = optax_transform_update_fn_updater(optimizer.update, *loss)
-    state = fit_core(updater, batcher, state, steps=1000)
+    updater = optax_transform_update_fn_updater(
+        optimizer.update, value_fn, value_and_grad_fn
+    )
+    state = fit_core(updater, batcher, ctx, steps=1000)
     y_pred = jax.vmap(state.model)(x)
     assert jnp.allclose(y_pred, y)
 
