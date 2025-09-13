@@ -23,18 +23,76 @@ from typing import Any, Protocol
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jax.random as jr
+import numpy as np
 import optax
 from jaxtyping import PRNGKeyArray, PyTree, Scalar
 
-from ._datahandler import BatchGenerator, batch_data
+from ._datahandler import broadcast_and_get_size
 from ._wrappers import apply
 
 
 @dataclass
 class TrainingState:
-    model: PyTree
-    opt_state: PyTree
+    flat_model: PyTree
+    flat_opt_state: PyTree
+    treedef_model: PyTree
+    treedef_opt_state: PyTree
     step: int = 0
+
+    def __init__(self, model: PyTree, opt_state: PyTree = None, step: int = 0):
+        # Apply the Constraint in the model to ensure apply-constrains are met
+        # initially
+        model = apply(model)
+
+        # Use the unflatten trick to speed up training,
+        # see https://docs.kidger.site/equinox/tricks/
+        flat_model, treedef_model = jax.tree.flatten(model)
+        flat_opt_state, treedef_opt_state = jax.tree.flatten(opt_state)
+
+        self.flat_model = flat_model
+        self.flat_opt_state = flat_opt_state
+        self.treedef_model = treedef_model
+        self.treedef_opt_state = treedef_opt_state
+        self.step = step
+
+    @property
+    def model(self) -> PyTree:
+        return jax.tree_util.tree_unflatten(
+            self.treedef_model, self.flat_model
+        )
+
+    @property
+    def opt_state(self) -> PyTree:
+        return jax.tree_util.tree_unflatten(
+            self.treedef_opt_state, self.flat_opt_state
+        )
+
+    def update(
+        self, flat_model: PyTree, flat_opt_state: PyTree, step: int
+    ) -> None:
+        self.flat_model = flat_model
+        self.flat_opt_state = flat_opt_state
+        self.step = step
+
+
+class Callback(ABC):
+    """An abstract callback.
+
+    Inherit from this class to create a custom callback.
+    """
+
+    def __call__(self, state: TrainingState) -> bool | None:
+        """Call after each step during training."""
+        pass
+
+    def on_training_end(self, state: TrainingState) -> None:
+        """Call when training ends."""
+        pass
+
+    def on_training_start(self, state: TrainingState) -> None:
+        """Call when training starts."""
+        pass
 
 
 @typing.runtime_checkable
@@ -133,9 +191,69 @@ def optax_transform_update_fn_extra_args_updater(
     return wrapper
 
 
+@typing.runtime_checkable
+class Batcher(Protocol):
+    @abstractmethod
+    def __call__(
+        self,
+        data: PyTree[Any],
+        batch_size: int,
+        batch_axis: int,
+        *,
+        key: PRNGKeyArray,
+    ) -> Generator[PyTree[Any], TrainingState, None]:
+        pass
+
+
+def stateful_batch_data(
+    data: PyTree[Any],
+    batch_size: int,
+    batch_axis: int,
+    convert_to_numpy: bool = True,
+    *,
+    key: PRNGKeyArray,  # Only cor compliance with the `Batcher` protocol
+) -> Generator[PyTree[Any], TrainingState, None]:
+    """Create a stateful batch generator that uses the step as seed."""
+    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
+
+    # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
+    # for fast model training steps this actually makes a huge difference!
+    # However, be aware that this is likely only true if JAX runs on CPU.
+    if convert_to_numpy:
+        data = jax.tree.map(
+            lambda x, a: x if a is None else np.array(x),
+            data,
+            batch_axis,
+            is_leaf=lambda x: x is None,
+        )
+
+    # Reduce batch size if the dataset has less examples than batch size
+    batch_size = min(batch_size, dataset_size)
+
+    indices = jnp.arange(dataset_size)
+    while True:
+        # Store the training state as received by the `.send(state)` within
+        # the training loop.
+        state: TrainingState = yield
+        key = jax.random.PRNGKey(state.step)  # Create key from step
+        perm = jr.permutation(key, indices)
+        (key,) = jr.split(key, 1)  # Update key
+        start, end = 0, batch_size
+        while end <= dataset_size:
+            batch_perm = perm[start:end]
+            yield jax.tree.map(
+                lambda a, x: x if a is None else x[batch_perm],
+                batch_axis,
+                data,
+                is_leaf=lambda x: x is None,
+            )
+            start = end
+            end = start + batch_size
+
+
 def fit_core[T: eqx.Module](
     updater: Updater,
-    batcher: Generator[PyTree[Any], None, None],
+    batcher: Generator[PyTree[Any], TrainingState, None],
     state: TrainingState,
     steps: int,
 ):
@@ -143,9 +261,9 @@ def fit_core[T: eqx.Module](
     def make_step(batch, flat_model, flat_opt_state):
         # Use the unflatten trick to speed up training,
         # see https://docs.kidger.site/equinox/tricks/
-        model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
+        model = jax.tree_util.tree_unflatten(state.treedef_model, flat_model)
         opt_state = jax.tree_util.tree_unflatten(
-            treedef_opt_state, flat_opt_state
+            state.treedef_opt_state, flat_opt_state
         )
 
         # Compute and apply the parameter updates
@@ -162,25 +280,12 @@ def fit_core[T: eqx.Module](
 
         return flat_model, flat_opt_state
 
-    # Apply the Constraint in the model to ensure apply-constrains are met
-    # initially
-    state.model = apply(state.model)
-
-    # Use the unflatten trick to speed up training,
-    # see https://docs.kidger.site/equinox/tricks/
-    flat_model, treedef_model = jax.tree.flatten(state.model)
-    flat_opt_state, treedef_opt_state = jax.tree.flatten(state.opt_state)
-
     for state.step in range(state.step, state.step + steps + 1):
-        batch = next(batcher)
-        flat_model, flat_opt_state = make_step(
-            batch, flat_model, flat_opt_state
+        next(batcher)
+        batch = batcher.send(state)  # Send the state back to the batcher
+        state.flat_model, state.flat_opt_state = make_step(
+            batch, state.flat_model, state.flat_opt_state
         )
-
-    state.model = jax.tree_util.tree_unflatten(treedef_model, flat_model)
-    state.opt_state = jax.tree_util.tree_unflatten(
-        treedef_opt_state, flat_opt_state
-    )
 
     return state
 
@@ -195,7 +300,7 @@ def fit(
     loss: LossFactory = mse,
     optimizer: optax.GradientTransformation,
     init_opt_state: PyTree[Any] = None,
-    batcher: BatchGenerator = batch_data,
+    batcher: Batcher = stateful_batch_data,
     updater: UpdaterFactory = optax_transform_update_fn_updater,
     key: PRNGKeyArray,
 ):
@@ -240,14 +345,18 @@ if __name__ == "__main__":
         model=model,
         opt_state=optimizer.init(eqx.filter(model, eqx.is_inexact_array)),
     )
-    batcher = batch_data(
+    batcher = stateful_batch_data(
         (x, y),
         batch_size=32,
         batch_axis=batch_axis,
-        key=eqx.internal.GetKey()(),
+        key=eqx.internal.GetKey()(),  # Unused
     )
     loss = mse(batch_axis)
     updater = optax_transform_update_fn_updater(optimizer.update, *loss)
     state = fit_core(updater, batcher, state, steps=1000)
     y_pred = jax.vmap(state.model)(x)
     assert jnp.allclose(y_pred, y)
+
+    import pprint
+
+    pprint.pp(state)
