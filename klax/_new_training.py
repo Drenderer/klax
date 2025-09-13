@@ -417,6 +417,10 @@ def fit_core[T: eqx.Module](
         if any([callback(ctx) for callback in callbacks]):
             break
 
+    # Call callbacks after training
+    for callback in callbacks:
+        callback.on_training_end(ctx)
+
     return ctx
 
 
