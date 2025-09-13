@@ -222,66 +222,6 @@ def optax_transform_update_fn_extra_args_updater(
     return wrapper
 
 
-@typing.runtime_checkable
-class Batcher(Protocol):
-    @abstractmethod
-    def __call__(
-        self,
-        data: PyTree[Any],
-        batch_size: int,
-        batch_axis: int,
-        *,
-        key: PRNGKeyArray,
-    ) -> Generator[PyTree[Any], TrainingState, None]:
-        pass
-
-
-def stateful_batch_data(
-    data: PyTree[Any],
-    batch_size: int,
-    batch_axis: int,
-    convert_to_numpy: bool = True,
-    *,
-    key: PRNGKeyArray,  # Only cor compliance with the `Batcher` protocol
-) -> Generator[PyTree[Any], TrainingState, None]:
-    """Create a stateful batch generator that uses the step as seed."""
-    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
-
-    # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
-    # for fast model training steps this actually makes a huge difference!
-    # However, be aware that this is likely only true if JAX runs on CPU.
-    if convert_to_numpy:
-        data = jax.tree.map(
-            lambda x, a: x if a is None else np.array(x),
-            data,
-            batch_axis,
-            is_leaf=lambda x: x is None,
-        )
-
-    # Reduce batch size if the dataset has less examples than batch size
-    batch_size = min(batch_size, dataset_size)
-
-    indices = jnp.arange(dataset_size)
-    while True:
-        # Store the training state as received by the `.send(state)` within
-        # the training loop.
-        state: TrainingState = yield
-        key = jax.random.PRNGKey(state.step)  # Create key from step
-        perm = jr.permutation(key, indices)
-        (key,) = jr.split(key, 1)  # Update key
-        start, end = 0, batch_size
-        while end <= dataset_size:
-            batch_perm = perm[start:end]
-            yield jax.tree.map(
-                lambda a, x: x if a is None else x[batch_perm],
-                batch_axis,
-                data,
-                is_leaf=lambda x: x is None,
-            )
-            start = end
-            end = start + batch_size
-
-
 @dataclass
 class EvaluationContext:
     value_fn: ValueFn
@@ -362,9 +302,69 @@ class Callback(ABC):
         pass
 
 
+@typing.runtime_checkable
+class Batcher(Protocol):
+    @abstractmethod
+    def __call__(
+        self,
+        data: PyTree[Any],
+        batch_size: int,
+        batch_axis: int,
+        *,
+        key: PRNGKeyArray,
+    ) -> Generator[PyTree[Any], TrainingState, None]:
+        pass
+
+
+def stateful_batch_data(
+    data: PyTree[Any],
+    batch_size: int,
+    batch_axis: int,
+    convert_to_numpy: bool = True,
+    *,
+    key: PRNGKeyArray,  # Only cor compliance with the `Batcher` protocol
+) -> Generator[PyTree[Any], TrainingContext, None]:
+    """Create a stateful batch generator that uses the step as seed."""
+    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
+
+    # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
+    # for fast model training steps this actually makes a huge difference!
+    # However, be aware that this is likely only true if JAX runs on CPU.
+    if convert_to_numpy:
+        data = jax.tree.map(
+            lambda x, a: x if a is None else np.array(x),
+            data,
+            batch_axis,
+            is_leaf=lambda x: x is None,
+        )
+
+    # Reduce batch size if the dataset has less examples than batch size
+    batch_size = min(batch_size, dataset_size)
+
+    indices = jnp.arange(dataset_size)
+    while True:
+        # Store the training state as received by the `.send(state)` within
+        # the training loop.
+        ctx: TrainingContext = yield
+        key = jax.random.PRNGKey(ctx.state.step)  # Create key from step
+        perm = jr.permutation(key, indices)
+        (key,) = jr.split(key, 1)  # Update key
+        start, end = 0, batch_size
+        while end <= dataset_size:
+            batch_perm = perm[start:end]
+            yield jax.tree.map(
+                lambda a, x: x if a is None else x[batch_perm],
+                batch_axis,
+                data,
+                is_leaf=lambda x: x is None,
+            )
+            start = end
+            end = start + batch_size
+
+
 def fit_core[T: eqx.Module](
     updater: Updater,
-    batcher: Generator[PyTree[Any], TrainingState, None],
+    batcher: Generator[PyTree[Any], TrainingContext, None],
     ctx: TrainingContext,
     steps: int,
     callbacks: Iterable[Callback] | None = None,
@@ -402,7 +402,7 @@ def fit_core[T: eqx.Module](
 
     for _ in range(steps):
         next(batcher)
-        batch = batcher.send(ctx.state)  # Send the state back to the batcher
+        batch = batcher.send(ctx)  # Send the context
         flat_model, flat_opt_state = make_step(
             batch, ctx.state.flat_model, ctx.state.flat_opt_state
         )
