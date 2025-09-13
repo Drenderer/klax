@@ -17,10 +17,13 @@ from ._callbacks import (
     Callback as Callback,
 )
 from ._callbacks import (
-    CallbackArgs as CallbackArgs,
-)
-from ._callbacks import (
     HistoryCallback as HistoryCallback,
+)
+from ._context import (
+    EvaluationContext,
+    TimingInfo,
+    TrainingContext,
+    TrainingState,
 )
 from ._datahandler import (
     BatchGenerator as BatchGenerator,
@@ -32,13 +35,7 @@ from ._datahandler import (
     split_data as split_data,
 )
 from ._losses import (
-    MAE as MAE,
-)
-from ._losses import (
-    MSE as MSE,
-)
-from ._losses import (
-    Loss as Loss,
+    LossFactory as LossFactory,
 )
 from ._losses import (
     mae as mae,
