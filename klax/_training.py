@@ -37,7 +37,7 @@ from ._wrappers import apply, unwrap
 
 
 @overload
-def fit[T: eqx.Module](
+def fit[T: PyTree[Any]](
     model: T,
     data: PyTree[Any],
     *,
@@ -54,7 +54,7 @@ def fit[T: eqx.Module](
     key: PRNGKeyArray,
 ) -> tuple[T, HistoryCallback]: ...
 @overload
-def fit[T: eqx.Module, H: Callback](
+def fit[T: PyTree[Any], H: Callback](
     model: T,
     data: PyTree[Any],
     *,
@@ -70,7 +70,7 @@ def fit[T: eqx.Module, H: Callback](
     callbacks: Iterable[Callback] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[T, H]: ...
-def fit[T: eqx.Module, H: Callback](
+def fit[T: PyTree[Any], H: Callback](
     model: T,
     data: PyTree[Any],
     *,
