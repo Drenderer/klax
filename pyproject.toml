@@ -17,7 +17,6 @@ dependencies = [
     "equinox>=0.12.2",
     "jax>=0.6.0",
     "optax>=0.2.4",
-    "paramax>=0.0.3",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
