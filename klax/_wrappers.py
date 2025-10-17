@@ -369,7 +369,7 @@ class Constraint(Unwrappable[Array], ABC):
         pass
 
 
-def apply(tree: PyTree):
+def apply(tree: PyTree) -> PyTree:
     """Map across a PyTree and apply all [Constraints][klax.Constraint].
 
     This leaves all other nodes unchanged.
@@ -437,7 +437,7 @@ class NonNegative(Constraint):
 # ===----------------------------------------------------------------------===#
 
 
-def finalize(tree: PyTree):
+def finalize(tree: PyTree) -> PyTree:
     """Make a model containing [Constraints][klax.Constraint] callable.
 
     This function combined that functionalities of [`klax.apply`][] and
