@@ -50,7 +50,7 @@ def test_training(getkey):
     model, _ = klax.fit(
         model,
         ((b, x), y),
-        batch_axis=0,  # Test automatic batch axis braodcasting to data
+        batch_axes=0,  # Test automatic batch axis braodcasting to data
         optimizer=optax.adam(1.0),
         key=getkey(),
     )

@@ -34,12 +34,12 @@ class Loss(Protocol):
         be implemented as follows:
 
         ```python
-        >>> def mse(model, data, batch_axis=0):
+        >>> def mse(model, data, batch_axes=0):
         ...    x, y = data
-        ...    if isinstance(batch_axis, tuple):
-        ...        in_axes = batch_axis[0]
+        ...    if isinstance(batch_axes, tuple):
+        ...        in_axes = batch_axes[0]
         ...    else:
-        ...        in_axes = batch_axis
+        ...        in_axes = batch_axes
         ...    y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
         ...    return jnp.mean(jnp.square(y_pred - y))
         ```
@@ -54,14 +54,14 @@ class Loss(Protocol):
         self,
         model: PyTree,
         data: PyTree,
-        batch_axis: int | None | Sequence[Any],
+        batch_axes: int | None | Sequence[Any],
     ) -> Scalar:
         """Abstract method to compute the loss for a given model and data.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
             data: The input data or structure used for loss computation.
-            batch_axis: Specifies the axis or axes corresponding to the batch
+            batch_axes: Specifies the axis or axes corresponding to the batch
                 dimension in the data. Can be an integer, None, or a sequence
                 of values.
 
@@ -83,13 +83,13 @@ class MSE(Loss):
         self,
         model: PyTree,
         data: PyTree,
-        batch_axis: int | None | Sequence[Any] = 0,
+        batch_axes: int | None | Sequence[Any] = 0,
     ) -> Scalar:
         x, y = data
-        if isinstance(batch_axis, tuple):
-            in_axes = batch_axis[0]
+        if isinstance(batch_axes, tuple):
+            in_axes = batch_axes[0]
         else:
-            in_axes = batch_axis
+            in_axes = batch_axes
         y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
         return jnp.mean(jnp.square(y_pred - y))
 
@@ -108,13 +108,13 @@ class MAE(Loss):
         self,
         model: PyTree,
         data: PyTree,
-        batch_axis: int | None | Sequence[Any] = 0,
+        batch_axes: int | None | Sequence[Any] = 0,
     ) -> Scalar:
         x, y = data
-        if isinstance(batch_axis, tuple):
-            in_axes = batch_axis[0]
+        if isinstance(batch_axes, tuple):
+            in_axes = batch_axes[0]
         else:
-            in_axes = batch_axis
+            in_axes = batch_axes
         y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
         return jnp.mean(jnp.abs(y_pred - y))
 

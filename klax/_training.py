@@ -42,7 +42,7 @@ def fit[T: PyTree[Any]](
     data: PyTree[Any],
     *,
     batch_size: int = 32,
-    batch_axis: PyTree[int | None] = 0,
+    batch_axes: PyTree[int | None] = 0,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss_fn: Loss = mse,
@@ -59,7 +59,7 @@ def fit[T: PyTree[Any], H: Callback](
     data: PyTree[Any],
     *,
     batch_size: int = 32,
-    batch_axis: PyTree[int | None] = 0,
+    batch_axes: PyTree[int | None] = 0,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss_fn: Loss = mse,
@@ -75,7 +75,7 @@ def fit[T: PyTree[Any], H: Callback](
     data: PyTree[Any],
     *,
     batch_size: int = 32,
-    batch_axis: PyTree[int | None] = 0,
+    batch_axes: PyTree[int | None] = 0,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss_fn: Loss = mse,
@@ -96,9 +96,9 @@ def fit[T: PyTree[Any], H: Callback](
             Most likely you'll want `data` to be a tuple `(x, y)` with model
             inputs `x` and model outputs `y`.
         batch_size: The number of examples in a batch.
-        batch_axis: A `PyTree` denoting, which axis is the batch axis for
-            arrays in `data`. `batch_axis` must be a prefix of `data`. By
-            specifying `batch_axis` as a `PyTree` it is possible to specify
+        batch_axes: A `PyTree` denoting, which axis is the batch axis for
+            arrays in `data`. `batch_axes` must be a prefix of `data`. By
+            specifying `batch_axes` as a `PyTree` it is possible to specify
             different batch axes for different leaves of `data`. (Defaults to
             `0`, meaning the first axes of arrays in `data` are batch
             dimensions.)
@@ -107,7 +107,7 @@ def fit[T: PyTree[Any], H: Callback](
             to None.)
         steps: Number of gradient updates to apply. (Defaults to 1000.)
         loss_fn: The loss function with call signature
-            `(model: PyTree, data: PyTree, batch_axis: int | None |
+            `(model: PyTree, data: PyTree, batch_axes: int | None |
             Sequence[Any]) -> float`. (Defaults to `mse`.)
         optimizer: The optimizer. Any optax gradient transform to calculate
             the updates for the model. (Defaults to optax.adam(1e-3).)
@@ -140,20 +140,20 @@ def fit[T: PyTree[Any], H: Callback](
         A tuple of the trained model and the loss history.
 
     """
-    # Braodcast the batch_axis to the data. While this happens again in the
-    # batch_data, doing it here allows the use of the broadcasted batch_axis in
-    # the loss function. If `batch_axis` is a prefix of `data`, this ensures
+    # Braodcast the batch axes to the data. While this happens again in the
+    # batch_data, doing it here allows the use of the broadcasted batch_axes in
+    # the loss function. If `batch_axes` is a prefix of `data`, this ensures
     # that only leafs of type ArrayLike are vmapped. Thus it is possible to
-    # have data like `(str, array)` ans still use `batch_axis=0` instead of
-    # `batch_axis=(None, 0)`.
-    batch_axis, dataset_size = broadcast_and_get_size(data, batch_axis)
+    # have data like `(str, array)` ans still use `batch_axes=0` instead of
+    # `batch_axes=(None, 0)`.
+    batch_axes, dataset_size = broadcast_and_get_size(data, batch_axes)
 
     # Define a function to calculate the loss. This is jit compiled to speed up
     # the loss evaluation for the loss history.
     @eqx.filter_jit
     def combined_loss(model, batch):
         model = unwrap(model)
-        return loss_fn(model, batch, batch_axis=batch_axis)
+        return loss_fn(model, batch, batch_axes=batch_axes)
 
     # This partitioned loss function is required within the make_step function,
     # because the optax.lbgfs GradientTransformation required the loss function
@@ -235,7 +235,7 @@ def fit[T: PyTree[Any], H: Callback](
     # Loop over all training steps
     for step, batch in zip(
         range(1, steps + 1),
-        batcher(data, batch_size, batch_axis, key=key),
+        batcher(data, batch_size, batch_axes, key=key),
     ):
         flat_model, flat_opt_state = make_step(
             batch, flat_model, optimizer, flat_opt_state
