@@ -53,14 +53,14 @@ class Loss(Protocol):
     def __call__(
         self,
         model: PyTree,
-        data: PyTree,
+        batch: PyTree,
         batch_axes: int | None | Sequence[Any],
     ) -> Scalar:
         """Abstract method to compute the loss for a given model and data.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
-            data: The input data or structure used for loss computation.
+            batch: A batch of input data used for loss computation.
             batch_axes: Specifies the axis or axes corresponding to the batch
                 dimension in the data. Can be an integer, None, or a sequence
                 of values.
@@ -73,7 +73,7 @@ class Loss(Protocol):
 
 
 class MSE(Loss):
-    """Mean squared error for a tuple of data `(x, y)`.
+    """Mean squared error for a batch of data of the form `(x, y)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
@@ -82,10 +82,10 @@ class MSE(Loss):
     def __call__(
         self,
         model: PyTree,
-        data: PyTree,
+        batch: PyTree,
         batch_axes: int | None | Sequence[Any] = 0,
     ) -> Scalar:
-        x, y = data
+        x, y = batch
         if isinstance(batch_axes, tuple):
             in_axes = batch_axes[0]
         else:
@@ -98,7 +98,7 @@ mse = MSE()
 
 
 class MAE(Loss):
-    """Mean absolute error for a tuple of data `(x, y)`.
+    """Mean absolute error for a batch of data of the form `(x, y)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
@@ -107,10 +107,10 @@ class MAE(Loss):
     def __call__(
         self,
         model: PyTree,
-        data: PyTree,
+        batch: PyTree,
         batch_axes: int | None | Sequence[Any] = 0,
     ) -> Scalar:
-        x, y = data
+        x, y = batch
         if isinstance(batch_axes, tuple):
             in_axes = batch_axes[0]
         else:
