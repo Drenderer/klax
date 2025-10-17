@@ -132,6 +132,7 @@ def test_training(getkey):
         optax.novograd(1.0),
         optax.optimistic_gradient_descent(1.0),
         optax.optimistic_adam(1.0),
+        optax.optimistic_adam_v2(1.0),
         optax.polyak_sgd(1.0),
         optax.radam(1.0),
         optax.rmsprop(1.0),
