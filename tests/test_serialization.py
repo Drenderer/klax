@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from typing import Any, BinaryIO
-
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
@@ -23,23 +21,26 @@ import klax
 
 
 def _get_pytress():
+    fun = lambda x: x
+    obj = object()
+
     tree = (
         jnp.array(1),
         jnp.array([1.0, 2.0]),
+        fun,
         np.array(1),
         np.array([1.0, 2.0]),
         (True, 1, 1.0, 1 + 1j),
-        lambda x: x,
-        object(),
+        obj,
     )
     like = (
         jnp.array(5),
         jnp.array([6.0, 7.0]),
+        fun,
         np.array(5),
         np.array([6.0, 7.0]),
         (False, 6, 6.0, 6 + 6j),
-        lambda x: x,
-        object(),
+        obj,
     )
     return tree, like
 
@@ -56,6 +57,7 @@ def test_text_serialize_filter_spec(tmp_path):
         file_path, like, filter_spec=klax.text_deserialize_filter_spec
     )
 
-    assert eqx.tree_equal(tree_loaded[:-2], tree[:-2])
-    assert tree_loaded[-2] is like[-2]  # Compare function
-    assert tree_loaded[-1] is like[-1]  # Compare object
+    print(tree_loaded)
+    print(tree)
+
+    assert eqx.tree_equal(tree_loaded, tree)
