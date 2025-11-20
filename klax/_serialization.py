@@ -54,6 +54,10 @@ def text_serialize_filter_spec(f: BinaryIO, x: Any) -> None:
         pass
 
 
+def _readline_decode(f: BinaryIO) -> str:
+    return f.readline().decode()
+
+
 def text_deserialize_filter_spec(f: BinaryIO, x: Any) -> Any:
     """Filter specification for deserializing a leaf from text.
 
@@ -84,16 +88,15 @@ def text_deserialize_filter_spec(f: BinaryIO, x: Any) -> Any:
         ```
 
     """
-    line = f.readline().decode()
     if isinstance(x, (bool, complex, float, int, np.generic)):
-        return type(x)(line)
+        return type(x)(_readline_decode(f))
     elif isinstance(x, (jax.Array, jax.ShapeDtypeStruct)):
         return jnp.fromstring(
-            line, dtype=x.dtype, sep=" ", count=x.size
+            _readline_decode(f), dtype=x.dtype, sep=" ", count=x.size
         ).reshape(x.shape)
     elif isinstance(x, np.ndarray):
         return np.fromstring(
-            line, dtype=x.dtype, sep=" ", count=x.size
+            _readline_decode(f), dtype=x.dtype, sep=" ", count=x.size
         ).reshape(x.shape)
     else:
         return x
