@@ -35,6 +35,7 @@ from ._serialization import (
 from ._serialization import (
     text_serialize_filter_spec as text_serialize_filter_spec,
 )
+from ._tools import parameter_count
 from ._training import fit as fit
 from ._wrappers import Constraint as Constraint
 from ._wrappers import NonNegative as NonNegative

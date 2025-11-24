@@ -105,6 +105,7 @@ nav:
       - api/callbacks.md
       - api/serialization.md
       - api/initialization.md
+      - api/tools.md
       - Neural Networks:
           - api/nn/linear.md
           - api/nn/mlp.md
