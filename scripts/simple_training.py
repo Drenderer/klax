@@ -1,6 +1,5 @@
 from jax import numpy as jnp
 from jax import random as jr
-from matplotlib import pyplot as plt
 
 import klax
 
@@ -18,7 +17,3 @@ model, history = klax.fit(
     steps=10_000,
     key=train_key,
 )
-
-history.plot()
-plt.legend
-plt.show()
