@@ -24,9 +24,10 @@ from typing import Literal
 import equinox as eqx
 import jax
 import jax.random as jrandom
-from jax.nn.initializers import Initializer, he_normal, zeros
+from jax.nn.initializers import he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
+from .._initializers import Initializer
 from .._misc import default_floating_dtype
 from .._wrappers import Constraint, Unwrappable
 from ._linear import Linear
@@ -75,18 +76,12 @@ class MLP(eqx.Module, strict=True):
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
-            weight_init: The weight initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to he_normal().)
-            bias_init: The bias initializer of type
-                `jax.nn.initializers.Initializer`. (Defaults to zeros.)
+            weight_init: The weight initializer of type `Initializer`.
+            bias_init: The bias initializer of type `Initializer`.
             activation: The activation function after each hidden layer.
-                (Defaults to `jax.nn.softplus`).
             final_activation: The activation function after the output layer.
-                (Defaults to the identity.)
             use_bias: Whether to add on a bias to internal layers.
-                (Defaults to `True`.)
             use_final_bias: Whether to add on a bias to the final layer.
-                (Defaults to `True`.)
             weight_wrap: An optional wrapper that is passed to all weights.
             bias_wrap: An optional wrapper that is passed to all biases.
             dtype: The dtype to use for all the weights and biases in this MLP.
