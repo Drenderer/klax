@@ -17,10 +17,13 @@ from ._callbacks import (
     Callback as Callback,
 )
 from ._callbacks import (
-    CallbackArgs as CallbackArgs,
+    HistoryCallback as HistoryCallback,
 )
 from ._callbacks import (
-    HistoryCallback as HistoryCallback,
+    TrainingState as TrainingState,
+)
+from ._callbacks import (
+    TrainingStatic as TrainingStatic,
 )
 from ._datahandler import (
     BatchGenerator as BatchGenerator,

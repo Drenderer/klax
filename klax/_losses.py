@@ -13,20 +13,28 @@
 # limitations under the License.
 
 import typing
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Protocol
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree, Scalar
 
+from ._wrappers import unwrap
 
-@typing.runtime_checkable
-class Loss(Protocol):
+
+class Loss(ABC):
     """An abstract callable loss object.
 
     It can be used to build custom losses that can be passed to [`klax.fit`][].
+    An instance of the loss class has two methods that are required for
+    [`klax.fit`][`fit`]: `value` and `value_and_grad`. In most cases the default
+    implementation should be used. `value` just [`klax.unwrap`][unwraps] the model
+    before computing the loss as specified in `__call__`, while `value_and_grad`
+    per default applies `jax.value_and_grad` to `value`. These functions can be
+    overwritten, for example to enable custom calculations of the gradients.
 
     Example:
         A simple custom loss that computes the mean squared error between
@@ -34,14 +42,11 @@ class Loss(Protocol):
         be implemented as follows:
 
         ```python
-        >>> def mse(model, data, batch_axis=0):
-        ...    x, y = data
-        ...    if isinstance(batch_axis, tuple):
-        ...        in_axes = batch_axis[0]
-        ...    else:
-        ...        in_axes = batch_axis
-        ...    y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
-        ...    return jnp.mean(jnp.square(y_pred - y))
+        >>> class MSE(klax.Loss):
+        ...     def __call__(self, model, data, batch_axes):
+        ...         x, y = data
+        ...         y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+        ...         return jnp.mean(jnp.square(y_pred - y))
         ```
 
         Note that, since we a aim to provide a maximum of flexibility the users
@@ -49,19 +54,19 @@ class Loss(Protocol):
 
     """
 
+    @staticmethod
     @abstractmethod
-    def __call__(
-        self,
+    def __call__[T](
         model: PyTree,
-        data: PyTree,
-        batch_axis: int | None | Sequence[Any],
+        batch: PyTree[Any, "T"],
+        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
     ) -> Scalar:
         """Abstract method to compute the loss for a given model and data.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
-            data: The input data or structure used for loss computation.
-            batch_axis: Specifies the axis or axes corresponding to the batch
+            batch: The input data or structure used for loss computation.
+            batch_axes: Specifies the axis or axes corresponding to the batch
                 dimension in the data. Can be an integer, None, or a sequence
                 of values.
 
@@ -69,7 +74,50 @@ class Loss(Protocol):
             Scalar: The computed loss value.
 
         """
-        ...
+        pass
+
+    def value[T](
+        self,
+        model: PyTree,
+        batch: PyTree[Any, "T"],
+        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+    ) -> Scalar:
+        """Compute the loss value during training.
+
+        Args:
+            model: The model parameters or structure to evaluate the loss.
+            batch: The input data or structure used for loss computation.
+            batch_axes: Specifies the axis or axes corresponding to the batch
+                dimension in the data. Can be an integer, None, or a sequence
+                of values.
+
+        Returns:
+            Scalar: The computed loss value.
+
+        """
+        model = unwrap(model)
+        return self(model, batch, batch_axes)
+
+    def value_and_grad[T, M](
+        self,
+        model: PyTree[Any, "M"],
+        batch: PyTree[Any, "T"],
+        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+    ) -> tuple[Scalar, PyTree[Any, "M"]]:
+        """Compute the loss value and gradient during training.
+
+        Args:
+            model: The model parameters or structure to evaluate the loss.
+            batch: The input data or structure used for loss computation.
+            batch_axes: Specifies the axis or axes corresponding to the batch
+                dimension in the data. Can be an integer, None, or a sequence
+                of values.
+
+        Returns:
+            Tuple of loss value and gradient with respect to the model.
+
+        """
+        return eqx.filter_value_and_grad(self.value)(model, batch, batch_axes)
 
 
 class MSE(Loss):
@@ -79,18 +127,9 @@ class MSE(Loss):
     and equal length along that axis.
     """
 
-    def __call__(
-        self,
-        model: PyTree,
-        data: PyTree,
-        batch_axis: int | None | Sequence[Any] = 0,
-    ) -> Scalar:
+    def __call__(self, model, data, batch_axes):
         x, y = data
-        if isinstance(batch_axis, tuple):
-            in_axes = batch_axis[0]
-        else:
-            in_axes = batch_axis
-        y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
+        y_pred = jax.vmap(model, in_axes=batch_axes)(x)
         return jnp.mean(jnp.square(y_pred - y))
 
 
@@ -104,18 +143,9 @@ class MAE(Loss):
     and equal length along that axis.
     """
 
-    def __call__(
-        self,
-        model: PyTree,
-        data: PyTree,
-        batch_axis: int | None | Sequence[Any] = 0,
-    ) -> Scalar:
+    def __call__(self, model, data, batch_axes):
         x, y = data
-        if isinstance(batch_axis, tuple):
-            in_axes = batch_axis[0]
-        else:
-            in_axes = batch_axis
-        y_pred = jax.vmap(model, in_axes=(in_axes,))(x)
+        y_pred = jax.vmap(model, in_axes=batch_axes)(x)
         return jnp.mean(jnp.abs(y_pred - y))
 
 

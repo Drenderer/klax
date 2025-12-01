@@ -17,139 +17,14 @@ import importlib
 import pickle
 import time
 from abc import ABC
+from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
-import jax
-from jaxtyping import PyTree, PyTreeDef, Scalar
+from jaxtyping import PyTree, Scalar
 
-
-class CallbackArgs:
-    """A callback argument designed to work in conjunction with [`klax.fit`][].
-
-    This class should not be instantiated directly. An instance of this class
-    is passed to every callback object in the fit function. When writing a
-    custom callback, use the properties of this class to access the current
-    model, optimizer state, training data, and validation data during training.
-
-    This class implements cached and lazy-evaluated values via property
-    methods. This means that properties like ``loss`` are only calculated if
-    they are used and are stored such that they are not calculated multiple
-    times.
-    """
-
-    step: int  #: Current step-count of the training.
-    time_on_last_update: float  #: Global time of the last :meth:`update` call.
-    data: PyTree  #: PyTree of the training data.
-    val_data: PyTree | None  #: PyTree of the validation data.
-    _treedef_model: PyTreeDef
-    _flat_model: list
-    _treedef_opt_state: PyTreeDef
-    _flat_opt_state: list
-    _cache: dict = {}
-    _get_loss: Callable[[PyTree, PyTree], Scalar]
-    _start_time: float
-
-    def __init__(
-        self,
-        get_loss: Callable[[PyTree, PyTree], Scalar],
-        treedef_model: PyTreeDef,
-        treedef_opt_state: PyTreeDef,
-        data: PyTree,
-        val_data: PyTree | None = None,
-    ):
-        """Initialize the callback arguments object.
-
-        Args:
-        get_loss: Function that takes a model and a batch of data and
-            returns the loss.
-        treedef_model: Tree structure of the model.
-        treedef_opt_state: Tree structure of the :py:mod:`optax` optimizer.
-        data: PyTree of the training data.
-        val_data: PyTree of the validation data. If None, no validation
-            loss is calculated and the property :py:attr:`val_loss` will
-            return None.
-
-        """
-        self.data = data
-        self.val_data = val_data
-        self._get_loss = get_loss
-        self._treedef_model = treedef_model
-        self._treedef_opt_state = treedef_opt_state
-
-    def update(self, flat_model: PyTree, flat_opt_state: PyTree, step: int):
-        """Update the object with the current model and optimizer state.
-
-        This method is called repeatedly in [`klax.fit`][].
-
-        Args:
-            flat_model: Flattened PyTree of the model.
-            flat_opt_state: Flattened PyTree of the `optax`
-                optimizer.
-            step: Current step-count of the training.
-
-        """
-        self._flat_model = flat_model
-        self._flat_opt_state = flat_opt_state
-        self.step = step
-        self.time_on_last_update = time.time()
-
-        # Clear cache
-        self._cache = {}
-
-    @staticmethod
-    def _lazy_evaluated_and_cached(fun: Callable[[Any], Any]) -> property:
-        """Turn a public method into a property.
-
-        The return value of ``fun`` is stored in the ``_cache`` dictionary of
-        the current object using the function name as key. If the name is
-        already in ``_cache`` then the cached value is simply returned,
-        without evaluating ``fun``.
-
-        Args:
-            fun: Method to wrap.
-
-        Returns:
-            Wrapped method as a property.
-
-        """
-        attr_name = fun.__name__
-
-        def wrapper(self: Self):
-            if attr_name not in self._cache:
-                self._cache.setdefault(attr_name, fun(self))
-            return self._cache.get(attr_name)
-
-        wrapper.__doc__ = fun.__doc__
-
-        return property(wrapper)
-
-    @_lazy_evaluated_and_cached
-    def model(self):
-        """Lazy-evaluated and cached model."""
-        return jax.tree_util.tree_unflatten(
-            self._treedef_model, self._flat_model
-        )
-
-    @_lazy_evaluated_and_cached
-    def opt_state(self):
-        """Lazy-evaluated and cached optimizer state."""
-        return jax.tree_util.tree_unflatten(
-            self._treedef_opt_state, self._flat_opt_state
-        )
-
-    @_lazy_evaluated_and_cached
-    def loss(self):
-        """Lazy-evaluated and cached training loss."""
-        return self._get_loss(self.model, self.data)
-
-    @_lazy_evaluated_and_cached
-    def val_loss(self) -> Scalar | None:
-        """Lazy-evaluated and cached validation loss."""
-        if self.val_data is None:
-            return None
-        return self._get_loss(self.model, self.val_data)
+from ._trainstate import TrainingState, TrainingStatic
 
 
 class Callback(ABC):
@@ -158,16 +33,26 @@ class Callback(ABC):
     Inherit from this class to create a custom callback.
     """
 
-    def __call__(self, cbargs: CallbackArgs) -> bool | None:
+    def on_training_start(
+        self, state: TrainingState, static: TrainingStatic
+    ) -> None:
+        """Call when training starts."""
+        pass
+
+    def __call__(
+        self,
+        state: TrainingState,
+        step: int,
+        step_loss: Scalar,
+        static: TrainingStatic,
+    ) -> bool | None:
         """Call after each step during training."""
         pass
 
-    def on_training_end(self, cbargs: CallbackArgs) -> None:
+    def on_training_end(
+        self, state: TrainingState, static: TrainingStatic
+    ) -> None:
         """Call when training ends."""
-        pass
-
-    def on_training_start(self, cbargs: CallbackArgs) -> None:
-        """Call when training starts."""
         pass
 
 
@@ -178,31 +63,37 @@ class HistoryCallback(Callback):
     """
 
     log_every: int
+    verbose: bool
     steps: list  #: List of steps at which the losses were recorded.
-    loss: list
-    val_loss: list
+    metric_defs: dict[str, tuple[PyTree, Callable[[PyTree, PyTree], float]]]
+    metrics: dict[str, list[float]]
     last_start_time: float  # start time of the last training
     last_end_time: float  # End time of the last training
     training_time: float = 0  # Total training time of all trainings
-    verbose: bool
     step_offset: int = 0  # Potential offset due to previous trainings
     last_opt_state: PyTree | None = None
 
-    def __init__(self, log_every: int = 100, verbose: bool = True):
+    def __init__(
+        self, metric_defs={}, log_every: int = 100, verbose: bool = True
+    ):
         """Initialize the `HistoryCallback`.
 
         Args:
+        metric_defs: A dictionary defining the metrics to be recorded. Each key is
+            the name of the metric, and each value is a tuple containing the data
+            required to compute the metric and a callable that computes the metric
         log_every: Amount of steps after which the training and validation
             losses are logged. (Defaults to 100.)
         verbose: If true prints the training progress and losses.
             (Defaults to True.)
 
         """
+        self.metric_defs = metric_defs
         self.log_every = log_every
         self.verbose = verbose
         self.steps = []
-        self.loss = []
-        self.val_loss = []
+        self.metrics = defaultdict(list)
+        self.total_steps_digits: int
 
     def __repr__(self):
         """Return a string representation of the HistoryCallback."""
@@ -211,48 +102,65 @@ class HistoryCallback(Callback):
             f"verbose={self.verbose})"
         )
 
-    def __call__(self, cbargs: CallbackArgs):
-        """Record the losses and step count.
-
-        Called at each step during training.
-        """
-        if cbargs.step % self.log_every == 0:
-            self.steps.append(self.step_offset + cbargs.step)
-            self.loss.append(cbargs.loss)
-            self.val_loss.append(cbargs.val_loss)
-
-            # Print message
-            if self.verbose:
-                message = f"Step: {cbargs.step}, Loss: {cbargs.loss:.3e}"
-                if cbargs.val_data is not None:
-                    message += f", Validation loss: {cbargs.val_loss:.3e}"
-                print(message)
-
-    def on_training_start(self, cbargs: CallbackArgs):
+    def on_training_start(self, state: TrainingState, static: TrainingStatic):
         """Initialize the training start time.
 
         Called at beginning of training.
         """
-        self.last_start_time = cbargs.time_on_last_update
+        self.last_start_time = time.time()
+        self.total_steps_digits = len(str(static.steps))
         if self.steps:
             # If there are already steps, we assume that this is a continuation
             # of a training.
             self.step_offset = self.steps[-1]
         else:
-            self(cbargs)
+            self(state, 0, float("nan"), static)  # Log initial losses
 
-    def on_training_end(self, cbargs: CallbackArgs):
+    def __call__(
+        self,
+        state: TrainingState,
+        step: int,
+        step_loss: Scalar,
+        static: TrainingStatic,
+    ):
+        """Record the losses and step count.
+
+        Called at each step during training.
+        """
+        if step % self.log_every == 0:
+            self.steps.append(self.step_offset + step)
+            self.metrics["step_loss"].append(step_loss)
+            for name, (data, metric_fn) in self.metric_defs.items():
+                metric_value = metric_fn(state.model, data)
+                self.metrics[name].append(metric_value)
+
+            # Print message
+            if self.verbose:
+                print(
+                    f"Step: {step:>{self.total_steps_digits}}: "
+                    + ", ".join(
+                        [
+                            f"{name}: {self.metrics[name][-1]:.3e}"
+                            for name in self.metrics.keys()
+                        ]
+                    )
+                )
+
+    def on_training_end(
+        self, state: TrainingState, static: TrainingStatic
+    ) -> None:
         """Record the training end time and the last optimizer state.
 
         Called at end of training.
         """
-        self.last_end_time = cbargs.time_on_last_update
-        self.training_time += self.last_end_time - self.last_start_time
-        self.last_opt_state = cbargs.opt_state
+        self.last_end_time = time.time()
+        last_training_time = self.last_end_time - self.last_start_time
+        self.training_time += last_training_time
+        self.last_opt_state = state.opt_state
         if self.verbose:
             print(
                 f"Training took: {
-                    datetime.timedelta(seconds=self.training_time)
+                    datetime.timedelta(seconds=last_training_time)
                 }"
             )
 
@@ -260,8 +168,6 @@ class HistoryCallback(Callback):
         self,
         *,
         ax: Any = None,
-        loss_options: dict = {},
-        val_loss_options: dict = {},
     ):
         """Plot the recorded training and validation losses.
 
@@ -271,10 +177,6 @@ class HistoryCallback(Callback):
         Args:
             ax: Matplotlib axes to plot into. If ``None`` then a new axis is
                 created. (Defaults to None.)
-            loss_options: Dictionary of keyword arguments passed to
-                matplotlibs ``plot`` for the training loss. (Defaults to {}.)
-            val_loss_options: Dictionary of keyword arguments passed to
-                matplotlibs ``plot`` for the validation loss. (Defaults to {}.)
 
         Raises:
             ImportError: _description_
@@ -287,27 +189,14 @@ class HistoryCallback(Callback):
                 _, ax = plt.subplots()
                 ax.set(
                     xlabel="Step",
-                    ylabel="Loss",
+                    ylabel="Metric",
                     yscale="log",
                     title="Training History",
                 )
                 ax.grid(True)
 
-            # Rename the color option to "c", if it exists. Otherwise "c" and
-            # "color" are both passed to plot, which causes an error.
-            if "color" in loss_options:
-                loss_options["c"] = loss_options.pop("color")
-            if "color" in val_loss_options:
-                val_loss_options["c"] = val_loss_options.pop("color")
-
-            loss_options = dict(label="Loss", ls="-", c="black") | loss_options
-            val_loss_options = (
-                dict(label="Validation loss", ls="--", c="red")
-                | val_loss_options
-            )
-            ax.plot(self.steps, self.loss, **loss_options)
-            if any(x is not None for x in self.val_loss):
-                ax.plot(self.steps, self.val_loss, **val_loss_options)
+            for name, values in self.metrics.items():
+                ax.plot(self.steps, values, label=name)
 
         except ImportError as e:
             raise ImportError(
