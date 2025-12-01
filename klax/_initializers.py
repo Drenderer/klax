@@ -1,11 +1,14 @@
+"""Specialized parameter initializers, extending `jax.nn.initializers`."""
+
 import inspect
 import typing
 from collections.abc import Sequence
+from functools import wraps
 from typing import Any, Protocol, cast
 
+import jax
 from jax import numpy as jnp
 from jax import random as jr
-from jax.nn.initializers import Initializer as JaxInitializer
 from jaxtyping import Array, PRNGKeyArray
 
 # Types from JAX
@@ -14,14 +17,14 @@ Shape = Sequence[int | Any]
 
 
 @typing.runtime_checkable
-class KlaxInitializer(Protocol):
-    """Protocol for initializers, generalizing `jax.nn.initializers`.
+class Initializer(Protocol):
+    """Protocol for initializers, generalizing `jax.nn.initializers.Initializer`.
 
     Some advanced initialization schemes initialize the bias
     depending on the number of input features (`fan_in`). However,
     from the bias shape alone `fan_in` cannot be computed. This
-    Protocol specifies a initializer that is supplied with
-    `fan_in` explicitly, enabeling advanced bias initialization.
+    protocol specifies an initializer that is supplied with
+    `fan_in` explicitly, enabling advanced bias initialization.
     """
 
     def __call__(
@@ -34,20 +37,22 @@ class KlaxInitializer(Protocol):
         raise NotImplementedError
 
 
-type Initializer = JaxInitializer | KlaxInitializer
+type SupportedInitializer = Initializer | jax.nn.initializers.Initializer
 
 
-def canonicalize_initializer(init: Initializer) -> KlaxInitializer:
-    """Convert `Initializer` to `KlaxInitializer`.
+def canonicalize_initializer(
+    init: Initializer | jax.nn.initializers.Initializer,
+) -> Initializer:
+    """Convert any supported initializer to an `Initializer`.
 
     Args:
-        init: Initializer (`JaxInitializer` or `KlaxInitializer`)
+        init: The initializers to convert.
 
     Raises:
         TypeError: If the initializer call signature cannot be inspected.
 
     Returns:
-        KlaxInitializer
+        Initializer
 
     """
     try:
@@ -58,18 +63,25 @@ def canonicalize_initializer(init: Initializer) -> KlaxInitializer:
         )
 
     if "fan_in" in sig.parameters:
-        return cast(KlaxInitializer, init)
-    else:
-        return lambda key, shape, fan_in, dtype=jnp.float_: init(
-            key, shape, dtype
-        )
+        return cast(Initializer, init)
+
+    @wraps(init)
+    def wrapper(
+        key: PRNGKeyArray,
+        shape: Shape,
+        fan_in: int,
+        dtype: DTypeLikeInexact = jnp.float_,
+    ):
+        return init(key, shape, dtype)
+
+    return wrapper
 
 
 # TODO: Maybe implement alternative distributions besides normal.
 def hoedt_normal(
     in_axis: int = -2,
     dtype: DTypeLikeInexact = jnp.float_,
-) -> JaxInitializer:
+) -> jax.nn.initializers.Initializer:
     """Build a Hoedt normal initializer (for positivity constrained weights).
 
     A [Hoedt normal initializer](https://arxiv.org/abs/2312.12474) is designed
@@ -78,15 +90,15 @@ def hoedt_normal(
     signal propagation through layers with non-negative weights.
 
     Tip:
-        To work properly, this parameter initialization needs to be paired with the
-        [`klax.hoedt_bias`][] initializer for the biases of constrained layers.
+        This initiailzation should be paired with the [`klax.hoedt_bias`][]
+        initializer for biases of constrained layers.
 
     Args:
         in_axis: Axis of the input dimension in the weights array.
         dtype: The dtype of the weights.
 
     Returns:
-        A `JaxInitializer`.
+        A `jax.nn.initializers.Initializer`.
 
     """
 
@@ -111,7 +123,7 @@ def hoedt_normal(
 
 
 # TODO: Add an option to the factory to choose between constant and random intialization
-def hoedt_bias() -> KlaxInitializer:
+def hoedt_bias() -> Initializer:
     """Build a Hoedt bias initializer (for layers with positivity constrained weights).
 
     A [Hoedt bias initializer](https://arxiv.org/abs/2312.12474) is designed
@@ -120,11 +132,11 @@ def hoedt_bias() -> KlaxInitializer:
     a constant value, computed from the number of input features (`fan_in`).
 
     Tip:
-        To work properly, this parameter initialization needs to be paired with the
-        [`klax.hoedt_normal`][] initializer for the positivity constraint weights.
+        This initialization should be paired with the [`klax.hoedt_normal`][] initializer
+        for the positivity constraint weights.
 
     Returns:
-        A `JaxInitializer`.
+        An `Initializer`.
 
     """
 

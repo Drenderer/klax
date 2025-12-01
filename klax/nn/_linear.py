@@ -27,7 +27,10 @@ import jax.random as jrandom
 from jax.nn.initializers import zeros
 from jaxtyping import Array, PRNGKeyArray
 
-from .._initializers import Initializer, canonicalize_initializer
+from .._initializers import (
+    SupportedInitializer,
+    canonicalize_initializer,
+)
 from .._misc import default_floating_dtype
 from .._wrappers import (
     Constraint,
@@ -55,8 +58,8 @@ class Linear(eqx.Module, strict=True):
         self,
         in_features: int | Literal["scalar"],
         out_features: int | Literal["scalar"],
-        weight_init: Initializer,
-        bias_init: Initializer = zeros,
+        weight_init: SupportedInitializer,
+        bias_init: SupportedInitializer = zeros,
         use_bias: bool = True,
         weight_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
         bias_wrap: type[Constraint] | type[Unwrappable[Array]] | None = None,
@@ -71,8 +74,8 @@ class Linear(eqx.Module, strict=True):
                 vector of shape `(in_features,)`
             out_features: The output size. The output from the layer will be a
                 vector of shape `(out_features,)`.
-            weight_init: The weight initializer of type `Initializer`.
-            bias_init: The bias initializer of type `Initializer`.
+            weight_init: The weight initializer.
+            bias_init: The bias initializer.
             use_bias: Whether to add on a bias as well.
             weight_wrap: An optional wrapper that can be passed to enforce
                 weight constraints.
@@ -207,8 +210,8 @@ class InputSplitLinear(eqx.Module, strict=True):
         self,
         in_features: Sequence[int | Literal["scalar"]],
         out_features: int | Literal["scalar"],
-        weight_inits: Sequence[Initializer] | Initializer,
-        bias_init: Initializer = zeros,
+        weight_inits: Sequence[SupportedInitializer] | SupportedInitializer,
+        bias_init: SupportedInitializer = zeros,
         use_bias: bool = True,
         weight_wraps: (
             Sequence[type[Constraint] | type[Unwrappable[Array]] | None]

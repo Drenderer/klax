@@ -2,10 +2,12 @@
 title: Parameter initialization
 ---
 
- For some initialization schemes, the bias depends on the number of input features, which cannot be determined from the shape of the bias array. To handle such cases Klax provides a initialization framework that slightly generalizes upon JAX, while still ensuring compatibility of all klax models with the [`jax.nn.initializers`](https://docs.jax.dev/en/latest/jax.nn.initializers.html).
+Specialized parameter initializers, extending `jax.nn.initializers`.
+
+ For some initialization schemes, the bias depends on the number of input features, which cannot be determined from the shape of the bias array (see, e.g, [Hoedt normal initializer](https://arxiv.org/abs/2312.12474)). To handle such cases klax provides a custom [`klax.Initializer`]() protocol that generalizes upon the JAX API, while ensuring compatibility with all [`jax.nn.initializers`](https://docs.jax.dev/en/latest/jax.nn.initializers.html).
 
 
-::: klax.KlaxInitializer
+::: klax.Initializer
     options:
         members:
             - __call__
