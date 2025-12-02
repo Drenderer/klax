@@ -79,13 +79,13 @@ class HistoryCallback(Callback):
         """Initialize the `HistoryCallback`.
 
         Args:
-        metric_defs: A dictionary defining the metrics to be recorded. Each key is
-            the name of the metric, and each value is a tuple containing the data
-            required to compute the metric and a callable that computes the metric
-        log_every: Amount of steps after which the training and validation
-            losses are logged. (Defaults to 100.)
-        verbose: If true prints the training progress and losses.
-            (Defaults to True.)
+            metric_defs: A dictionary defining the metrics to be recorded. Each key is
+                the name of the metric, and each value is a tuple containing the data
+                required to compute the metric and a callable that computes the metric
+            log_every: Amount of steps after which the training and validation
+                losses are logged. (Defaults to 100.)
+            verbose: If true prints the training progress and losses.
+                (Defaults to True.)
 
         """
         self.metric_defs = metric_defs
@@ -168,6 +168,7 @@ class HistoryCallback(Callback):
         self,
         *,
         ax: Any = None,
+        names: list[str] | None = None,
     ):
         """Plot the recorded training and validation losses.
 
@@ -177,6 +178,8 @@ class HistoryCallback(Callback):
         Args:
             ax: Matplotlib axes to plot into. If ``None`` then a new axis is
                 created. (Defaults to None.)
+            names: List of metric names to plot. If ``None``, all recorded
+                metrics are plotted. (Defaults to None.)
 
         Raises:
             ImportError: _description_
@@ -195,8 +198,13 @@ class HistoryCallback(Callback):
                 )
                 ax.grid(True)
 
-            for name, values in self.metrics.items():
-                ax.plot(self.steps, values, label=name)
+            if names is None:
+                names = list(self.metrics.keys())
+            for name in names:
+                ax.plot(self.steps, self.metrics[name], label=name)
+
+            ax.legend()
+            return ax
 
         except ImportError as e:
             raise ImportError(

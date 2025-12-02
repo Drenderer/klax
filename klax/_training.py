@@ -130,6 +130,9 @@ def fit[T: eqx.Module, H: Callback](
 ) -> tuple[T, HistoryCallback | H]:
     """Trains a model using an optimizer from optax.
 
+    This is a convenient wrapper around `training_loop` which sets up optimizer,
+    training state and callbacks.
+
     Args:
         model: The model instance, which should be trained. It must be a
             subclass of `equinox.Module`. The model may contain
