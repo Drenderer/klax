@@ -10,58 +10,68 @@ from jaxtyping import PyTree, PyTreeDef
 from klax._losses import Loss
 
 
+# TODO: Potentially rewrite this class as a non-dataclass, to get the __init__ function to work. I've tried, but got some weired error from jax on the filter_jit boundary in training_loop.
+# @jax.tree_util.register_pytree_node_class
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
-    model: PyTree
-    opt_state: PyTree
+    model_leaves: list[Any]
+    model_tree_def: PyTreeDef  # type: ignore
+    opt_state_leaves: list[Any]
+    opt_state_tree_def: PyTreeDef  # type: ignore
 
+    @classmethod
+    def create(cls, model: PyTree, opt_state: PyTree) -> "TrainingState":
+        model_leaves, model_tree_def = jax.tree.flatten(model)
+        opt_state_leaves, opt_state_tree_def = jax.tree.flatten(opt_state)
+        return cls(
+            model_leaves,
+            model_tree_def,
+            opt_state_leaves,
+            opt_state_tree_def,
+        )
 
-# @jax.tree_util.register_pytree_node_class
-# class TrainingState:
-#     model_leaves: list[Any]
-#     model_tree_def: PyTreeDef # type: ignore
-#     opt_state_leaves: list[Any]
-#     opt_state_tree_def: PyTreeDef # type: ignore
+    # def __init__(self, model: PyTree, opt_state: PyTree) -> None:
+    #     self.model_leaves, self.model_tree_def = jax.tree.flatten(model)
+    #     self.opt_state_leaves, self.opt_state_tree_def = jax.tree.flatten(opt_state)
 
+    @property
+    def model(self) -> PyTree:
+        return jax.tree.unflatten(self.model_tree_def, self.model_leaves)
 
-#     def __init__(self, model: PyTree, opt_state: PyTree) -> None:
-#         self.model_leaves, self.model_tree_def = jax.tree.flatten(model)
-#         self.opt_state_leaves, self.opt_state_tree_def = jax.tree.flatten(opt_state)
+    @model.setter
+    def model(self, value: PyTree) -> None:
+        self.model_leaves, self.model_tree_def = jax.tree.flatten(value)
 
-#     @property
-#     def model(self) -> PyTree:
-#         return jax.tree.unflatten(self.model_tree_def, self.model_leaves)
+    @property
+    def opt_state(self) -> PyTree:
+        return jax.tree.unflatten(
+            self.opt_state_tree_def, self.opt_state_leaves
+        )
 
-#     @model.setter
-#     def model(self, value: PyTree) -> None:
-#         self.model_leaves, self.model_tree_def = jax.tree.flatten(value)
+    @opt_state.setter
+    def opt_state(self, value: PyTree) -> None:
+        self.opt_state_leaves, self.opt_state_tree_def = jax.tree.flatten(
+            value
+        )
 
-#     @property
-#     def opt_state(self) -> PyTree:
-#         return jax.tree.unflatten(self.opt_state_tree_def, self.opt_state_leaves)
+    # def tree_flatten(self):
+    #     return (
+    #         (self.model_leaves, self.opt_state_leaves),
+    #         (self.model_tree_def, self.opt_state_tree_def),
+    #     )
 
-#     @opt_state.setter
-#     def opt_state(self, value: PyTree) -> None:
-#         self.opt_state_leaves, self.opt_state_tree_def = jax.tree.flatten(value)
-
-#     def tree_flatten(self):
-#         return (
-#             (self.model_leaves, self.opt_state_leaves),
-#             (self.model_tree_def, self.opt_state_tree_def),
-#         )
-
-#     @classmethod
-#     def tree_unflatten(
-#         cls,
-#         aux_data: tuple[PyTreeDef, PyTreeDef], # type: ignore
-#         children: list[Any],
-#     ) -> "TrainingState":
-#         model_tree_def, opt_state_tree_def = aux_data
-#         model_leaves, opt_state_leaves = children
-#         model = jax.tree.unflatten(model_tree_def, model_leaves)
-#         opt_state = jax.tree.unflatten(opt_state_tree_def, opt_state_leaves)
-#         return cls(model, opt_state)
+    # @classmethod
+    # def tree_unflatten(
+    #     cls,
+    #     aux_data: tuple[PyTreeDef, PyTreeDef],  # type: ignore
+    #     children: tuple,
+    # ) -> "TrainingState":
+    #     model_tree_def, opt_state_tree_def = aux_data
+    #     model_leaves, opt_state_leaves = children
+    #     model = jax.tree.unflatten(model_tree_def, model_leaves)
+    #     opt_state = jax.tree.unflatten(opt_state_tree_def, opt_state_leaves)
+    #     return cls(model, opt_state)
 
 
 @dataclass

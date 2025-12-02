@@ -14,7 +14,7 @@
 
 import typing
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
 import equinox as eqx
@@ -118,6 +118,13 @@ class Loss(ABC):
 
         """
         return eqx.filter_value_and_grad(self.value)(model, batch, batch_axes)
+
+
+def loss(func: Callable):
+    class FuncLoss(Loss):
+        __call__ = func
+
+    return FuncLoss()
 
 
 class MSE(Loss):

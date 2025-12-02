@@ -194,7 +194,7 @@ def fit[T: eqx.Module, H: Callback](
     # initially
     model = apply(model)
 
-    state = TrainingState(model=model, opt_state=opt_state)
+    state = TrainingState.create(model=model, opt_state=opt_state)
     static = TrainingStatic(
         optimizer=optimizer,
         batcher=batcher(
@@ -216,13 +216,13 @@ def fit[T: eqx.Module, H: Callback](
         metric_defs = {
             "training_loss": (
                 data,
-                partial(loss, batch_axes=batch_axes),
+                partial(loss.value, batch_axes=batch_axes),
             )
         }
         if validation_data is not None:
             metric_defs["validation_loss"] = (
                 validation_data,
-                partial(loss, batch_axes=batch_axes),
+                partial(loss.value, batch_axes=batch_axes),
             )
         history = HistoryCallback(
             metric_defs=metric_defs,
