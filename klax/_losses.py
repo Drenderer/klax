@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import typing
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
-from typing import Any, Protocol
+from collections.abc import Callable
+from typing import Any
 
 import equinox as eqx
 import jax
@@ -54,9 +53,9 @@ class Loss(ABC):
 
     """
 
-    @staticmethod
     @abstractmethod
     def __call__[T](
+        self,
         model: PyTree,
         batch: PyTree[Any, "T"],
         batch_axes: PyTree[int | None, "T ..."],  # type: ignore
@@ -121,39 +120,44 @@ class Loss(ABC):
 
 
 def loss(func: Callable):
+    """Convert a function into a [`klax.Loss`][] object.
+
+    Args:
+        func: Function that computes the loss. It must have the signature
+            `(model: PyTree, batch: PyTree, batch_axes: PyTree) -> Scalar`.
+
+    Returns:
+        Loss: An instance of a subclass of [`klax.Loss`][] that wraps the given
+            function.
+
+    """
+
     class FuncLoss(Loss):
-        __call__ = func
+        def __call__(self, model, batch, batch_axes):
+            return func(model, batch, batch_axes)
 
     return FuncLoss()
 
 
-class MSE(Loss):
+@loss
+def mse(model, data, batch_axes):
     """Mean squared error for a tuple of data `(x, y)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
     """
-
-    def __call__(self, model, data, batch_axes):
-        x, y = data
-        y_pred = jax.vmap(model, in_axes=batch_axes)(x)
-        return jnp.mean(jnp.square(y_pred - y))
+    x, y = data
+    y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+    return jnp.mean(jnp.square(y_pred - y))
 
 
-mse = MSE()
-
-
-class MAE(Loss):
+@loss
+def mae(model, data, batch_axes):
     """Mean absolute error for a tuple of data `(x, y)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
     """
-
-    def __call__(self, model, data, batch_axes):
-        x, y = data
-        y_pred = jax.vmap(model, in_axes=batch_axes)(x)
-        return jnp.mean(jnp.abs(y_pred - y))
-
-
-mae = MAE()
+    x, y = data
+    y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+    return jnp.mean(jnp.abs(y_pred - y))
