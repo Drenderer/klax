@@ -56,14 +56,14 @@ opt = optax.chain(
 class TrackScaleHistory(HistoryCallback):
     scales: list
 
-    def __init__(self, log_every: int = 100, verbose: bool = True):
-        super().__init__(log_every=log_every, verbose=verbose)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.scales = []
 
-    def __call__(self, cbargs):
-        super().__call__(cbargs)
-        if cbargs.step % self.log_every == 0:
-            scale = otu.tree_get(cbargs.opt_state, "scale")
+    def __call__(self, state, step, step_loss, static):
+        super().__call__(state, step, step_loss, static)
+        if step % self.log_every == 0:
+            scale = otu.tree_get(state.opt_state, "scale")
             self.scales.append(scale)
 
 
