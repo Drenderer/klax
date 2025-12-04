@@ -14,6 +14,7 @@ model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 model, history = klax.fit(
     model,
     (x, y),
+    validation_data=(x, y),
     steps=10_000,
     key=train_key,
 )
