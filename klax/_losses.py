@@ -121,7 +121,7 @@ class Loss(ABC):
         return eqx.filter_value_and_grad(self.value)(model, batch, batch_axes)
 
 
-def loss(func: Callable):
+def loss(func: Callable) -> Loss:
     """Convert a function into a [`klax.Loss`][] object.
 
     Args:

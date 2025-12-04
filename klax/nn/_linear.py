@@ -163,16 +163,15 @@ class Linear(eqx.Module, strict=True):
             raise ContainsUnwrappablesError(
                 "Model must be finalized before calling, see `klax.finalize`."
             )
+        weight = cast(Array, self.weight)
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
             x = jnp.broadcast_to(x, (1,))
-        weight = cast(
-            Array, self.weight
-        )  # Tell type checker that weight is not an Unwrappable
         x = jnp.matmul(x, weight)
         if self.bias is not None:
-            x = x + self.bias
+            bias = cast(Array, self.bias)
+            x = x + bias
         if self.out_features == "scalar":
             assert jnp.shape(x) == (1,), (
                 f"Output shape mismatch: expected (1,) for scalar output but "
@@ -354,7 +353,8 @@ class InputSplitLinear(eqx.Module, strict=True):
             axis=0,
         ).sum(axis=0)
         if self.bias is not None:
-            y = y + self.bias
+            bias = cast(Array, self.bias)
+            y = y + bias
         if self.out_features == "scalar":
             assert jnp.shape(y) == (1,), (
                 f"Output shape mismatch: expected (1,) for scalar output but "

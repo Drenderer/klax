@@ -22,6 +22,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import jax.numpy as jnp
 from jaxtyping import PyTree, Scalar
 
 from ._trainstate import TrainingState, TrainingStatic
@@ -65,8 +66,8 @@ class HistoryCallback(Callback):
     log_every: int
     verbose: bool
     steps: list  #: List of steps at which the losses were recorded.
-    metric_defs: dict[str, tuple[PyTree, Callable[[PyTree, PyTree], float]]]
-    metrics: dict[str, list[float]]
+    metric_defs: dict[str, tuple[PyTree, Callable[[PyTree, PyTree], Scalar]]]
+    metrics: dict[str, list[Scalar]]
     last_start_time: float  # start time of the last training
     last_end_time: float  # End time of the last training
     training_time: float = 0  # Total training time of all trainings
@@ -114,7 +115,7 @@ class HistoryCallback(Callback):
             # of a training.
             self.step_offset = self.steps[-1]
         else:
-            self(state, 0, float("nan"), static)  # Log initial losses
+            self(state, 0, jnp.array(jnp.nan), static)  # Log initial losses
 
     def __call__(
         self,
