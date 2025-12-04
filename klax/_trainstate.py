@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Iterable
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any
 
@@ -90,8 +90,8 @@ class TrainingState:
 
 @dataclass
 class TrainingStatic:
-    optimizer: optax.GradientTransformation
-    batcher: Iterable[PyTree[Any]]
+    optimizer: optax.GradientTransformationExtraArgs
+    batcher: Generator[PyTree[Any], None, None]
     batch_axes: PyTree[int | None]
     loss: Loss
     steps: int
