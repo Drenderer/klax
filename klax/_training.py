@@ -19,7 +19,6 @@ from functools import partial
 from typing import Any, overload
 
 import equinox as eqx
-import jax
 import optax
 from jaxtyping import PRNGKeyArray, PyTree
 
@@ -38,7 +37,7 @@ from ._trainstate import TrainingState, TrainingStatic
 from ._wrappers import apply
 
 
-def training_loop(
+def run_training_loop(
     state: TrainingState,
     static: TrainingStatic,
     callbacks: Iterable[Callback] = [],
@@ -63,10 +62,16 @@ def training_loop(
         callback.on_training_start(state, static)
 
     for step in range(1, static.steps + 1):
-        state, step_loss = make_step(state, next(static.batcher))
+        state, batch_loss = make_step(state, next(static.batcher))
+
+        # Run all callbacks and break if any of them request termination of
+        # the training loop.
+        # Note! The square brackets are important. Otherwise the loop is
+        # terminated with the first callback that returns true. But we want
+        # to run all callbacks first and then decide, whether to terminate.
         if any(
             [
-                callback(state, step, step_loss, static)
+                callback(state, step, batch_loss, static)
                 for callback in callbacks
             ]
         ):
@@ -197,7 +202,7 @@ def fit[T: eqx.Module, H: Callback](
     # initially
     model = apply(model)
 
-    state = TrainingState.create(model=model, opt_state=opt_state)
+    state = TrainingState(model=model, opt_state=opt_state)
     static = TrainingStatic(
         optimizer=optimizer,
         batcher=batcher(
@@ -217,15 +222,13 @@ def fit[T: eqx.Module, H: Callback](
     # Initialize callback arguments and history
     if history is None:
         metric_defs = {
-            "training_loss": (
-                data,
-                partial(loss.value, batch_axes=batch_axes),
+            "training_loss": partial(
+                loss.value, batch=data, batch_axes=batch_axes
             )
         }
         if validation_data is not None:
-            metric_defs["validation_loss"] = (
-                validation_data,
-                partial(loss.value, batch_axes=batch_axes),
+            metric_defs["validation_loss"] = partial(
+                loss.value, batch=validation_data, batch_axes=batch_axes
             )
         history = HistoryCallback(
             metric_defs=metric_defs,
@@ -233,6 +236,6 @@ def fit[T: eqx.Module, H: Callback](
         )
     callbacks.append(history)
 
-    state = training_loop(state, static, callbacks)
+    state = run_training_loop(state, static, callbacks)
 
     return state.model, history

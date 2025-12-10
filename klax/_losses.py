@@ -14,6 +14,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from functools import update_wrapper
 from typing import Any
 
 import equinox as eqx
@@ -37,7 +38,7 @@ class Loss(ABC):
 
     Example:
         A simple custom loss that computes the mean squared error between
-        the predicted values `y_pred` and true values `y` for in inputs `x` may
+        the predicted values `y_pred` and true values `y` for inputs `x` may
         be implemented as follows:
 
         ```python
@@ -66,8 +67,7 @@ class Loss(ABC):
             model: The model parameters or structure to evaluate the loss.
             batch: The input data or structure used for loss computation.
             batch_axes: Specifies the axis or axes corresponding to the batch
-                dimension in the data. Can be an integer, None, or a sequence
-                of values.
+                dimension in the data.
 
         Returns:
             Scalar: The computed loss value.
@@ -138,7 +138,7 @@ def loss(func: Callable) -> Loss:
         def __call__(self, model, batch, batch_axes):
             return func(model, batch, batch_axes)
 
-    return FuncLoss()
+    return update_wrapper(FuncLoss(), func)
 
 
 @loss

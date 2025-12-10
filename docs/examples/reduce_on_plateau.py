@@ -60,8 +60,8 @@ class TrackScaleHistory(HistoryCallback):
         super().__init__(*args, **kwargs)
         self.scales = []
 
-    def __call__(self, state, step, step_loss, static):
-        super().__call__(state, step, step_loss, static)
+    def __call__(self, state, step, batch_loss, static):
+        super().__call__(state, step, batch_loss, static)
         if step % self.log_every == 0:
             scale = otu.tree_get(state.opt_state, "scale")
             self.scales.append(scale)

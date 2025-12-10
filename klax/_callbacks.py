@@ -44,7 +44,7 @@ class Callback(ABC):
         self,
         state: TrainingState,
         step: int,
-        step_loss: Scalar,
+        batch_loss: Scalar,
         static: TrainingStatic,
     ) -> bool | None:
         """Call after each step during training."""
@@ -66,7 +66,7 @@ class HistoryCallback(Callback):
     log_every: int
     verbose: bool
     steps: list  #: List of steps at which the losses were recorded.
-    metric_defs: dict[str, tuple[PyTree, Callable[[PyTree, PyTree], Scalar]]]
+    metric_defs: dict[str, Callable[[PyTree], Scalar]]
     metrics: dict[str, list[Scalar]]
     last_start_time: float  # start time of the last training
     last_end_time: float  # End time of the last training
@@ -121,7 +121,7 @@ class HistoryCallback(Callback):
         self,
         state: TrainingState,
         step: int,
-        step_loss: Scalar,
+        batch_loss: Scalar,
         static: TrainingStatic,
     ):
         """Record the losses and step count.
@@ -130,9 +130,9 @@ class HistoryCallback(Callback):
         """
         if step % self.log_every == 0:
             self.steps.append(self.step_offset + step)
-            self.metrics["step_loss"].append(step_loss)
-            for name, (data, metric_fn) in self.metric_defs.items():
-                metric_value = metric_fn(state.model, data)
+            self.metrics["batch_loss"].append(batch_loss)
+            for name, metric_fn in self.metric_defs.items():
+                metric_value = metric_fn(state.model)
                 self.metrics[name].append(metric_value)
 
             # Print message

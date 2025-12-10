@@ -24,11 +24,22 @@ from jaxtyping import PyTree, PyTreeDef
 from klax._losses import Loss
 
 
-# TODO: Potentially rewrite this class as a non-dataclass, to get the __init__ function to work. I've tried, but got some weired error from jax on the filter_jit boundary in training_loop.
-# @jax.tree_util.register_pytree_node_class
+# TODO: Potentially rewrite this class as a non-dataclass, to get the __init__ function to work.
+# I've tried, but got some weired error from jax on the filter_jit boundary in training_loop or made everything slower...
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
+    """Dataclass of things that are expected to change during training.
+
+    This dataclass combines the model parameters and the optimizer state into
+    a single object that is passed around during training.
+    Furthermore it implements the unflattening described in
+    [low-overhead training loops][https://docs.kidger.site/equinox/tricks/]
+    by exposing the model and optimizer state as properties which unflatten.
+    This slightly reduces JAX's overhead when repeatedly passing through the
+    jit boundary of the make_step function in the training loop.
+    """
+
     model_leaves: list[Any]
     model_tree_def: PyTreeDef  # type: ignore
     opt_state_leaves: list[Any]
@@ -44,10 +55,6 @@ class TrainingState:
             opt_state_leaves,
             opt_state_tree_def,
         )
-
-    # def __init__(self, model: PyTree, opt_state: PyTree) -> None:
-    #     self.model_leaves, self.model_tree_def = jax.tree.flatten(model)
-    #     self.opt_state_leaves, self.opt_state_tree_def = jax.tree.flatten(opt_state)
 
     @property
     def model(self) -> PyTree:
@@ -69,27 +76,11 @@ class TrainingState:
             value
         )
 
-    # def tree_flatten(self):
-    #     return (
-    #         (self.model_leaves, self.opt_state_leaves),
-    #         (self.model_tree_def, self.opt_state_tree_def),
-    #     )
-
-    # @classmethod
-    # def tree_unflatten(
-    #     cls,
-    #     aux_data: tuple[PyTreeDef, PyTreeDef],  # type: ignore
-    #     children: tuple,
-    # ) -> "TrainingState":
-    #     model_tree_def, opt_state_tree_def = aux_data
-    #     model_leaves, opt_state_leaves = children
-    #     model = jax.tree.unflatten(model_tree_def, model_leaves)
-    #     opt_state = jax.tree.unflatten(opt_state_tree_def, opt_state_leaves)
-    #     return cls(model, opt_state)
-
 
 @dataclass
 class TrainingStatic:
+    """Dataclass of things that are expected to remain static during training."""
+
     optimizer: optax.GradientTransformationExtraArgs
     batcher: Generator[PyTree[Any], None, None]
     batch_axes: PyTree[int | None]
