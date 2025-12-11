@@ -15,8 +15,6 @@
 from . import nn as nn
 from ._callbacks import Callback as Callback
 from ._callbacks import HistoryCallback as HistoryCallback
-from ._callbacks import TrainingState as TrainingState
-from ._callbacks import TrainingStatic as TrainingStatic
 from ._datahandler import BatchGenerator as BatchGenerator
 from ._datahandler import batch_data as batch_data
 from ._datahandler import split_data as split_data
@@ -31,6 +29,8 @@ from ._serialization import (
     text_serialize_filter_spec as text_serialize_filter_spec,
 )
 from ._training import fit as fit
+from ._trainstate import TrainingState as TrainingState
+from ._trainstate import TrainingStatic as TrainingStatic
 from ._wrappers import Constraint as Constraint
 from ._wrappers import NonNegative as NonNegative
 from ._wrappers import NonTrainable as NonTrainable

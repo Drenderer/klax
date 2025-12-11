@@ -16,11 +16,11 @@ import datetime
 import importlib
 import pickle
 import time
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import jax.numpy as jnp
 from jaxtyping import PyTree, Scalar
@@ -28,32 +28,37 @@ from jaxtyping import PyTree, Scalar
 from ._trainstate import TrainingState, TrainingStatic
 
 
+# TODO: Write user-friendly documentation for Callbacks
 class Callback(ABC):
-    """An abstract callback.
+    """A callback base class.
 
     Inherit from this class to create a custom callback.
+    Methods should match these signatures:
+    - on_training_start(state, static) -> None
+    - __call__(state, static, step, batch_loss) -> bool | None
+    - on_training_end(state, static, step) -> None
     """
 
     def on_training_start(
         self, state: TrainingState, static: TrainingStatic
     ) -> None:
-        """Call when training starts."""
+        """Execute when training starts."""
         pass
 
     def __call__(
         self,
         state: TrainingState,
+        static: TrainingStatic,
         step: int,
         batch_loss: Scalar,
-        static: TrainingStatic,
     ) -> bool | None:
-        """Call after each step during training."""
+        """Execute after each step during training."""
         pass
 
     def on_training_end(
-        self, state: TrainingState, static: TrainingStatic
+        self, state: TrainingState, static: TrainingStatic, step: int
     ) -> None:
-        """Call when training ends."""
+        """Execute when training ends."""
         pass
 
 
@@ -68,11 +73,12 @@ class HistoryCallback(Callback):
     steps: list  #: List of steps at which the losses were recorded.
     metric_defs: dict[str, Callable[[PyTree], Scalar]]
     metrics: dict[str, list[Scalar]]
-    last_start_time: float  # start time of the last training
-    last_end_time: float  # End time of the last training
-    training_time: float = 0  # Total training time of all trainings
-    step_offset: int = 0  # Potential offset due to previous trainings
+    last_start_time: float  #: start time of the last training
+    last_end_time: float  #: End time of the last training
+    training_time: float = 0  #: Total training time of all trainings
+    step_offset: int = 0  #: Potential offset due to previous trainings
     last_opt_state: PyTree | None = None
+    total_steps_digits: int  #: Number of digits in total steps for printing
 
     def __init__(
         self, metric_defs={}, log_every: int = 100, verbose: bool = True
@@ -100,7 +106,7 @@ class HistoryCallback(Callback):
         """Return a string representation of the HistoryCallback."""
         return (
             f"HistoryCallback(log_every={self.log_every}, "
-            f"verbose={self.verbose})"
+            f"verbose={self.verbose}, metrics={list(self.metrics.keys())})"
         )
 
     def on_training_start(self, state: TrainingState, static: TrainingStatic):
@@ -115,14 +121,14 @@ class HistoryCallback(Callback):
             # of a training.
             self.step_offset = self.steps[-1]
         else:
-            self(state, 0, jnp.array(jnp.nan), static)  # Log initial losses
+            self(state, static, 0, jnp.array(jnp.nan))  # Log initial losses
 
     def __call__(
         self,
         state: TrainingState,
+        static: TrainingStatic,
         step: int,
         batch_loss: Scalar,
-        static: TrainingStatic,
     ):
         """Record the losses and step count.
 
@@ -141,14 +147,14 @@ class HistoryCallback(Callback):
                     f"Step: {step:>{self.total_steps_digits}}: "
                     + ", ".join(
                         [
-                            f"{name}: {self.metrics[name][-1]:.3e}"
-                            for name in self.metrics.keys()
+                            f"{name}: {value[-1]:.3e}"
+                            for name, value in self.metrics.items()
                         ]
                     )
                 )
 
     def on_training_end(
-        self, state: TrainingState, static: TrainingStatic
+        self, state: TrainingState, static: TrainingStatic, step: int
     ) -> None:
         """Record the training end time and the last optimizer state.
 

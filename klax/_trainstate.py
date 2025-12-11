@@ -16,7 +16,6 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any
 
-import equinox as eqx
 import jax
 import optax
 from jaxtyping import PyTree, PyTreeDef

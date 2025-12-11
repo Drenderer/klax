@@ -71,14 +71,14 @@ def run_training_loop(
         # to run all callbacks first and then decide, whether to terminate.
         if any(
             [
-                callback(state, step, batch_loss, static)
+                callback(state, static, step, batch_loss)
                 for callback in callbacks
             ]
         ):
             break
 
     for callback in callbacks:
-        callback.on_training_end(state, static)
+        callback.on_training_end(state, static, step)
 
     return state
 
