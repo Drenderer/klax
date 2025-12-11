@@ -79,21 +79,64 @@ def getarraywrap():
 
 
 @pytest.fixture
-def getmodel():
+def dummy_model():
     import equinox as eqx
 
     class Model(eqx.Module):
         def __call__(self, x):
             return x
 
-    return Model
+    return Model()
 
 
 @pytest.fixture
-def getloss():
-    def init(model, data):
-        x, y = data
-        y_pred = jax.vmap(model)(x)
-        return jnp.mean(jnp.square(y - y_pred))
+def dummy_data():
+    import jax.random as jr
 
-    return init
+    x = jr.uniform(jr.key(0), (100, 4))
+    y = jnp.abs(x).sum(axis=1, keepdims=True)
+    return x, y
+
+
+@pytest.fixture
+def dummy_train_state(dummy_model):
+    import equinox as eqx
+    import optax
+
+    from klax._trainstate import TrainingState
+
+    opt_state = optax.adam(1e-3).init(
+        eqx.filter(dummy_model, eqx.is_inexact_array)
+    )
+    return TrainingState.create(model=dummy_model, opt_state=opt_state)
+
+
+@pytest.fixture
+def dummy_train_static(getkey, dummy_data):
+    import optax
+
+    from klax import TrainingStatic, batch_data, mse
+
+    return TrainingStatic(
+        optimizer=optax.adam(1e-3),
+        batcher=batch_data(
+            dummy_data, batch_size=10, batch_axes=0, key=getkey()
+        ),
+        batch_axes=0,
+        loss=mse,
+        steps=1000,
+    )
+
+
+@pytest.fixture
+def dummy_metric_fn():
+    import equinox as eqx
+
+    def parameter_sum_metric(model):
+        return sum(
+            x.sum()
+            for x in jax.tree_util.tree_leaves(model)
+            if eqx.is_array(x)
+        )
+
+    return parameter_sum_metric
