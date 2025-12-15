@@ -14,7 +14,7 @@
 
 from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 import jax
 import optax
@@ -45,7 +45,8 @@ class TrainingState:
     opt_state_tree_def: PyTreeDef  # type: ignore
 
     @classmethod
-    def create(cls, model: PyTree, opt_state: PyTree) -> "TrainingState":
+    def create(cls, model: PyTree, opt_state: PyTree) -> Self:
+        """Create a TrainingState from an unflattened model and optimizer state."""
         model_leaves, model_tree_def = jax.tree.flatten(model)
         opt_state_leaves, opt_state_tree_def = jax.tree.flatten(opt_state)
         return cls(
@@ -80,8 +81,31 @@ class TrainingState:
 class TrainingStatic:
     """Dataclass of things that are expected to remain static during training."""
 
+    # TODO: As of Python 3.13, PEP 712 (https://peps.python.org/pep-0712/) is not
+    # yet implemented, so we cannot use the `converter` parameter. I also tried using
+    # using an `equinox.Module` with `eqx.field` instead, but is messes with the initializer
+    # input types, if there is a type conversion in the converter function.
     optimizer: optax.GradientTransformationExtraArgs
     batcher: Generator[PyTree[Any], None, None]
     batch_axes: PyTree[int | None]
     loss: Loss
     steps: int
+
+    def __init__(
+        self,
+        optimizer: optax.GradientTransformation
+        | optax.GradientTransformationExtraArgs,
+        batcher: Generator[PyTree[Any], None, None],
+        batch_axes: PyTree[int | None],
+        loss: Loss,
+        steps: int,
+    ):
+        self.optimizer = (
+            optax.with_extra_args_support(optimizer)
+            if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
+            else optimizer
+        )
+        self.batcher = batcher
+        self.batch_axes = batch_axes
+        self.loss = loss
+        self.steps = steps
