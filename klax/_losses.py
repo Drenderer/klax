@@ -88,8 +88,7 @@ class Loss(ABC):
             model: The model parameters or structure to evaluate the loss.
             batch: The input data or structure used for loss computation.
             batch_axes: Specifies the axis or axes corresponding to the batch
-                dimension in the data. Can be an integer, None, or a sequence
-                of values.
+                dimension in the data.
 
         Returns:
             Scalar: The computed loss value.
@@ -119,6 +118,35 @@ class Loss(ABC):
 
         """
         return eqx.filter_value_and_grad(self.value)(model, batch, batch_axes)
+
+    @eqx.filter_jit
+    def partitioned_value[T](
+        self,
+        params: PyTree,
+        static: PyTree,
+        batch: PyTree[Any, "T"],
+        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+    ) -> Scalar:
+        """Compute the loss value for partitioned models.
+
+        This method is useful when working with models that have been
+        partitioned using Equinox's `partition` functionality. It separates
+        the model into its parameter and static parts before computing the
+        loss.
+
+        Args:
+            params: The parameter part of the partitioned model.
+            static: The static part of the partitioned model.
+            batch: The input data or structure used for loss computation.
+            batch_axes: Specifies the axis or axes corresponding to the batch
+                dimension in the data.
+
+        Returns:
+            Scalar: The computed loss value.
+
+        """
+        model = eqx.combine(params, static)
+        return self.value(model, batch, batch_axes)
 
 
 def loss(func: Callable) -> Loss:
