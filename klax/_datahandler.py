@@ -57,7 +57,7 @@ def broadcast_and_get_size[T](
             is_leaf=lambda x: x is None,
         )
     except ValueError as e:
-        raise ValueError(f"batch_axes must be a prefix of data.")
+        raise ValueError("batch_axes must be a prefix of data.")
 
     batch_sizes = jax.tree.map(
         lambda a, d: None if a is None else d.shape[a],
@@ -70,8 +70,11 @@ def broadcast_and_get_size[T](
         # No leaf in data has a batch dimension -> singelton data set
         dataset_size = 1
     else:
-        if not jax.tree.reduce(operator.eq, batch_sizes):
-            raise ValueError("All batched arrays must have equal batch sizes.")
+        if not all(v == leaves[0] for v in leaves):
+            raise ValueError(
+                "All batched arrays must have equal batch sizes. "
+                f"{batch_sizes=}"
+            )
         dataset_size = leaves[0]
 
     return batch_axes, dataset_size
