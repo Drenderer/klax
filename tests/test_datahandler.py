@@ -48,8 +48,8 @@ def test_batch_data(getkey):
     # Batch mask
     x = jrandom.uniform(getkey(), (10,))
     data = (x, (x, x))
-    batch_axis = (0, (None, 0))
-    generator = batch_data(data, 2, batch_axis, key=getkey())
+    batch_axes = (0, (None, 0))
+    generator = batch_data(data, 2, batch_axes, key=getkey())
     assert next(generator)[0].shape[0] == 2
     assert next(generator)[1][0].shape[0] == 10
     assert next(generator)[1][1].shape[0] == 2
@@ -57,8 +57,8 @@ def test_batch_data(getkey):
     # No batch dimensions
     x = jrandom.uniform(getkey(), (10,))
     data = (x,)
-    batch_axis = None
-    generator = batch_data(data, batch_axis=batch_axis, key=getkey())
+    batch_axes = None
+    generator = batch_data(data, batch_axes=batch_axes, key=getkey())
     assert next(generator) == data
 
     # Different batch sizes
@@ -90,8 +90,8 @@ def test_split_data(getkey):
         ],
     )
     proportions = (2, 1, 1)
-    batch_axis = (0, 1)
-    subsets = split_data(data, proportions, batch_axis, key=getkey())
+    batch_axes = (0, 1)
+    subsets = split_data(data, proportions, batch_axes, key=getkey())
 
     for s, p in zip(subsets, (0.5, 0.25, 0.25)):
         assert s[0].shape == (round(p * batch_size), 2)
