@@ -100,7 +100,7 @@ class HistoryCallback(Callback):
         self.verbose = verbose
         self.steps = []
         self.metrics = defaultdict(list)
-        self.total_steps_digits: int
+        self.total_steps_digits = 0
 
     def __repr__(self):
         """Return a string representation of the HistoryCallback."""
