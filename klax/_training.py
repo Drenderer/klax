@@ -19,6 +19,7 @@ from functools import partial
 from typing import Any, overload
 
 import equinox as eqx
+import jax
 import optax
 from jaxtyping import PRNGKeyArray, PyTree
 
@@ -44,22 +45,38 @@ def run_training_loop(
 ):
     @eqx.filter_jit
     def make_step(state, batch):
+        params, sttic = eqx.partition(state.model, eqx.is_inexact_array)
         value, grad = static.loss.value_and_grad(
             state.model, batch, static.batch_axes
         )
         updates, opt_state = static.optimizer.update(
             grad,
             state.opt_state,
+            params,
             value=value,
             grad=grad,
+            value_fn=jax.tree_util.Partial(
+                static.loss.partitioned_value,
+                static=sttic,
+                batch=batch,
+                batch_axes=static.batch_axes,
+            ),
         )
-        model = apply(eqx.apply_updates(state.model, updates))
+        params = optax.apply_updates(params, updates)
+        model = eqx.combine(params, sttic)
+
+        # Apply the constraints to ensure they are met again after the update.
+        model = apply(model)
+
         state.model = model
         state.opt_state = opt_state
         return state, value
 
     for callback in callbacks:
         callback.on_training_start(state, static)
+
+    # To silence the `possibly unbound` warning from `callback.on_training_end`
+    step = 0
 
     for step in range(1, static.steps + 1):
         state, batch_loss = make_step(state, next(static.batcher))
@@ -93,7 +110,8 @@ def fit[T: eqx.Module](
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
-    optimizer: optax.GradientTransformationExtraArgs = optax.adam(1e-3),
+    optimizer: optax.GradientTransformation
+    | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
     history: None = None,
@@ -110,7 +128,8 @@ def fit[T: eqx.Module, H: Callback](
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
-    optimizer: optax.GradientTransformationExtraArgs = optax.adam(1e-3),
+    optimizer: optax.GradientTransformation
+    | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
     history: H,
@@ -126,7 +145,8 @@ def fit[T: eqx.Module, H: Callback](
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
-    optimizer: optax.GradientTransformationExtraArgs = optax.adam(1e-3),
+    optimizer: optax.GradientTransformation
+    | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
     history: HistoryCallback | H | None = None,
@@ -202,7 +222,7 @@ def fit[T: eqx.Module, H: Callback](
     # initially
     model = apply(model)
 
-    state = TrainingState(model=model, opt_state=opt_state)
+    state = TrainingState.create(model=model, opt_state=opt_state)
     static = TrainingStatic(
         optimizer=optimizer,
         batcher=batcher(
@@ -222,12 +242,10 @@ def fit[T: eqx.Module, H: Callback](
     # Initialize callback arguments and history
     if history is None:
         metric_defs = {
-            "training_loss": partial(
-                loss.value, batch=data, batch_axes=batch_axes
-            )
+            "loss": partial(loss.value, batch=data, batch_axes=batch_axes)
         }
         if validation_data is not None:
-            metric_defs["validation_loss"] = partial(
+            metric_defs["val_loss"] = partial(
                 loss.value, batch=validation_data, batch_axes=batch_axes
             )
         history = HistoryCallback(
