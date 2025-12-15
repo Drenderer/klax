@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import partial
 from typing import Self
 
 import equinox as eqx
@@ -37,10 +38,14 @@ def test_fit(getkey):
 
     # Continued training with history and solver state
     x = jrandom.uniform(getkey(), (2, 1))
+    data = (x, x)
     model = eqx.nn.Linear(1, 1, key=getkey())
-    history = klax.HistoryCallback(log_every=2)
+    history = klax.HistoryCallback(
+        metric_defs={"loss": partial(klax.mse, batch=data, batch_axes=0)},
+        log_every=2,
+    )
     model, history = klax.fit(
-        model, (x, x), steps=20, history=history, key=getkey()
+        model, data, steps=20, history=history, key=getkey()
     )
     assert len(history.steps) == 11
     assert len(history.metrics["loss"]) == 11
@@ -67,6 +72,7 @@ def test_fit(getkey):
 
     # Callbacks
     x = jrandom.uniform(getkey(), (2, 1))
+    data = (x, x)
     model = eqx.nn.Linear(1, 1, key=getkey())
 
     class MyCallback(klax.Callback):
@@ -77,8 +83,11 @@ def test_fit(getkey):
 
     _, history = klax.fit(
         model,
-        (x, x),
-        history=klax.HistoryCallback(1),
+        data,
+        history=klax.HistoryCallback(
+            metric_defs={"loss": partial(klax.mse, batch=data, batch_axes=0)},
+            log_every=1,
+        ),
         callbacks=(MyCallback(),),
         key=getkey(),
     )
