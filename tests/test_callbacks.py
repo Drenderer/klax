@@ -14,66 +14,65 @@
 
 import time
 
+import jax.numpy as jnp
 import pytest
 
 import klax
 
 
-class TestHistoryCallback:
-    def test_history_callback(
-        self, dummy_train_state, dummy_train_static, dummy_metric_fn
-    ):
-        history = klax.HistoryCallback(
-            metric_defs={"param_sum": dummy_metric_fn}, log_every=2
-        )
+def test_history_callback(
+    dummy_train_state, dummy_train_static, dummy_metric_fn
+):
+    history = klax.HistoryCallback(
+        metric_defs={"param_sum": dummy_metric_fn}, log_every=2
+    )
 
-        # On training start update
-        history.on_training_start(dummy_train_state, dummy_train_static)
-        assert history.last_start_time is not None
-        assert list(history.metrics.keys()) == ["batch_loss", "param_sum"]
-        assert len(history.metrics["batch_loss"]) == 1
-        assert len(history.metrics["param_sum"]) == 1
-        time.sleep(
-            1e-6
-        )  # Sleep to ensure that training time is greater than 0
+    # On training start update
+    history.on_training_start(dummy_train_state, dummy_train_static)
+    assert history.last_start_time is not None
+    assert list(history.metrics.keys()) == ["batch_loss", "param_sum"]
+    assert len(history.metrics["batch_loss"]) == 1
+    assert len(history.metrics["param_sum"]) == 1
+    time.sleep(1e-6)  # Sleep to ensure that training time is greater than 0
 
-        # First update
-        history(dummy_train_state, dummy_train_static, 1, 0.2)
-        assert len(history.metrics["batch_loss"]) == 1
-        assert len(history.metrics["param_sum"]) == 1
+    # First update
+    history(dummy_train_state, dummy_train_static, 1, jnp.array(0.2))
+    assert len(history.metrics["batch_loss"]) == 1
+    assert len(history.metrics["param_sum"]) == 1
 
-        # Second update
-        history(dummy_train_state, dummy_train_static, 2, 0.1)
-        assert len(history.metrics["batch_loss"]) == 2
-        assert len(history.metrics["param_sum"]) == 2
+    # Second update
+    history(dummy_train_state, dummy_train_static, 2, jnp.array(0.1))
+    assert len(history.metrics["batch_loss"]) == 2
+    assert len(history.metrics["param_sum"]) == 2
 
-        # On training end update
-        history.on_training_end(dummy_train_state, dummy_train_static, 2)
+    # On training end update
+    history.on_training_end(dummy_train_state, dummy_train_static, 2)
 
-        assert history.training_time > 0.0
+    assert history.training_time > 0.0
 
-    def test_history_callback_save_load(
-        self, dummy_train_state, dummy_train_static, dummy_metric_fn, tmp_path
-    ):
-        history = klax.HistoryCallback(
-            metric_defs={"param_sum": dummy_metric_fn}, log_every=1
-        )
 
-        history.on_training_start(dummy_train_state, dummy_train_static)
-        history(dummy_train_state, dummy_train_static, 1, 0.2)
-        history(dummy_train_state, dummy_train_static, 2, 0.1)
-        history.on_training_end(dummy_train_state, dummy_train_static, 2)
+def test_history_callback_save_load(
+    dummy_train_state, dummy_train_static, dummy_metric_fn, tmp_path
+):
+    history = klax.HistoryCallback(
+        metric_defs={"param_sum": dummy_metric_fn}, log_every=1
+    )
 
-        # Test save and load
-        filepath = tmp_path / "some_dir/test_history.pkl"
-        with pytest.raises(FileNotFoundError):
-            history.save(filepath, create_dir=False)
-        history.save(filepath, create_dir=True)
-        with pytest.raises(FileExistsError):
-            history.save(filepath, overwrite=False)
-        history.save(filepath, overwrite=True)
+    history.on_training_start(dummy_train_state, dummy_train_static)
+    history(dummy_train_state, dummy_train_static, 1, jnp.array(0.2))
+    history(dummy_train_state, dummy_train_static, 2, jnp.array(0.1))
+    history.on_training_end(dummy_train_state, dummy_train_static, 2)
 
-        history2 = klax.HistoryCallback.load(filepath)
+    # Test save and load
+    filepath = tmp_path / "some_dir/test_history.pkl"
+    with pytest.raises(FileNotFoundError):
+        history.save(filepath, create_dir=False)
+    history.save(filepath, create_dir=True)
+    with pytest.raises(FileExistsError):
+        history.save(filepath, overwrite=False)
+    history.save(filepath, overwrite=True)
 
-        # This is not a complete equality test!
-        assert len(history2.metrics) == len(history.metrics)
+    history2 = klax.HistoryCallback.load(filepath)
+
+    # This is not a complete equality test!
+    assert len(history2.metrics) == len(history.metrics)

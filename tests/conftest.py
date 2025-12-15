@@ -103,7 +103,7 @@ def dummy_train_state(dummy_model):
     import equinox as eqx
     import optax
 
-    from klax._trainstate import TrainingState
+    from klax import TrainingState
 
     opt_state = optax.adam(1e-3).init(
         eqx.filter(dummy_model, eqx.is_inexact_array)

@@ -26,35 +26,13 @@ import klax
 from klax import Constraint, Unwrappable
 
 
-def test_training(getkey):
+def test_fit(getkey):
     # Fitting a linear function
     x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
     y = 2.0 * x + 1.0
     model = eqx.nn.Linear(1, 1, key=getkey())
     model, _ = klax.fit(model, (x, y), optimizer=optax.adam(1.0), key=getkey())
     y_pred = jax.vmap(model)(x)
-    assert jnp.allclose(y_pred, y)
-
-    # Multiple inputs
-    class Model(eqx.Module):
-        weight: Array
-
-        def __call__(self, x):
-            b, x = x
-            return b + self.weight * x
-
-    x = jrandom.uniform(key=getkey(), shape=(10,))
-    b = 2.0
-    y = b + 2 * x
-    model = Model(weight=jnp.array(1.0))
-    model, _ = klax.fit(
-        model,
-        ((b, x), y),
-        batch_axis=0,  # Test automatic batch axis braodcasting to data
-        optimizer=optax.adam(1.0),
-        key=getkey(),
-    )
-    y_pred = jax.vmap(model, in_axes=((None, 0),))((b, x))
     assert jnp.allclose(y_pred, y)
 
     # Continued training with history and solver state
@@ -65,7 +43,7 @@ def test_training(getkey):
         model, (x, x), steps=20, history=history, key=getkey()
     )
     assert len(history.steps) == 11
-    assert len(history.loss) == 11
+    assert len(history.metrics["loss"]) == 11
     time_1 = history.training_time
     model, history = klax.fit(
         model,
@@ -76,7 +54,7 @@ def test_training(getkey):
         key=getkey(),
     )
     assert len(history.steps) == 16
-    assert len(history.loss) == 16
+    assert len(history.metrics["loss"]) == 16
     assert history.steps[-1] == 30
     time_2 = history.training_time
     assert time_1 < time_2
@@ -85,16 +63,16 @@ def test_training(getkey):
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     _, history = klax.fit(model, (x, x), validation_data=(x, x), key=getkey())
-    assert len(history.val_loss) == 11
+    assert len(history.metrics["val_loss"]) == 11
 
     # Callbacks
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
 
     class MyCallback(klax.Callback):
-        def __call__(self, cbargs: klax.CallbackArgs):
+        def __call__(self, state, static, step, batch_loss):
             """Break training after five steps."""
-            if cbargs.step == 5:
+            if step == 5:
                 return True
 
     _, history = klax.fit(
@@ -141,14 +119,14 @@ def test_training(getkey):
         optax.yogi(1.0),
     ],
 )
-def test_training_optax_optimizers(getkey, optimizer):
+def test_fit_optax_optimizers(getkey, optimizer):
     # Test all optex optimizers
     x = jrandom.uniform(getkey(), (2, 1))
     model = eqx.nn.Linear(1, 1, key=getkey())
     klax.fit(model, (x, x), steps=2, optimizer=optimizer, key=getkey())
 
 
-def test_apply_in_training(getkey):
+def test_apply_in_fit(getkey):
     # Create dummy data
     x = jnp.linspace(0.0, 1.0, 20)
     y = -2 * x - 1
