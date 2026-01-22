@@ -34,7 +34,7 @@ from ._datahandler import (
     batch_data,
 )
 from ._losses import Loss, mse
-from ._trainstate import TrainingState, TrainingStatic
+from ._trainstate import TrainingState, TrainingStatic, TrainingView
 from ._wrappers import apply
 
 
@@ -45,35 +45,47 @@ def run_training_loop(
 ):
     @eqx.filter_jit
     def make_step(state, batch):
-        params, sttic = eqx.partition(state.model, eqx.is_inexact_array)
+        # Assembling the model here provides a clear separation between
+        # static and dynamic parts of the training loop.
+        # Furthermore it implements the unflattening trick described in
+        # [low-overhead training loops][https://docs.kidger.site/equinox/tricks/].
+        # This slightly reduces JAX's overhead when repeatedly passing through the
+        # jit boundary of the make_step function in the training loop.
+        model = static.assemble_model(state.model_leaves)
+        opt_state = static.assemble_opt_state(state.opt_state_leaves)
+
+        model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
         value, grad = static.loss.value_and_grad(
-            state.model, batch, static.batch_axes
+            model, batch, static.batch_axes
         )
         updates, opt_state = static.optimizer.update(
             grad,
-            state.opt_state,
-            params,
+            opt_state,
+            model_params,
             value=value,
             grad=grad,
             value_fn=jax.tree_util.Partial(
                 static.loss.partitioned_value,
-                static=sttic,
+                static=model_static,
                 batch=batch,
                 batch_axes=static.batch_axes,
             ),
         )
-        params = optax.apply_updates(params, updates)
-        model = eqx.combine(params, sttic)
+        model_params = optax.apply_updates(model_params, updates)
+        model = eqx.combine(model_params, model_static)
 
         # Apply the constraints to ensure they are met again after the update.
         model = apply(model)
 
-        state.model = model
-        state.opt_state = opt_state
-        return state, value
+        new_state = TrainingState(
+            model_leaves=static.disassemble_model(model),
+            opt_state_leaves=static.disassemble_opt_state(opt_state),
+        )
+        return new_state, value
 
+    view = TrainingView(state, static)
     for callback in callbacks:
-        callback.on_training_start(state, static)
+        callback.on_training_start(view)
 
     # To silence the `possibly unbound` warning from `callback.on_training_end`
     step = 0
@@ -81,21 +93,15 @@ def run_training_loop(
     for step in range(1, static.steps + 1):
         state, batch_loss = make_step(state, next(static.batcher))
 
-        # Run all callbacks and break if any of them request termination of
-        # the training loop.
-        # Note! The square brackets are important. Otherwise the loop is
-        # terminated with the first callback that returns true. But we want
-        # to run all callbacks first and then decide, whether to terminate.
-        if any(
-            [
-                callback(state, static, step, batch_loss)
-                for callback in callbacks
-            ]
-        ):
+        view = TrainingView(state, static)
+        stop = False
+        for callback in callbacks:
+            stop |= bool(callback(view, step, batch_loss))
+        if stop:
             break
 
     for callback in callbacks:
-        callback.on_training_end(state, static, step)
+        callback.on_training_end(view, step)
 
     return state
 

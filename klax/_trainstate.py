@@ -24,7 +24,7 @@ from klax._losses import Loss
 
 
 # TODO: Potentially rewrite this class as a non-dataclass, to get the __init__ function to work.
-# I've tried, but got some weired error from jax on the filter_jit boundary in training_loop or made everything slower...
+# I've tried, but got some weird error from jax on the filter_jit boundary in training_loop or made everything slower...
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
@@ -32,60 +32,27 @@ class TrainingState:
 
     This dataclass combines the model parameters and the optimizer state into
     a single object that is passed around during training.
-    Furthermore it implements the unflattening described in
-    [low-overhead training loops][https://docs.kidger.site/equinox/tricks/]
-    by exposing the model and optimizer state as properties which unflatten.
-    This slightly reduces JAX's overhead when repeatedly passing through the
-    jit boundary of the make_step function in the training loop.
     """
 
-    model_leaves: list[Any]
-    model_tree_def: PyTreeDef  # type: ignore
-    opt_state_leaves: list[Any]
-    opt_state_tree_def: PyTreeDef  # type: ignore
-
-    @classmethod
-    def create(cls, model: PyTree, opt_state: PyTree) -> Self:
-        """Create a TrainingState from an unflattened model and optimizer state."""
-        model_leaves, model_tree_def = jax.tree.flatten(model)
-        opt_state_leaves, opt_state_tree_def = jax.tree.flatten(opt_state)
-        return cls(
-            model_leaves,
-            model_tree_def,
-            opt_state_leaves,
-            opt_state_tree_def,
-        )
-
-    @property
-    def model(self) -> PyTree:
-        return jax.tree.unflatten(self.model_tree_def, self.model_leaves)
-
-    @model.setter
-    def model(self, value: PyTree) -> None:
-        self.model_leaves, self.model_tree_def = jax.tree.flatten(value)
-
-    @property
-    def opt_state(self) -> PyTree:
-        return jax.tree.unflatten(
-            self.opt_state_tree_def, self.opt_state_leaves
-        )
-
-    @opt_state.setter
-    def opt_state(self, value: PyTree) -> None:
-        self.opt_state_leaves, self.opt_state_tree_def = jax.tree.flatten(
-            value
-        )
+    model_leaves: list
+    opt_state_leaves: list
 
 
-@dataclass
+@dataclass(frozen=True)
 class TrainingStatic:
-    """Dataclass of things that are expected to remain static during training."""
+    """Dataclass of things that are expected to remain static during training.
+
+    It provides an interface to unflatten and flatten the model and optimizer
+    from their flat states.
+    """
 
     # TODO: As of Python 3.13, PEP 712 (https://peps.python.org/pep-0712/) is not
     # yet implemented, so we cannot use the `converter` parameter. I also tried using
     # using an `equinox.Module` with `eqx.field` instead, but is messes with the initializer
     # input types, if there is a type conversion in the converter function.
+    model_tree_def: PyTreeDef  # type: ignore
     optimizer: optax.GradientTransformationExtraArgs
+    opt_state_tree_def: PyTreeDef  # type: ignore
     batcher: Generator[PyTree[Any], None, None]
     batch_axes: PyTree[int | None]
     loss: Loss
@@ -109,3 +76,65 @@ class TrainingStatic:
         self.batch_axes = batch_axes
         self.loss = loss
         self.steps = steps
+
+    def assemble_model(self, model_leaves):
+        return jax.tree.unflatten(self.model_treedef, model_leaves)
+
+    def disassemble_model(self, model):
+        leaves, treedef = jax.tree.flatten(model)
+        if treedef != self.model_treedef:
+            raise ValueError("Model structure changed")
+        return leaves
+
+    def assemble_opt_state(self, opt_state_leaves):
+        return jax.tree.unflatten(self.opt_state_treedef, opt_state_leaves)
+
+    def disassemble_opt_state(self, opt_state):
+        leaves, treedef = jax.tree.flatten(opt_state)
+        if treedef != self.opt_state_treedef:
+            raise ValueError("Opt state structure changed")
+        return leaves
+
+
+# This is similar to the old CallbackArgs, but ensures a clean separation
+# between mutable state (TrainingState) and static components (TrainingStatic),
+# while providing a nice public-facing interface to access and modify the model
+# and optimizer state.
+# TODO: Either remove the model caching for simplicity or add caching for the optimizer state as well.
+class TrainingView:
+    """Public-facing interface for accessing the trainings state and static components.
+
+    Provides properties to access and modify the model and optimizer state.
+    """
+
+    _state: TrainingState
+    _static: TrainingStatic
+    _model: Any  # Cached model instance.
+
+    def __init__(self, state: TrainingState, static: TrainingStatic):
+        self._state = state
+        self._static = static
+        self._model = None
+
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = self._static.assemble_model(self._state.model_leaves)
+        return self._model
+
+    @model.setter
+    def model(self, value):
+        self._state.model_leaves = self._static.disassemble_model(value)
+        self._model = value
+
+    @property
+    def opt_state(self):
+        self._opt_state = self._static.assemble_opt_state(
+            self._state.opt_state_leaves
+        )
+
+    @opt_state.setter
+    def opt_state(self, value):
+        self._state.opt_state_leaves = self._static.disassemble_opt_state(
+            value
+        )
