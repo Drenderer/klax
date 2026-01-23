@@ -15,14 +15,17 @@
 """Utilities for logging during training."""
 
 from abc import ABC, abstractmethod
+from time import time
 from typing import Any, Protocol
 
+import jax
 from jax import numpy as jnp
-from jaxtyping import PyTree
+from jaxtyping import Array, PRNGKeyArray, PyTree
 
 from klax._callbacks import Callback
 from klax._datahandler import BatchGenerator
 from klax._losses import Loss
+from klax._trainstate import TrainingView
 
 
 class Metric(Protocol):
@@ -39,31 +42,139 @@ class LossMetric:
         batcher: BatchGenerator,
         data: Any,
         batch_size: int,
-        batch_axis: Any,
+        batch_axes: Any,
         loss: Loss,
-        num_batches: int = 1,
+        *,
+        key: PRNGKeyArray,
     ):
-        self.batch = batcher(data, batch_size, batch_axis)
-        self.batch_axis = batch_axis
+        self.batch = batcher(data, batch_size, batch_axes, key=key)
+        self.batch_axes = batch_axes
         self.loss = loss
-        self.num_batches = num_batches
 
-    def __call__(self, model: PyTree) -> PyTree:
-        losses = []
-        for _ in range(self.num_batches):
-            batch = next(self.batch)
-            l = self.loss.value(model, batch, self.batch_axis)
-            losses.append(l)
-        return jnp.mean(jnp.stack(losses))
+    def __call__(self, model: PyTree) -> Array:
+        batch = next(self.batch)
+        return self.loss.value(model, batch, self.batch_axes)
+
+
+steps = list[int]
+values = list[Any]
 
 
 class History:
     """History container with some utility methods."""
 
-    pass
+    content: dict[str, tuple[steps, values]]
+    total_time: float  #: Total time spent in training
+    total_steps: int  #: Total number of steps used in the training
+    final_opt_state: PyTree  #: Final optimizer state after training
+
+    def __init__(self):
+        self.content = {}
+        self.total_time = -1.0
+        self.total_steps = -1
+        self.final_opt_state = None
+
+    def append(self, step: int, metric: str, value: Any) -> None:
+        if metric not in self.content:
+            self.content[metric] = ([], [])
+        self.content[metric][0].append(step)
+        self.content[metric][1].append(value)
+
+    def __getitem__(self, name: str) -> tuple[steps, values]:
+        if name not in self.content:
+            raise KeyError(f"Metric '{name}' not found in history.")
+        return self.content[name]
+
+    def save():
+        raise NotImplementedError
+
+    def load():
+        raise NotImplementedError
+
+    def plot():
+        raise NotImplementedError
+
+    def __add__(self, other: "History") -> "History":
+        """Concatenate two History objects."""
+        raise NotImplementedError
 
 
 class MetricLogger(Callback):
     """Callback for logging metrics in an History during training."""
 
-    pass
+    history: History
+    log_every: int
+    metric_defs: dict[str, (bool, Metric)]
+    steps_str_length: int = 0
+    verbose: bool = True
+    start_time: float = 0.0
+
+    def __init__(
+        self,
+        log_every: int = 100,
+        metric_defs: dict[str, (bool, Metric)] | None = None,
+        verbose: bool = True,
+    ):
+        """Initialize the MetricLogger.
+
+        Args:
+            log_every: Frequency of logging metrics (in steps).
+            metric_defs: A dictionary mapping metric names to tuples of
+                (whether to print the metric, metric function).
+            verbose: Whether to print logged metrics to the console.
+
+        """
+        self.metric_defs = metric_defs or {}
+        self.log_every = log_every
+        self.history = History()
+        self.verbose = verbose
+
+    def add_metric(
+        self, name: str, metric: Metric, verbose: bool = False
+    ) -> None:
+        """Add a metric to be logged during training.
+
+        Args:
+            name: Name of the metric.
+            metric: A callable that computes the metric given the model.
+            verbose: Whether to print the metric during logging.
+
+        """
+        self.metric_defs[name] = (verbose, metric)
+
+    def __call__(self, view: TrainingView, step: int) -> None:
+        """Log metrics at the current training step.
+
+        Args:
+            view: The current TrainingView containing state and static info.
+            step: The current training step.
+
+        """
+        if step % self.log_every == 0:
+            message = []
+            for name, (verbose, metric_fn) in self.metric_defs.items():
+                metric_value = jax.device_get(metric_fn(view.model))
+                self.history.append(step, name, metric_value)
+                if self.verbose and verbose:
+                    try:
+                        formatted_value = f"{metric_value:.4e}"
+                    except TypeError:
+                        formatted_value = str(metric_value)
+                    message.append(f"{name}: {formatted_value}")
+
+            if self.verbose:
+                print(
+                    f"Step {step:>{self.steps_str_length}}/{view.static.steps}: "
+                    + ", ".join(message)
+                )
+
+    def on_training_start(self, view: TrainingView, step: int) -> None:
+        self.start_time = time()
+        self.steps_str_length = len(str(view.static.steps))
+        self(view, step)
+
+    def on_training_end(self, view: TrainingView, step: int) -> None:
+        end_time = time()
+        self.history.total_time = end_time - self.start_time
+        self.history.total_steps = step
+        self.history.final_opt_state = view.opt_state

@@ -56,44 +56,21 @@ class TrainingStatic:
     loss: Loss
     steps: int
 
-    def __init__(
-        self,
-        model_tree_def: PyTreeDef,  # pyright: ignore[reportInvalidTypeForm]
-        optimizer: optax.GradientTransformation
-        | optax.GradientTransformationExtraArgs,
-        opt_state_tree_def: PyTreeDef,  # pyright: ignore[reportInvalidTypeForm]
-        batch: Generator[PyTree[Any], None, None],
-        batch_axes: PyTree[int | None],
-        loss: Loss,
-        steps: int,
-    ):
-        self.model_tree_def = model_tree_def
-        self.optimizer = (
-            optax.with_extra_args_support(optimizer)
-            if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
-            else optimizer
-        )
-        self.opt_state_tree_def = opt_state_tree_def
-        self.batch = batch
-        self.batch_axes = batch_axes
-        self.loss = loss
-        self.steps = steps
-
     def assemble_model(self, model_leaves):
-        return jax.tree.unflatten(self.model_treedef, model_leaves)
+        return jax.tree.unflatten(self.model_tree_def, model_leaves)
 
     def disassemble_model(self, model):
         leaves, treedef = jax.tree.flatten(model)
-        if treedef != self.model_treedef:
+        if treedef != self.model_tree_def:
             raise ValueError("Model structure changed")
         return leaves
 
     def assemble_opt_state(self, opt_state_leaves):
-        return jax.tree.unflatten(self.opt_state_treedef, opt_state_leaves)
+        return jax.tree.unflatten(self.opt_state_tree_def, opt_state_leaves)
 
     def disassemble_opt_state(self, opt_state):
         leaves, treedef = jax.tree.flatten(opt_state)
-        if treedef != self.opt_state_treedef:
+        if treedef != self.opt_state_tree_def:
             raise ValueError("Opt state structure changed")
         return leaves
 
@@ -126,6 +103,12 @@ def make_state_and_static(
     model_leaves, model_treedef = jax.tree.flatten(model)
     opt_state_leaves, opt_state_treedef = jax.tree.flatten(opt_state)
 
+    optimizer = (
+        optax.with_extra_args_support(optimizer)
+        if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
+        else optimizer
+    )
+
     state = TrainingState(
         model_leaves=model_leaves,
         opt_state_leaves=opt_state_leaves,
@@ -148,7 +131,6 @@ def make_state_and_static(
 # between mutable state (TrainingState) and static components (TrainingStatic),
 # while providing a nice public-facing interface to access and modify the model
 # and optimizer state.
-# TODO: Either remove the model caching for simplicity or add caching for the optimizer state as well.
 class TrainingView:
     """Public-facing interface for accessing the trainings state and static components.
 
@@ -158,11 +140,13 @@ class TrainingView:
     state: TrainingState
     static: TrainingStatic
     _model: Any  # Cached model instance.
+    _opt_state: Any  # Cached optimizer state.
 
     def __init__(self, state: TrainingState, static: TrainingStatic):
         self.state = state
         self.static = static
         self._model = None
+        self._opt_state = None
 
     @property
     def model(self):
@@ -177,10 +161,13 @@ class TrainingView:
 
     @property
     def opt_state(self):
-        self._opt_state = self.static.assemble_opt_state(
-            self.state.opt_state_leaves
-        )
+        if self._opt_state is None:
+            self._opt_state = self.static.assemble_opt_state(
+                self.state.opt_state_leaves
+            )
+        return self._opt_state
 
     @opt_state.setter
     def opt_state(self, value):
         self.state.opt_state_leaves = self.static.disassemble_opt_state(value)
+        self._opt_state = value

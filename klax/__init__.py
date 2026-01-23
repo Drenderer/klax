@@ -14,10 +14,13 @@
 
 from . import nn as nn
 from ._callbacks import Callback as Callback
-from ._callbacks import HistoryCallback as HistoryCallback
 from ._datahandler import BatchGenerator as BatchGenerator
 from ._datahandler import batch_data as batch_data
 from ._datahandler import split_data as split_data
+from ._logging import History as History
+from ._logging import LossMetric as LossMetric
+from ._logging import Metric as Metric
+from ._logging import MetricLogger as MetricLogger
 from ._losses import Loss as Loss
 from ._losses import loss as loss
 from ._losses import mae as mae
@@ -29,8 +32,12 @@ from ._serialization import (
     text_serialize_filter_spec as text_serialize_filter_spec,
 )
 from ._training import fit as fit
+from ._training import make_step as make_step
+from ._training import run_training_loop as run_training_loop
 from ._trainstate import TrainingState as TrainingState
 from ._trainstate import TrainingStatic as TrainingStatic
+from ._trainstate import TrainingView as TrainingView
+from ._trainstate import make_state_and_static as make_state_and_static
 from ._wrappers import Constraint as Constraint
 from ._wrappers import NonNegative as NonNegative
 from ._wrappers import NonTrainable as NonTrainable

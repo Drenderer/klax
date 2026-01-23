@@ -15,24 +15,21 @@
 """Implements a basic training loop."""
 
 from collections.abc import Iterable
-from functools import partial
-from typing import Any, overload
+from typing import Any
 
 import equinox as eqx
 import jax
 import optax
 from jaxtyping import PRNGKeyArray, PyTree
 
-from ._callbacks import (
-    Callback,
-    HistoryCallback,
-    TrainingState,
-    TrainingStatic,
-)
+from klax._losses import Loss
+
+from ._callbacks import Callback
 from ._datahandler import (
     BatchGenerator,
     batch_data,
 )
+from ._logging import History, LossMetric, MetricLogger
 from ._losses import Loss, mse
 from ._trainstate import (
     TrainingState,
@@ -42,61 +39,62 @@ from ._trainstate import (
 )
 from ._wrappers import apply
 
+new_logger = object()
+
+
+@eqx.filter_jit
+def make_step(
+    state: TrainingState, batch: PyTree[Any], static: TrainingStatic
+) -> TrainingState:
+    # Assembling the model here provides a clear separation between
+    # static and dynamic parts of the training loop.
+    # Furthermore it implements the unflattening trick described in
+    # [low-overhead training loops][https://docs.kidger.site/equinox/tricks/].
+    # This slightly reduces JAX's overhead when repeatedly passing through the
+    # jit boundary of the make_step function in the training loop.
+    model = static.assemble_model(state.model_leaves)
+    opt_state = static.assemble_opt_state(state.opt_state_leaves)
+
+    model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
+    value, grad = static.loss.value_and_grad(model, batch, static.batch_axes)
+    updates, opt_state = static.optimizer.update(
+        grad,
+        opt_state,
+        model_params,
+        value=value,
+        grad=grad,
+        value_fn=jax.tree_util.Partial(
+            static.loss.partitioned_value,
+            static=model_static,
+            batch=batch,
+            batch_axes=static.batch_axes,
+        ),
+    )
+    model_params = optax.apply_updates(model_params, updates)
+    model = eqx.combine(model_params, model_static)
+
+    # Apply the constraints to ensure they are met again after the update.
+    model = apply(model)
+
+    new_state = TrainingState(
+        model_leaves=static.disassemble_model(model),
+        opt_state_leaves=static.disassemble_opt_state(opt_state),
+    )
+    return new_state
+
 
 def run_training_loop(
     state: TrainingState,
     static: TrainingStatic,
     callbacks: Iterable[Callback],
 ):
-    @eqx.filter_jit
-    def make_step(state: TrainingState, batch: PyTree[Any]) -> TrainingState:
-        # Assembling the model here provides a clear separation between
-        # static and dynamic parts of the training loop.
-        # Furthermore it implements the unflattening trick described in
-        # [low-overhead training loops][https://docs.kidger.site/equinox/tricks/].
-        # This slightly reduces JAX's overhead when repeatedly passing through the
-        # jit boundary of the make_step function in the training loop.
-        model = static.assemble_model(state.model_leaves)
-        opt_state = static.assemble_opt_state(state.opt_state_leaves)
-
-        model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
-        value, grad = static.loss.value_and_grad(
-            model, batch, static.batch_axes
-        )
-        updates, opt_state = static.optimizer.update(
-            grad,
-            opt_state,
-            model_params,
-            value=value,
-            grad=grad,
-            value_fn=jax.tree_util.Partial(
-                static.loss.partitioned_value,
-                static=model_static,
-                batch=batch,
-                batch_axes=static.batch_axes,
-            ),
-        )
-        model_params = optax.apply_updates(model_params, updates)
-        model = eqx.combine(model_params, model_static)
-
-        # Apply the constraints to ensure they are met again after the update.
-        model = apply(model)
-
-        new_state = TrainingState(
-            model_leaves=static.disassemble_model(model),
-            opt_state_leaves=static.disassemble_opt_state(opt_state),
-        )
-        return new_state
-
+    step = 0
     view = TrainingView(state, static)
     for callback in callbacks:
-        callback.on_training_start(view)
-
-    # To silence the `possibly unbound` warning from `callback.on_training_end`
-    step = 0
+        callback.on_training_start(view, step)
 
     for step in range(1, static.steps + 1):
-        state = make_step(state, next(static.batch))
+        state = make_step(state, next(static.batch), static)
 
         view = TrainingView(state, static)
         stop = False
@@ -111,25 +109,6 @@ def run_training_loop(
     return state
 
 
-@overload
-def fit[T: eqx.Module](
-    model: T,
-    data: PyTree[Any],
-    *,
-    batch_size: int = 32,
-    batch_axes: PyTree[int | None] = 0,
-    validation_data: PyTree[Any] = None,
-    steps: int = 1000,
-    loss: Loss = mse,
-    optimizer: optax.GradientTransformation
-    | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
-    init_opt_state: PyTree[Any] = None,
-    batcher: BatchGenerator = batch_data,
-    history: None = None,
-    callbacks: Iterable[Callback] | None = None,
-    key: PRNGKeyArray,
-) -> tuple[T, HistoryCallback]: ...
-@overload
 def fit[T: eqx.Module, H: Callback](
     model: T,
     data: PyTree[Any],
@@ -143,27 +122,10 @@ def fit[T: eqx.Module, H: Callback](
     | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    history: H,
+    logger: MetricLogger | None = new_logger,
     callbacks: Iterable[Callback] | None = None,
     key: PRNGKeyArray,
-) -> tuple[T, H]: ...
-def fit[T: eqx.Module, H: Callback](
-    model: T,
-    data: PyTree[Any],
-    *,
-    batch_size: int = 32,
-    batch_axes: PyTree[int | None] = 0,
-    validation_data: PyTree[Any] = None,
-    steps: int = 1000,
-    loss: Loss = mse,
-    optimizer: optax.GradientTransformation
-    | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
-    init_opt_state: PyTree[Any] = None,
-    batcher: BatchGenerator = batch_data,
-    history: HistoryCallback | H | None = None,
-    callbacks: Iterable[Callback] | None = None,
-    key: PRNGKeyArray,
-) -> tuple[T, HistoryCallback | H]:
+) -> tuple[T, History]:
     """Trains a model using an optimizer from optax.
 
     This is a convenient wrapper around `training_loop` which sets up optimizer,
@@ -199,13 +161,27 @@ def fit[T: eqx.Module, H: Callback](
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        history: A callback intended for tracking the training process. If no
-            custom callback is passed the [`klax.HistoryCallback`][] with a
+        logger: A callback intended for tracking the training process. If no
+            custom callback is passed the [`klax.MetricLogger`][] with a
             logging interval of 100 steps is used. To change the logging
             increment or verbosity of this default callback, pass a
-            `HistoryCallback` object to this argument, e.g.,
-            `history=HistoryCallback(log_every=10, verbose=False)` for logging
-            on every 10-th step without printing the loss.
+            `MetricLogger` object to this argument, e.g.,
+            `logger=MetricLogger(log_every=10, verbose=False)` for logging
+            on every 10-th step without printing the loss. This can also be used
+            to log additional metrics during training, e.g.,
+            ```python
+                mylogger=MetricLogger(log_every=100)
+                mylogger.add_metric(
+                    "accuracy",
+                    lambda model: compute_accuracy(model)
+                )
+                model, history = fit(
+                    model,
+                    data,
+                    ...,
+                    logger=mylogger,
+                )
+            ```
         callbacks: Callback functions that are evaluated after every training
             step. They can be used to implement early stopping, custom history
             logging and more. The argument to the callback function is a
@@ -233,7 +209,8 @@ def fit[T: eqx.Module, H: Callback](
     # initially
     model = apply(model)
 
-    batch = batcher(data, batch_size, batch_axes, key=key)
+    bkey, key = jax.random.split(key)
+    batch = batcher(data, batch_size, batch_axes, key=bkey)
     state, static = make_state_and_static(
         model,
         optimizer,
@@ -248,22 +225,36 @@ def fit[T: eqx.Module, H: Callback](
     callbacks = [] if callbacks is None else list(callbacks)
 
     # Initialize callback arguments and history
-    if history is None:
-        metric_defs = {
-            "loss": partial(loss.value, batch=data, batch_axes=batch_axes)
-        }
-        if validation_data is not None:
-            metric_defs["val_loss"] = partial(
-                loss.value, batch=validation_data, batch_axes=batch_axes
-            )
-        history = HistoryCallback(
-            metric_defs=metric_defs,
-            log_every=100,
+    if logger is not None:
+        logger = MetricLogger() if logger is new_logger else logger
+
+        bkey, key = jax.random.split(key)
+        logger.add_metric(
+            "loss",
+            LossMetric(batcher, data, batch_size, batch_axes, loss, key=bkey),
+            verbose=True,
         )
-    callbacks.append(history)
+
+        if validation_data is not None:
+            bkey, key = jax.random.split(key)
+            logger.add_metric(
+                "validation_loss",
+                LossMetric(
+                    batcher,
+                    validation_data,
+                    4 * batch_size,
+                    batch_axes,
+                    loss,
+                    key=bkey,
+                ),
+                verbose=True,
+            )
+        callbacks.append(logger)
 
     state = run_training_loop(state, static, callbacks)
 
     model = static.assemble_model(state.model_leaves)
+
+    history = logger.history if logger is not None else History()
 
     return model, history
