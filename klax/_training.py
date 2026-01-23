@@ -34,17 +34,22 @@ from ._datahandler import (
     batch_data,
 )
 from ._losses import Loss, mse
-from ._trainstate import TrainingState, TrainingStatic, TrainingView
+from ._trainstate import (
+    TrainingState,
+    TrainingStatic,
+    TrainingView,
+    make_state_and_static,
+)
 from ._wrappers import apply
 
 
 def run_training_loop(
     state: TrainingState,
     static: TrainingStatic,
-    callbacks: Iterable[Callback] = [],
+    callbacks: Iterable[Callback],
 ):
     @eqx.filter_jit
-    def make_step(state, batch):
+    def make_step(state: TrainingState, batch: PyTree[Any]) -> TrainingState:
         # Assembling the model here provides a clear separation between
         # static and dynamic parts of the training loop.
         # Furthermore it implements the unflattening trick described in
@@ -81,7 +86,7 @@ def run_training_loop(
             model_leaves=static.disassemble_model(model),
             opt_state_leaves=static.disassemble_opt_state(opt_state),
         )
-        return new_state, value
+        return new_state
 
     view = TrainingView(state, static)
     for callback in callbacks:
@@ -91,12 +96,12 @@ def run_training_loop(
     step = 0
 
     for step in range(1, static.steps + 1):
-        state, batch_loss = make_step(state, next(static.batcher))
+        state = make_step(state, next(static.batch))
 
         view = TrainingView(state, static)
         stop = False
         for callback in callbacks:
-            stop |= bool(callback(view, step, batch_loss))
+            stop |= bool(callback(view, step))
         if stop:
             break
 
@@ -228,18 +233,15 @@ def fit[T: eqx.Module, H: Callback](
     # initially
     model = apply(model)
 
-    state = TrainingState.create(model=model, opt_state=opt_state)
-    static = TrainingStatic(
-        optimizer=optimizer,
-        batcher=batcher(
-            data,
-            batch_size,
-            batch_axes,
-            key=key,
-        ),
-        batch_axes=batch_axes,
-        loss=loss,
-        steps=steps,
+    batch = batcher(data, batch_size, batch_axes, key=key)
+    state, static = make_state_and_static(
+        model,
+        optimizer,
+        opt_state,
+        batch,
+        batch_axes,
+        loss,
+        steps,
     )
 
     # Make callbacks iterable
@@ -262,4 +264,6 @@ def fit[T: eqx.Module, H: Callback](
 
     state = run_training_loop(state, static, callbacks)
 
-    return state.model, history
+    model = static.assemble_model(state.model_leaves)
+
+    return model, history

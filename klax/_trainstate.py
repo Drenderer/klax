@@ -23,8 +23,6 @@ from jaxtyping import PyTree, PyTreeDef
 from klax._losses import Loss
 
 
-# TODO: Potentially rewrite this class as a non-dataclass, to get the __init__ function to work.
-# I've tried, but got some weird error from jax on the filter_jit boundary in training_loop or made everything slower...
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
@@ -50,29 +48,33 @@ class TrainingStatic:
     # yet implemented, so we cannot use the `converter` parameter. I also tried using
     # using an `equinox.Module` with `eqx.field` instead, but is messes with the initializer
     # input types, if there is a type conversion in the converter function.
-    model_tree_def: PyTreeDef  # type: ignore
+    model_tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
     optimizer: optax.GradientTransformationExtraArgs
-    opt_state_tree_def: PyTreeDef  # type: ignore
-    batcher: Generator[PyTree[Any], None, None]
+    opt_state_tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
+    batch: Generator[PyTree[Any], None, None]
     batch_axes: PyTree[int | None]
     loss: Loss
     steps: int
 
     def __init__(
         self,
+        model_tree_def: PyTreeDef,  # pyright: ignore[reportInvalidTypeForm]
         optimizer: optax.GradientTransformation
         | optax.GradientTransformationExtraArgs,
-        batcher: Generator[PyTree[Any], None, None],
+        opt_state_tree_def: PyTreeDef,  # pyright: ignore[reportInvalidTypeForm]
+        batch: Generator[PyTree[Any], None, None],
         batch_axes: PyTree[int | None],
         loss: Loss,
         steps: int,
     ):
+        self.model_tree_def = model_tree_def
         self.optimizer = (
             optax.with_extra_args_support(optimizer)
             if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
             else optimizer
         )
-        self.batcher = batcher
+        self.opt_state_tree_def = opt_state_tree_def
+        self.batch = batch
         self.batch_axes = batch_axes
         self.loss = loss
         self.steps = steps
@@ -96,6 +98,52 @@ class TrainingStatic:
         return leaves
 
 
+def make_state_and_static(
+    model: PyTree[Any],
+    optimizer: optax.GradientTransformation
+    | optax.GradientTransformationExtraArgs,
+    opt_state: PyTree[Any],
+    batch: Generator[PyTree[Any], None, None],
+    batch_axes: PyTree[int | None],
+    loss: Loss,
+    steps: int,
+) -> tuple[TrainingState, TrainingStatic]:
+    """Create the initial TrainingState and TrainingStatic from the model and optimizer.
+
+    Args:
+        model: The initial model parameters.
+        optimizer: The optimizer to use for training.
+        opt_state: The initial optimizer state.
+        batch: A generator that yields batches of data.
+        batch_axes: A PyTree indicating the batch axes for each component of the data.
+        loss: The loss function to use for training.
+        steps: The total number of training steps.
+
+    Returns:
+        A tuple of (TrainingState, TrainingStatic).
+
+    """
+    model_leaves, model_treedef = jax.tree.flatten(model)
+    opt_state_leaves, opt_state_treedef = jax.tree.flatten(opt_state)
+
+    state = TrainingState(
+        model_leaves=model_leaves,
+        opt_state_leaves=opt_state_leaves,
+    )
+
+    static = TrainingStatic(
+        model_tree_def=model_treedef,
+        optimizer=optimizer,
+        opt_state_tree_def=opt_state_treedef,
+        batch=batch,
+        batch_axes=batch_axes,
+        loss=loss,
+        steps=steps,
+    )
+
+    return state, static
+
+
 # This is similar to the old CallbackArgs, but ensures a clean separation
 # between mutable state (TrainingState) and static components (TrainingStatic),
 # while providing a nice public-facing interface to access and modify the model
@@ -107,34 +155,32 @@ class TrainingView:
     Provides properties to access and modify the model and optimizer state.
     """
 
-    _state: TrainingState
-    _static: TrainingStatic
+    state: TrainingState
+    static: TrainingStatic
     _model: Any  # Cached model instance.
 
     def __init__(self, state: TrainingState, static: TrainingStatic):
-        self._state = state
-        self._static = static
+        self.state = state
+        self.static = static
         self._model = None
 
     @property
     def model(self):
         if self._model is None:
-            self._model = self._static.assemble_model(self._state.model_leaves)
+            self._model = self.static.assemble_model(self.state.model_leaves)
         return self._model
 
     @model.setter
     def model(self, value):
-        self._state.model_leaves = self._static.disassemble_model(value)
+        self.state.model_leaves = self.static.disassemble_model(value)
         self._model = value
 
     @property
     def opt_state(self):
-        self._opt_state = self._static.assemble_opt_state(
-            self._state.opt_state_leaves
+        self._opt_state = self.static.assemble_opt_state(
+            self.state.opt_state_leaves
         )
 
     @opt_state.setter
     def opt_state(self, value):
-        self._state.opt_state_leaves = self._static.disassemble_opt_state(
-            value
-        )
+        self.state.opt_state_leaves = self.static.disassemble_opt_state(value)

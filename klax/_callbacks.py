@@ -25,7 +25,7 @@ from typing import Any, Protocol, runtime_checkable
 import jax.numpy as jnp
 from jaxtyping import PyTree, Scalar
 
-from ._trainstate import TrainingState, TrainingStatic
+from ._trainstate import TrainingView
 
 
 # TODO: Write user-friendly documentation for Callbacks
@@ -39,25 +39,15 @@ class Callback(ABC):
     - on_training_end(state, static, step) -> None
     """
 
-    def on_training_start(
-        self, state: TrainingState, static: TrainingStatic
-    ) -> None:
+    def on_training_start(self, view: TrainingView) -> None:
         """Execute when training starts."""
         pass
 
-    def __call__(
-        self,
-        state: TrainingState,
-        static: TrainingStatic,
-        step: int,
-        batch_loss: Scalar,
-    ) -> bool | None:
+    def __call__(self, view: TrainingView, step: int) -> bool | None:
         """Execute after each step during training."""
         pass
 
-    def on_training_end(
-        self, state: TrainingState, static: TrainingStatic, step: int
-    ) -> None:
+    def on_training_end(self, view: TrainingView, step: int) -> None:
         """Execute when training ends."""
         pass
 
@@ -109,7 +99,7 @@ class HistoryCallback(Callback):
             f"verbose={self.verbose}, metrics={list(self.metrics.keys())})"
         )
 
-    def on_training_start(self, state: TrainingState, static: TrainingStatic):
+    def on_training_start(self, view: TrainingView) -> None:
         """Initialize the training start time.
 
         Called at beginning of training.
