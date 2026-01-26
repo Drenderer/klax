@@ -132,9 +132,15 @@ def make_state_and_static(
 # while providing a nice public-facing interface to access and modify the model
 # and optimizer state.
 class TrainingView:
-    """Public-facing interface for accessing the trainings state and static components.
+    """Interface for accessing the training state and static components.
 
     Provides properties to access and modify the model and optimizer state.
+
+    Attributes:
+        static: The immutable [training static][klax.TrainingStatic].
+        model: The model instance.
+        opt_state: The optimizer state.
+
     """
 
     state: TrainingState
@@ -150,6 +156,7 @@ class TrainingView:
 
     @property
     def model(self):
+        """Accessor for the model instance."""
         if self._model is None:
             self._model = self.static.assemble_model(self.state.model_leaves)
         return self._model
@@ -161,6 +168,7 @@ class TrainingView:
 
     @property
     def opt_state(self):
+        """Accessor for the optimizer state."""
         if self._opt_state is None:
             self._opt_state = self.static.assemble_opt_state(
                 self.state.opt_state_leaves

@@ -21,16 +21,11 @@ from ._trainstate import TrainingView
 class Callback(ABC):
     """Callback base class.
 
-    Callbacks allow users to inject custom behavior into the
-    training loop *after* each parameter update. This can be
-    used for logging, early stopping or modifying the model in
-    a jax-incompatible way.
-
     A callback consists of three methods:
-    - `on_training_start`: Executed once at the start of training.
-    - `on_training_step`: Executed after each step (parameter update)
-        during training.
-    - `on_training_end`: Executed once at the end of training.
+        - `on_training_start`: Executed once at the start of training.
+        - `on_training_step`: Executed after each step (parameter update)
+            during training.
+        - `on_training_end`: Executed once at the end of training.
 
     Each method receives the current step and a [`TrainingView`][klax.TrainingView]
     object that provides read and write access to the current

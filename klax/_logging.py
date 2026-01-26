@@ -29,7 +29,7 @@ from klax._trainstate import TrainingView
 
 
 class Metric(Protocol):
-    """Any object that can be called on a model and returns a value."""
+    """A Metric is any object that can be called on a model and returns a value."""
 
     def __call__(self, model: PyTree) -> Any: ...
 
@@ -38,7 +38,7 @@ class LossMetric:
     """Compute a scalar loss on a random batch of data.
 
     This metric samples a new batch of data on each call and computes the loss
-    on that batch.
+    value given the model and the sampled batch.
     """
 
     def __init__(
@@ -51,11 +51,31 @@ class LossMetric:
         *,
         key: PRNGKeyArray,
     ):
+        """Initialize the `LossMetric`.
+
+        Args:
+            batcher: Batch generator function.
+            data: The dataset to generate batches from.
+            batch_size: The size of each batch.
+            batch_axes: The axes corresponding to the batch dimension in the data.
+            loss: The loss function to compute.
+            key: PRNG key for random number generation.
+
+        """
         self.batch = batcher(data, batch_size, batch_axes, key=key)
         self.batch_axes = batch_axes
         self.loss = loss
 
     def __call__(self, model: PyTree) -> Scalar:
+        """Compute the loss metric.
+
+        Args:
+            model: Model to evaluate on a batch.
+
+        Returns:
+            The loss value on the sampled batch.
+
+        """
         batch = next(self.batch)
         return self.loss.value(model, batch, self.batch_axes)
 
@@ -65,12 +85,12 @@ type values = list[Any]
 
 
 class History:
-    """Dict-like object for storing training history with metadata and utility methods.
+    """Dict-like object for storing a training history with metadata and utility methods.
 
     The training history stores (metric) values along with the
     training steps they correspond to, as well as total training
     time, total steps, and the final optimizer state.
-    It also provides methods for saving/loading the history
+    Furthermore, it provides methods for saving/loading the history
     to/from disk, plotting metrics, and extending the history.
     """
 
@@ -159,7 +179,7 @@ class History:
             final_opt_state=payload.get("final_opt_state", None),
         )
 
-    def plot(self, *keys: str, ax: Any = None, **kwargs) -> None:
+    def plot(self, *keys: str, ax: Any = None, **kwargs: Any) -> None:
         """Plot stored metrics using matplotlib.
 
         Note:
@@ -222,7 +242,24 @@ class History:
 
 
 class MetricLogger(Callback):
-    """Callback for logging metrics in a History during training."""
+    """Callback for logging metrics in a History during training.
+
+    Example:
+        ```python
+            mylogger=MetricLogger(log_every=100)
+            mylogger.add_metric(
+                "accuracy",
+                lambda model: compute_accuracy(model)
+            )
+            model, history = fit(
+                model,
+                data,
+                ...,
+                logger=mylogger,
+            )
+        ```
+
+    """
 
     history: History
     log_every: int

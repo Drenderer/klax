@@ -44,14 +44,26 @@ new_logger = object()
 
 @eqx.filter_jit
 def make_step(
-    state: TrainingState, batch: PyTree[Any], static: TrainingStatic
+    state: TrainingState, batch: PyTree, static: TrainingStatic
 ) -> TrainingState:
-    # Assembling the model here provides a clear separation between
-    # static and dynamic parts of the training loop.
-    # Furthermore it implements the unflattening trick described in
-    # [low-overhead training loops][https://docs.kidger.site/equinox/tricks/].
-    # This slightly reduces JAX's overhead when repeatedly passing through the
-    # jit boundary of the make_step function in the training loop.
+    """Update the training state by one optimization step.
+
+    This function implements the unflattening trick described in
+    [low-overhead training loops](https://docs.kidger.site/equinox/tricks/),
+    slightly reducing JAX's overhead when repeatedly passing through the
+    jit boundary of the `make_step` function in a training loop.
+    It is furthermore compatible with all optimizers from the optax library.
+    After each update, any constraints in the model are [applied][klax.apply].
+
+    Args:
+        state: [TrainingState][klax.TrainingState].
+        batch: Batch of training data.
+        static: [TrainingStatic][klax.TrainingStatic].
+
+    Returns:
+        Updated training state.
+
+    """
     model = static.assemble_model(state.model_leaves)
     opt_state = static.assemble_opt_state(state.opt_state_leaves)
 
@@ -76,18 +88,28 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    new_state = TrainingState(
+    return TrainingState(
         model_leaves=static.disassemble_model(model),
         opt_state_leaves=static.disassemble_opt_state(opt_state),
     )
-    return new_state
 
 
 def run_training_loop(
     state: TrainingState,
     static: TrainingStatic,
     callbacks: Iterable[Callback],
-):
+) -> TrainingState:
+    """Iterate [`make_step`][klax.make_step] in pure python with callback integration.
+
+    Args:
+        state: Initial [TrainingState][klax.TrainingState]
+        static: [TrainingStatic][klax.TrainingStatic]
+        callbacks: Iterable of [Callback][klax.Callback] instances.
+
+    Returns:
+        Final [TrainingState][klax.TrainingState].
+
+    """
     step = 0
     view = TrainingView(state, static)
     for callback in callbacks:
@@ -126,18 +148,18 @@ def fit[T: eqx.Module, H: Callback](
     callbacks: Iterable[Callback] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[T, History]:
-    """Trains a model using an optimizer from optax.
+    """Train a model using an optimizer from optax.
 
-    This is a convenient wrapper around `training_loop` which sets up optimizer,
-    training state and callbacks.
+    This is a convenient wrapper around [`run_training_loop`][klax.run_training_loop]
+    that sets up optimizer, training state and callbacks.
 
     Args:
         model: The model instance, which should be trained. It must be a
             subclass of `equinox.Module`. The model may contain
             [`klax.Unwrappable`][] wrappers.
-        data: The training data can be any `PyTree` with `ArrayLike` leaves.
-            Most likely you'll want `data` to be a tuple `(x, y)` with model
-            inputs `x` and model outputs `y`.
+        data: The training data can be any `PyTree` with at least some
+            `ArrayLike` leaves. Most likely you'll want `data` to be a
+            tuple `(x, y)` with model inputs `x` and model outputs `y`.
         batch_size: The number of examples in a batch.
         batch_axes: A `PyTree` denoting, which axis is the batch axis for
             arrays in `data`. `batch_axes` must be a prefix of `data`. By
@@ -145,9 +167,20 @@ def fit[T: eqx.Module, H: Callback](
             different batch axes for different leaves of `data`. (Defaults to
             `0`, meaning the first axes of arrays in `data` are batch
             dimensions.)
+
+            Example: For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
+            where `x` has  shape `(100, 32)`, `y1` has shape `(100,)`
+            and `y2` has shape `(10, 100)`, the appropriate `batch_axes`
+            would be `batch_axes = (0, (0, 1, None))` indicating that
+            the batch axis for `x` is the first axis (0), for `y1` also
+            the first axis (0), for `y2` the second axis (1) and for the
+            string there is no batch axis (`None`).
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
             to None.)
+            Internally, the validation data is used to create a [LossMetric][klax.LossMetric]
+            for logging. Each time the metric is evaluated, the loss is computed
+            on a batch from the validation dataset and logged with batch size ``4*batch_size``.
         steps: Number of gradient updates to apply. (Defaults to 1000.)
         loss: The loss function with call signature
             `(model: PyTree, data: PyTree, batch_axes: int | None |
@@ -182,6 +215,11 @@ def fit[T: eqx.Module, H: Callback](
                     logger=mylogger,
                 )
             ```
+            Any passed [`klax.MetricLogger`][] will have a training
+            [LossMetric][klax.LossMetric] and - if applicable - a validation
+            [LossMetric][klax.LossMetric] added automatically. If this is undesired,
+            set `logger=None` and pass your logger as a callback via the
+            `callbacks` argument. (Per default a new MetricLogger instance is created.)
         callbacks: Callback functions that are evaluated after every training
             step. They can be used to implement early stopping, custom history
             logging and more. The argument to the callback function is a
