@@ -336,7 +336,8 @@ class Constraint(Unwrappable[Array], ABC):
 
     Note:
         Models containing [Constraints][klax.Constraint] need to be
-        [finalized][klax.finalize] before they are callable.
+        [unwrapped][klax.unwrap] or [finalized][klax.finalize] before they
+        are callable.
 
     Warning:
         [Constraints][klax.Constraint] objects should not be nested, as this

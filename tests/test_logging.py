@@ -1,7 +1,6 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
 
-import jax
+import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jr
 import pytest
@@ -34,8 +33,8 @@ class TestLossMetric:
         assert metric.batch_axes == batch_axes
         assert metric.loss == klax.mse
 
-    def test_call_single_batch(self, getkey):
-        """Test __call__ method with single batch."""
+    def test_call(self, getkey):
+        """Test __call__ method."""
         data = (
             jr.uniform(getkey(), (100, 2)),
             jr.uniform(getkey(), (100, 1)),
@@ -52,9 +51,7 @@ class TestLossMetric:
             key=getkey(),
         )
 
-        model = klax.nn.Linear(
-            2, 1, weight_init=jax.nn.initializers.lecun_normal(), key=getkey()
-        )
+        model = eqx.nn.Linear(2, 1, key=getkey())
         result = metric(model)
 
         assert isinstance(result, jnp.ndarray)
@@ -75,7 +72,7 @@ class TestHistory:
     def test_append_single_metric(self):
         """Test appending a single metric entry."""
         history = History()
-        history.append(step=0, metric="loss", value=0.5)
+        history.append(step=0, key="loss", value=0.5)
 
         assert "loss" in history.content
         assert history.content["loss"][0] == [0]
@@ -84,9 +81,9 @@ class TestHistory:
     def test_append_multiple_entries_same_metric(self):
         """Test appending multiple entries to the same metric."""
         history = History()
-        history.append(step=0, metric="loss", value=0.5)
-        history.append(step=10, metric="loss", value=0.3)
-        history.append(step=20, metric="loss", value=0.1)
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=10, key="loss", value=0.3)
+        history.append(step=20, key="loss", value=0.1)
 
         steps, values = history.content["loss"]
         assert steps == [0, 10, 20]
@@ -95,10 +92,10 @@ class TestHistory:
     def test_append_multiple_different_metrics(self):
         """Test appending entries to different metrics."""
         history = History()
-        history.append(step=0, metric="loss", value=0.5)
-        history.append(step=0, metric="accuracy", value=0.8)
-        history.append(step=10, metric="loss", value=0.3)
-        history.append(step=10, metric="accuracy", value=0.85)
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=0, key="accuracy", value=0.8)
+        history.append(step=10, key="loss", value=0.3)
+        history.append(step=10, key="accuracy", value=0.85)
 
         assert "loss" in history.content
         assert "accuracy" in history.content
@@ -108,17 +105,26 @@ class TestHistory:
     def test_getitem_existing_metric(self):
         """Test retrieving an existing metric using __getitem__."""
         history = History()
-        history.append(step=0, metric="loss", value=0.5)
-        history.append(step=10, metric="loss", value=0.3)
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=10, key="loss", value=0.3)
 
         steps, values = history["loss"]
         assert steps == [0, 10]
         assert values == [0.5, 0.3]
 
+    def test_keys_returns_all_metric_keys(self):
+        """Test that keys() returns all metric keys."""
+        history = History()
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=0, key="accuracy", value=0.8)
+
+        keys = set(history.keys())
+        assert keys == {"loss", "accuracy"}
+
     def test_getitem_nonexistent_metric_raises_keyerror(self):
         """Test that accessing non-existent metric raises KeyError."""
         history = History()
-        history.append(step=0, metric="loss", value=0.5)
+        history.append(step=0, key="loss", value=0.5)
 
         with pytest.raises(KeyError, match="Metric 'accuracy' not found"):
             history["accuracy"]
@@ -128,13 +134,13 @@ class TestHistory:
         history = History()
 
         # Float value
-        history.append(step=0, metric="loss", value=0.5)
+        history.append(step=0, key="loss", value=0.5)
         # Integer value
-        history.append(step=1, metric="epoch", value=1)
+        history.append(step=1, key="epoch", value=1)
         # Array value
-        history.append(step=2, metric="gradients", value=jnp.array([0.1, 0.2]))
+        history.append(step=2, key="gradients", value=jnp.array([0.1, 0.2]))
         # Complex value
-        history.append(step=3, metric="dict_metric", value={"a": 1, "b": 2})
+        history.append(step=3, key="dict_metric", value={"a": 1, "b": 2})
 
         assert history.content["loss"][1][0] == 0.5
         assert history.content["epoch"][1][0] == 1
@@ -147,7 +153,7 @@ class TestHistory:
         """Test that append maintains insertion order."""
         history = History()
         for i in range(100):
-            history.append(step=i, metric="loss", value=float(i))
+            history.append(step=i, key="loss", value=float(i))
 
         steps, values = history["loss"]
         assert steps == list(range(100))
@@ -156,8 +162,8 @@ class TestHistory:
     def test_content_structure(self):
         """Test the structure of the content dictionary."""
         history = History()
-        history.append(step=0, metric="metric1", value=1.0)
-        history.append(step=5, metric="metric1", value=2.0)
+        history.append(step=0, key="metric1", value=1.0)
+        history.append(step=5, key="metric1", value=2.0)
 
         # Each metric should map to a tuple of (steps, values)
         metric_data = history.content["metric1"]
@@ -165,6 +171,54 @@ class TestHistory:
         assert len(metric_data) == 2
         assert isinstance(metric_data[0], list)
         assert isinstance(metric_data[1], list)
+
+    def test_extend(self):
+        """Test extending one History with another."""
+        history1 = History(total_steps=10, total_time=5.0, final_opt_state=1)
+        history1.append(step=0, key="loss", value=0.5)
+        history1.append(step=10, key="loss", value=0.3)
+        history1.append(step=10, key="hist1_metric", value=-5)
+
+        history2 = History(total_steps=15, total_time=3.0, final_opt_state=2)
+        history2.append(step=0, key="loss", value=0.2)
+        history2.append(step=10, key="loss", value=0.1)
+        history2.append(step=10, key="hist2_metric", value=5)
+
+        history1.extend(history2)
+
+        steps, values = history1["loss"]
+        assert steps == [0, 10, 10, 20]
+        assert values == [0.5, 0.3, 0.2, 0.1]
+
+        steps, values = history1["hist1_metric"]
+        assert steps == [10]
+        assert values == [-5]
+
+        steps, values = history1["hist2_metric"]
+        assert steps == [20]
+        assert values == [5]
+
+        assert history1.total_steps == 25
+        assert history1.total_time == 8.0
+        assert history1.final_opt_state == 2
+
+    def test_save_and_load_roundtrip(self, tmp_path):
+        history = History()
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=5, key="acc", value=0.8)
+        history.total_steps = 5
+        history.total_time = 1.25
+        history.final_opt_state = {"opt": 1}
+
+        path = tmp_path / "nested" / "history.pkl"
+        history.save(path)
+
+        loaded = History.load(path)
+
+        assert loaded.content == history.content
+        assert loaded.total_steps == history.total_steps
+        assert loaded.total_time == history.total_time
+        assert loaded.final_opt_state == history.final_opt_state
 
 
 class TestMetricLogger:
@@ -189,16 +243,16 @@ class TestMetricLogger:
         view = self._make_view(steps=10)
 
         # Step 1: not divisible by 2 -> no log
-        logger(view, 1)
+        logger.on_training_step(view, 1)
         assert "m1" not in logger.history.content
 
         # Step 2: divisible by 2 -> should log
-        logger(view, 2)
+        logger.on_training_step(view, 2)
         assert "m1" in logger.history.content
         assert logger.history.content["m1"][0] == [2]
 
         # Step 4: divisible by 2 -> should log again
-        logger(view, 4)
+        logger.on_training_step(view, 4)
         assert logger.history.content["m1"][0] == [2, 4]
 
     def test_verbose_print_scalar_metric(self, capsys):
@@ -206,7 +260,7 @@ class TestMetricLogger:
         logger.add_metric("loss", lambda model: jnp.array(1.23), verbose=True)
 
         view = self._make_view(steps=10)
-        logger(view, 0)
+        logger.on_training_step(view, 0)
 
         out = capsys.readouterr().out
         assert "Step 0/10:" in out
@@ -220,7 +274,7 @@ class TestMetricLogger:
         )
 
         view = self._make_view(steps=5)
-        logger(view, 0)
+        logger.on_training_step(view, 0)
 
         out = capsys.readouterr().out
         assert "Step 0/5:" in out

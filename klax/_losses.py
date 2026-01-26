@@ -28,10 +28,11 @@ from ._wrappers import unwrap
 class Loss(ABC):
     """An abstract callable loss object.
 
-    It can be used to build custom losses that can be passed to [`klax.fit`][].
+    Inherit from this class to define a custom loss that can be passed to
+    [`fit`][klax.fit].
     An instance of the loss class has two methods that are required for
-    [`klax.fit`][`fit`]: `value` and `value_and_grad`. In most cases the default
-    implementation should be used. `value` just [`klax.unwrap`][unwraps] the model
+    [`fit`][klax.fit]: `value` and `value_and_grad`. In most cases the default
+    implementation should be used. `value` just [unwraps][klax.unwrap] the model
     before computing the loss as specified in `__call__`, while `value_and_grad`
     per default applies `jax.value_and_grad` to `value`. These functions can be
     overwritten, for example to enable custom calculations of the gradients.
@@ -82,7 +83,10 @@ class Loss(ABC):
         batch: PyTree[Any, "T"],
         batch_axes: PyTree[int | None, "T ..."],  # type: ignore
     ) -> Scalar:
-        """Compute the loss value during training.
+        """Compute the loss value used during training.
+
+        This method unwraps the model before computing the loss by calling
+        the `__call__` method.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
@@ -105,6 +109,10 @@ class Loss(ABC):
         batch_axes: PyTree[int | None, "T ..."],  # type: ignore
     ) -> tuple[Scalar, PyTree[Any, "M"]]:
         """Compute the loss value and gradient during training.
+
+        This method computes the loss value and its gradient with respect to
+        the model parameters by applying `jax.value_and_grad` to the `value`
+        method.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
@@ -151,6 +159,16 @@ class Loss(ABC):
 
 def loss(func: Callable) -> Loss:
     """Convert a function into a [`klax.Loss`][] object.
+
+    Example:
+        To create a mean squared error loss using this decorator, you can do:
+        ```python
+        @loss
+        def mse(model, data, batch_axes):
+            x, y = data
+            y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+            return jnp.mean(jnp.square(y_pred - y))
+        ```
 
     Args:
         func: Function that computes the loss. It must have the signature
