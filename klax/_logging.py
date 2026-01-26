@@ -15,14 +15,12 @@
 """Utilities for logging during training."""
 
 import pickle
-from abc import ABC, abstractmethod
 from pathlib import Path
 from time import time
 from typing import Any, Protocol
 
 import jax
-from jax import numpy as jnp
-from jaxtyping import Array, PRNGKeyArray, PyTree
+from jaxtyping import PRNGKeyArray, PyTree, Scalar
 
 from klax._callbacks import Callback
 from klax._datahandler import BatchGenerator
@@ -31,13 +29,17 @@ from klax._trainstate import TrainingView
 
 
 class Metric(Protocol):
-    """A metric that can be called on a model and returns a PyTree of results."""
+    """Any object that can be called on a model and returns a value."""
 
-    def __call__(self, model: PyTree) -> PyTree: ...
+    def __call__(self, model: PyTree) -> Any: ...
 
 
 class LossMetric:
-    """Compute loss over batches from a batcher."""
+    """Compute a scalar loss on a random batch of data.
+
+    This metric samples a new batch of data on each call and computes the loss
+    on that batch.
+    """
 
     def __init__(
         self,
@@ -53,7 +55,7 @@ class LossMetric:
         self.batch_axes = batch_axes
         self.loss = loss
 
-    def __call__(self, model: PyTree) -> Array:
+    def __call__(self, model: PyTree) -> Scalar:
         batch = next(self.batch)
         return self.loss.value(model, batch, self.batch_axes)
 
@@ -63,7 +65,14 @@ type values = list[Any]
 
 
 class History:
-    """History container with some utility methods."""
+    """Dict-like object for storing training history with metadata and utility methods.
+
+    The training history stores (metric) values along with the
+    training steps they correspond to, as well as total training
+    time, total steps, and the final optimizer state.
+    It also provides methods for saving/loading the history
+    to/from disk, plotting metrics, and extending the history.
+    """
 
     content: dict[str, tuple[steps, values]]
     total_time: float  #: Total time spent in training
@@ -83,6 +92,14 @@ class History:
         self.final_opt_state = final_opt_state
 
     def append(self, step: int, key: str, value: Any) -> None:
+        """Add a new value to the history.
+
+        Args:
+            step: Training step the value belongs to.
+            key: Metric name.
+            value: Metric value.
+
+        """
         if key not in self.content:
             self.content[key] = ([], [])
         self.content[key][0].append(step)
@@ -92,6 +109,15 @@ class History:
         if name not in self.content:
             raise KeyError(f"Metric '{name}' not found in history.")
         return self.content[name]
+
+    def keys(self) -> list[str]:
+        """Get the list of metric names stored in the history.
+
+        Returns:
+            A list of metric names.
+
+        """
+        return list(self.content.keys())
 
     def save(self, path: str | Path) -> None:
         """Persist the history to disk using pickle.
@@ -134,6 +160,22 @@ class History:
         )
 
     def plot(self, *keys: str, ax: Any = None, **kwargs) -> None:
+        """Plot stored metrics using matplotlib.
+
+        Note:
+            This method requires matplotlib.
+
+        Args:
+            keys: Metric names to plot. If empty, all metrics are plotted.
+            ax: Matplotlib axes to plot into. If ``None`` then a new axis is
+                created. (Defaults to None.)
+            kwargs: Dictionary of keyword arguments passed to
+                matplotlib's ``plot``.
+
+        Raises:
+            ImportError: If matplotlib is not installed.
+
+        """
         try:
             import matplotlib.pyplot as plt
         except ImportError as e:

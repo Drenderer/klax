@@ -112,6 +112,15 @@ class TestHistory:
         assert steps == [0, 10]
         assert values == [0.5, 0.3]
 
+    def test_keys_returns_all_metric_keys(self):
+        """Test that keys() returns all metric keys."""
+        history = History()
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=0, key="accuracy", value=0.8)
+
+        keys = set(history.keys())
+        assert keys == {"loss", "accuracy"}
+
     def test_getitem_nonexistent_metric_raises_keyerror(self):
         """Test that accessing non-existent metric raises KeyError."""
         history = History()
