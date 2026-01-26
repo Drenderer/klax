@@ -56,8 +56,8 @@ class LossMetric:
         return self.loss.value(model, batch, self.batch_axes)
 
 
-steps = list[int]
-values = list[Any]
+type steps = list[int]
+type values = list[Any]
 
 
 class History:
@@ -74,11 +74,11 @@ class History:
         self.total_steps = -1
         self.final_opt_state = None
 
-    def append(self, step: int, metric: str, value: Any) -> None:
-        if metric not in self.content:
-            self.content[metric] = ([], [])
-        self.content[metric][0].append(step)
-        self.content[metric][1].append(value)
+    def append(self, step: int, key: str, value: Any) -> None:
+        if key not in self.content:
+            self.content[key] = ([], [])
+        self.content[key][0].append(step)
+        self.content[key][1].append(value)
 
     def __getitem__(self, name: str) -> tuple[steps, values]:
         if name not in self.content:
@@ -94,9 +94,24 @@ class History:
     def plot():
         raise NotImplementedError
 
-    def __add__(self, other: "History") -> "History":
-        """Concatenate two History objects."""
-        raise NotImplementedError
+    def extend(self, other: "History") -> None:
+        """Extend this history with the contents of another history.
+
+        Args:
+            other: Another History instance to extend from.
+
+        """
+        for key, (other_steps, other_values) in other.content.items():
+            if key not in self.content:
+                self.content[key] = ([], [])
+            self.content[key][0].extend(
+                [s + self.total_steps for s in other_steps]
+            )
+            self.content[key][1].extend(other_values)
+
+        self.total_time += other.total_time
+        self.total_steps += other.total_steps
+        self.final_opt_state = other.final_opt_state
 
 
 class MetricLogger(Callback):
