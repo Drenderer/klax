@@ -165,21 +165,15 @@ class TestHistory:
 
     def test_extend(self):
         """Test extending one History with another."""
-        history1 = History()
+        history1 = History(total_steps=10, total_time=5.0, final_opt_state=1)
         history1.append(step=0, key="loss", value=0.5)
         history1.append(step=10, key="loss", value=0.3)
         history1.append(step=10, key="hist1_metric", value=-5)
-        history1.total_steps = 10
-        history1.total_time = 5.0
-        history1.final_opt_state = 1
 
-        history2 = History()
+        history2 = History(total_steps=15, total_time=3.0, final_opt_state=2)
         history2.append(step=0, key="loss", value=0.2)
         history2.append(step=10, key="loss", value=0.1)
         history2.append(step=10, key="hist2_metric", value=5)
-        history2.total_steps = 15
-        history2.total_time = 3.0
-        history2.final_opt_state = 2
 
         history1.extend(history2)
 
@@ -198,6 +192,24 @@ class TestHistory:
         assert history1.total_steps == 25
         assert history1.total_time == 8.0
         assert history1.final_opt_state == 2
+
+    def test_save_and_load_roundtrip(self, tmp_path):
+        history = History()
+        history.append(step=0, key="loss", value=0.5)
+        history.append(step=5, key="acc", value=0.8)
+        history.total_steps = 5
+        history.total_time = 1.25
+        history.final_opt_state = {"opt": 1}
+
+        path = tmp_path / "nested" / "history.pkl"
+        history.save(path)
+
+        loaded = History.load(path)
+
+        assert loaded.content == history.content
+        assert loaded.total_steps == history.total_steps
+        assert loaded.total_time == history.total_time
+        assert loaded.final_opt_state == history.final_opt_state
 
 
 class TestMetricLogger:

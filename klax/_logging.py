@@ -14,7 +14,9 @@
 
 """Utilities for logging during training."""
 
+import pickle
 from abc import ABC, abstractmethod
+from pathlib import Path
 from time import time
 from typing import Any, Protocol
 
@@ -68,11 +70,17 @@ class History:
     total_steps: int  #: Total number of steps used in the training
     final_opt_state: PyTree  #: Final optimizer state after training
 
-    def __init__(self):
-        self.content = {}
-        self.total_time = -1.0
-        self.total_steps = -1
-        self.final_opt_state = None
+    def __init__(
+        self,
+        content: dict[str, tuple[steps, values]] | None = None,
+        total_time: float = -1.0,
+        total_steps: int = -1,
+        final_opt_state: PyTree | None = None,
+    ):
+        self.content = content if content is not None else {}
+        self.total_time = total_time
+        self.total_steps = total_steps
+        self.final_opt_state = final_opt_state
 
     def append(self, step: int, key: str, value: Any) -> None:
         if key not in self.content:
@@ -85,11 +93,45 @@ class History:
             raise KeyError(f"Metric '{name}' not found in history.")
         return self.content[name]
 
-    def save():
-        raise NotImplementedError
+    def save(self, path: str | Path) -> None:
+        """Persist the history to disk using pickle.
 
-    def load():
-        raise NotImplementedError
+        Args:
+            path: Destination filepath where the history will be stored.
+
+        """
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "content": self.content,
+            "total_time": self.total_time,
+            "total_steps": self.total_steps,
+            "final_opt_state": self.final_opt_state,
+        }
+        with path.open("wb") as file:
+            pickle.dump(payload, file)
+
+    @classmethod
+    def load(cls, path: str | Path) -> "History":
+        """Restore a history saved with :meth:`save`.
+
+        Args:
+            path: Filepath to load the serialized history from.
+
+        Returns:
+            A populated History instance.
+
+        """
+        path = Path(path)
+        with path.open("rb") as file:
+            payload = pickle.load(file)
+
+        return cls(
+            content=payload.get("content", None),
+            total_time=payload.get("total_time", -1.0),
+            total_steps=payload.get("total_steps", -1),
+            final_opt_state=payload.get("final_opt_state", None),
+        )
 
     def plot():
         raise NotImplementedError
