@@ -85,7 +85,7 @@ class TestRunTrainingLoop:
             def on_training_start(self, view, step):
                 self.start_steps.append(step)
 
-            def __call__(self, view, step):
+            def on_training_step(self, view, step):
                 self.steps.append(step)
 
             def on_training_end(self, view, step):
@@ -183,7 +183,7 @@ class TestRunTrainingLoop:
                 self.steps = []
                 self.end_steps = []
 
-            def __call__(self, view, step):
+            def on_training_step(self, view, step):
                 self.steps.append(step)
                 return True  # request stop after first step
 

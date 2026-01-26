@@ -222,7 +222,7 @@ class MetricLogger(Callback):
         """
         self.metric_defs[name] = (verbose, metric)
 
-    def __call__(self, view: TrainingView, step: int) -> None:
+    def on_training_step(self, view: TrainingView, step: int) -> None:
         """Log metrics at the current training step.
 
         Args:
@@ -251,7 +251,7 @@ class MetricLogger(Callback):
     def on_training_start(self, view: TrainingView, step: int) -> None:
         self.start_time = time()
         self.steps_str_length = len(str(view.static.steps))
-        self(view, step)
+        self.on_training_step(view, step)
 
     def on_training_end(self, view: TrainingView, step: int) -> None:
         end_time = time()

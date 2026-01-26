@@ -12,267 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-import importlib
-import pickle
-import time
-from abc import ABC, abstractmethod
-from collections import defaultdict
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
 
-import jax.numpy as jnp
-from jaxtyping import PyTree, Scalar
+from abc import ABC
 
 from ._trainstate import TrainingView
 
 
-# TODO: Write user-friendly documentation for Callbacks
 class Callback(ABC):
-    """A callback base class.
+    """Callback base class.
 
-    Inherit from this class to create a custom callback.
-    Methods should match these signatures:
-    - on_training_start(state, static) -> None
-    - __call__(state, static, step, batch_loss) -> bool | None
-    - on_training_end(state, static, step) -> None
+    Callbacks allow users to inject custom behavior into the
+    training loop *after* each parameter update. This can be
+    used for logging, early stopping or modifying the model in
+    a jax-incompatible way.
+
+    A callback consists of three methods:
+    - `on_training_start`: Executed once at the start of training.
+    - `on_training_step`: Executed after each step (parameter update)
+        during training.
+    - `on_training_end`: Executed once at the end of training.
+
+    Each method receives the current step and a [`TrainingView`][klax.TrainingView]
+    object that provides read and write access to the current
+    training state (model and optimizer state) as well as read-only
+    access to static training information (loss function, optimizer,
+    batch axes, etc). The `on_training_step` method can optionally
+    return a boolean "stop signal", that - if `True` - will stop the
+    training at the current step.
+
+    Inherit from this class and overwrite one or more methods to
+    create a custom callback.
     """
 
     def on_training_start(self, view: TrainingView, step: int) -> None:
-        """Execute when training starts."""
+        """Execute at the beginning of training, before any parameter updates."""
         pass
 
-    def __call__(self, view: TrainingView, step: int) -> bool | None:
-        """Execute after each step during training."""
+    def on_training_step(self, view: TrainingView, step: int) -> bool | None:
+        """Execute after each parameter update during training."""
         pass
 
     def on_training_end(self, view: TrainingView, step: int) -> None:
-        """Execute when training ends."""
+        """Execute at the end of training."""
         pass
-
-
-# class HistoryCallback(Callback):
-#     """Default callback for logging a training process.
-
-#     Records loss histories, training time, and the last optimizer state.
-#     """
-
-#     log_every: int
-#     verbose: bool
-#     steps: list  #: List of steps at which the losses were recorded.
-#     metric_defs: dict[str, Callable[[PyTree], Scalar]]
-#     metrics: dict[str, list[Scalar]]
-#     last_start_time: float  #: start time of the last training
-#     last_end_time: float  #: End time of the last training
-#     training_time: float = 0  #: Total training time of all trainings
-#     step_offset: int = 0  #: Potential offset due to previous trainings
-#     last_opt_state: PyTree | None = None
-#     total_steps_digits: int  #: Number of digits in total steps for printing
-
-#     def __init__(
-#         self, metric_defs={}, log_every: int = 100, verbose: bool = True
-#     ):
-#         """Initialize the `HistoryCallback`.
-
-#         Args:
-#             metric_defs: A dictionary defining the metrics to be recorded. Each key is
-#                 the name of the metric, and each value is a tuple containing the data
-#                 required to compute the metric and a callable that computes the metric
-#             log_every: Amount of steps after which the training and validation
-#                 losses are logged. (Defaults to 100.)
-#             verbose: If true prints the training progress and losses.
-#                 (Defaults to True.)
-
-#         """
-#         self.metric_defs = metric_defs
-#         self.log_every = log_every
-#         self.verbose = verbose
-#         self.steps = []
-#         self.metrics = defaultdict(list)
-#         self.total_steps_digits = 0
-
-#     def __repr__(self):
-#         """Return a string representation of the HistoryCallback."""
-#         return (
-#             f"HistoryCallback(log_every={self.log_every}, "
-#             f"verbose={self.verbose}, metrics={list(self.metrics.keys())})"
-#         )
-
-#     def on_training_start(self, view: TrainingView) -> None:
-#         """Initialize the training start time.
-
-#         Called at beginning of training.
-#         """
-#         self.last_start_time = time.time()
-#         self.total_steps_digits = len(str(static.steps))
-#         if self.steps:
-#             # If there are already steps, we assume that this is a continuation
-#             # of a training.
-#             self.step_offset = self.steps[-1]
-#         else:
-#             self(state, static, 0, jnp.array(jnp.nan))  # Log initial losses
-
-#     def __call__(
-#         self,
-#         state: TrainingState,
-#         static: TrainingStatic,
-#         step: int,
-#         batch_loss: Scalar,
-#     ):
-#         """Record the losses and step count.
-
-#         Called at each step during training.
-#         """
-#         if step % self.log_every == 0:
-#             self.steps.append(self.step_offset + step)
-#             self.metrics["batch_loss"].append(batch_loss)
-#             for name, metric_fn in self.metric_defs.items():
-#                 metric_value = metric_fn(state.model)
-#                 self.metrics[name].append(metric_value)
-
-#             # Print message
-#             if self.verbose:
-#                 print(
-#                     f"Step: {step:>{self.total_steps_digits}}: "
-#                     + ", ".join(
-#                         [
-#                             f"{name}: {value[-1]:.3e}"
-#                             for name, value in self.metrics.items()
-#                         ]
-#                     )
-#                 )
-
-#     def on_training_end(
-#         self, state: TrainingState, static: TrainingStatic, step: int
-#     ) -> None:
-#         """Record the training end time and the last optimizer state.
-
-#         Called at end of training.
-#         """
-#         self.last_end_time = time.time()
-#         last_training_time = self.last_end_time - self.last_start_time
-#         self.training_time += last_training_time
-#         self.last_opt_state = state.opt_state
-#         if self.verbose:
-#             print(
-#                 f"Training took: {
-#                     datetime.timedelta(seconds=last_training_time)
-#                 }"
-#             )
-
-#     def plot(
-#         self,
-#         *,
-#         ax: Any = None,
-#         names: list[str] | None = None,
-#     ):
-#         """Plot the recorded training and validation losses.
-
-#         Note:
-#             This method requires matplotlib.
-
-#         Args:
-#             ax: Matplotlib axes to plot into. If ``None`` then a new axis is
-#                 created. (Defaults to None.)
-#             names: List of metric names to plot. If ``None``, all recorded
-#                 metrics are plotted. (Defaults to None.)
-
-#         Raises:
-#             ImportError: _description_
-
-#         """
-#         module_name = "matplotlib.pyplot"
-#         try:
-#             plt = importlib.import_module(module_name)
-#             if ax is None:
-#                 _, ax = plt.subplots()
-#                 ax.set(
-#                     xlabel="Step",
-#                     ylabel="Metric",
-#                     yscale="log",
-#                     title="Training History",
-#                 )
-#                 ax.grid(True)
-
-#             if names is None:
-#                 names = list(self.metrics.keys())
-#             for name in names:
-#                 ax.plot(self.steps, self.metrics[name], label=name)
-
-#             ax.legend()
-#             return ax
-
-#         except ImportError as e:
-#             raise ImportError(
-#                 f"Failed to import module '{module_name}'. "
-#                 f"Install it with: pip install klax[plotting]. "
-#                 f"Original error: {str(e)}"
-#             )
-
-#     def save(
-#         self,
-#         filename: str | Path,
-#         overwrite: bool = False,
-#         create_dir: bool = True,
-#     ) -> None:
-#         """Save the HistoryCallback instance to a file using pickle.
-
-#         Args:
-#             filename: The file path where the instance should be saved.
-#             overwrite: If True, overwrite the file if it already exists.
-#                 If False, raise a FileExistsError if the file exists.
-#                 (Defaults to False.)
-#             create_dir: If True, create the parent directory if it does not
-#                 exist. (Defaults to True.)
-
-#         Raises:
-#             FileExistsError: If the file already exists and overwrite is False.
-#             ValueError: If the provided path is not a valid file path.
-
-#         """
-#         filename = Path(filename)
-
-#         if filename.suffix == "":
-#             filename = filename.with_suffix(".pkl")
-#         assert filename.suffix == ".pkl", "File must have a .pkl suffix."
-
-#         if filename.exists() and not overwrite:
-#             raise FileExistsError(
-#                 f"The file '{filename}' already exists. Use overwrite=True to "
-#                 f"overwrite it."
-#             )
-
-#         if create_dir:
-#             filename.parent.mkdir(parents=True, exist_ok=True)
-
-#         with filename.open("wb") as f:
-#             pickle.dump(self, f)
-
-#     @staticmethod
-#     def load(filename: str | Path) -> "HistoryCallback":
-#         """Load a `HistoryCallback` instance from a file.
-
-#         Args:
-#             filename: The file path from which the instance should be loaded.
-
-#         Returns:
-#             The loaded `HistoryCallback` instance.
-
-#         Raises:
-#             ValueError: If the file is not a valid pickle file or does not
-#                 contain a `HistoryCallback` instance.
-
-#         """
-#         filename = Path(filename)
-
-#         with filename.open("rb") as f:
-#             obj = pickle.load(f)
-
-#         if not isinstance(obj, HistoryCallback):
-#             raise ValueError(
-#                 f"The file '{filename}' does not contain a valid "
-#                 f"HistoryCallback instance."
-#             )
-
-#         return obj

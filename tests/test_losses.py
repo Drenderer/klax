@@ -191,11 +191,12 @@ class TestLossDecorator:
 
         @loss
         def my_custom_loss(model, batch, batch_axes):
+            """Calculate my loss."""
             x, y = batch
             y_pred = jax.vmap(model, in_axes=batch_axes)(x)
             return jnp.mean(jnp.square(y_pred - y))
 
-        assert my_custom_loss.__doc__ == "Custom loss docstring."
+        assert my_custom_loss.__doc__ == "Calculate my loss."
 
     def test_loss_decorator_can_be_called(self):
         """Test that decorated loss can be used for training."""

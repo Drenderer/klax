@@ -234,16 +234,16 @@ class TestMetricLogger:
         view = self._make_view(steps=10)
 
         # Step 1: not divisible by 2 -> no log
-        logger(view, 1)
+        logger.on_training_step(view, 1)
         assert "m1" not in logger.history.content
 
         # Step 2: divisible by 2 -> should log
-        logger(view, 2)
+        logger.on_training_step(view, 2)
         assert "m1" in logger.history.content
         assert logger.history.content["m1"][0] == [2]
 
         # Step 4: divisible by 2 -> should log again
-        logger(view, 4)
+        logger.on_training_step(view, 4)
         assert logger.history.content["m1"][0] == [2, 4]
 
     def test_verbose_print_scalar_metric(self, capsys):
@@ -251,7 +251,7 @@ class TestMetricLogger:
         logger.add_metric("loss", lambda model: jnp.array(1.23), verbose=True)
 
         view = self._make_view(steps=10)
-        logger(view, 0)
+        logger.on_training_step(view, 0)
 
         out = capsys.readouterr().out
         assert "Step 0/10:" in out
@@ -265,7 +265,7 @@ class TestMetricLogger:
         )
 
         view = self._make_view(steps=5)
-        logger(view, 0)
+        logger.on_training_step(view, 0)
 
         out = capsys.readouterr().out
         assert "Step 0/5:" in out

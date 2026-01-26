@@ -99,7 +99,7 @@ def run_training_loop(
         view = TrainingView(state, static)
         stop = False
         for callback in callbacks:
-            stop |= bool(callback(view, step))
+            stop |= bool(callback.on_training_step(view, step))
         if stop:
             break
 
@@ -162,8 +162,8 @@ def fit[T: eqx.Module, H: Callback](
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
         logger: A callback intended for tracking the training process. If no
-            custom callback is passed the [`klax.MetricLogger`][] with a
-            logging interval of 100 steps is used. To change the logging
+            custom MetricLogger instance is passed the [`klax.MetricLogger`][]
+            with a logging interval of 100 steps is used. To change the logging
             increment or verbosity of this default callback, pass a
             `MetricLogger` object to this argument, e.g.,
             `logger=MetricLogger(log_every=10, verbose=False)` for logging
