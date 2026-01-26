@@ -133,8 +133,31 @@ class History:
             final_opt_state=payload.get("final_opt_state", None),
         )
 
-    def plot():
-        raise NotImplementedError
+    def plot(self, *keys: str, ax: Any = None, **kwargs) -> None:
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as e:
+            raise ImportError(
+                "Failed to import matplotlib. Install it with: "
+                "pip install klax[plotting]. "
+                f"Original error: {str(e)}"
+            )
+
+        if ax is None:
+            _, ax = plt.subplots()
+            ax.set(
+                xlabel="Step",
+                ylabel="Metric",
+                yscale="log",
+                title="Training History",
+            )
+            ax.grid(True)
+        keys = keys if keys else list(self.content.keys())
+        for name in keys:
+            steps, values = self.content[name]
+            ax.plot(steps, values, label=name, **kwargs)
+        ax.legend()
+        return ax
 
     def extend(self, other: "History") -> None:
         """Extend this history with the contents of another history.
@@ -157,7 +180,7 @@ class History:
 
 
 class MetricLogger(Callback):
-    """Callback for logging metrics in an History during training."""
+    """Callback for logging metrics in a History during training."""
 
     history: History
     log_every: int
