@@ -14,7 +14,6 @@
 
 """Implements methods for handling data, such as batching and splitting."""
 
-import operator
 import typing
 import warnings
 from collections.abc import Generator, Sequence
