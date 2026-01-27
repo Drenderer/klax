@@ -225,7 +225,8 @@ class History:
         keys = keys if keys else list(self.content.keys())
         for name in keys:
             steps, values = self.content[name]
-            ax.plot(steps, values, label=name, **kwargs)
+            kwargs.setdefault("label", name)
+            ax.plot(steps, values, **kwargs)
         ax.legend()
         return ax
 
