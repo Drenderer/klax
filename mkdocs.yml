@@ -64,6 +64,7 @@ plugins:
         - klax._datahandler.BatchGenerator # TODO: This is currently a work around to avoid errors
         - optax.GradientTransformation
         - jax.nn.initializers.Initializer
+        - jax.numpy.float64
   - mkdocstrings:
       handlers:
         python:
@@ -104,6 +105,7 @@ nav:
       - api/callbacks.md
       - api/serialization.md
       - api/tools.md
+      - api/initialization.md
       - Neural Networks:
           - api/nn/linear.md
           - api/nn/mlp.md
