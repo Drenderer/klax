@@ -14,16 +14,17 @@ y = jnp.sin(x)
 
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
+get_bias = lambda m: m.layers[0].bias
+
 logger = klax.MetricLogger(log_every=100)
-logger.add_metric("parameter", lambda model: model.layers[0].weight[0])
+logger.add_metric("parameter", lambda model: get_bias(model))
 
 
 class MyCallback(klax.Callback):
     def on_training_step(self, view, step):
         if step % 1000 == 0:
-            get_bias = lambda m: m.layers[0].bias
             view.model = eqx.tree_at(
-                get_bias, view.model, 0 * get_bias(view.model)
+                get_bias, view.model, jnp.roll(get_bias(view.model), shift=1)
             )
 
 
@@ -37,7 +38,7 @@ model, history = klax.fit(
     key=train_key,
 )
 
-ax = history.plot("parameter", color="black")
+ax = history.plot("parameter")
 ax.set(yscale="linear", title="Training History (Linear Scale)")
 plt.show()
 
