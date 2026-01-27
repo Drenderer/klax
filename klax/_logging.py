@@ -88,8 +88,8 @@ class LossMetric:
         return self.loss.value(model, batch, self.batch_axes)
 
 
-type steps = list[int]
-type values = list[Any]
+type Steps = list[int]
+type Values = list[Any]
 
 
 class History:
@@ -102,14 +102,14 @@ class History:
     to/from disk, plotting metrics, and extending the history.
     """
 
-    content: dict[str, tuple[steps, values]]
+    content: dict[str, tuple[Steps, Values]]
     total_time: float  #: Total time spent in training
     total_steps: int  #: Total number of steps used in the training
     final_opt_state: PyTree  #: Final optimizer state after training
 
     def __init__(
         self,
-        content: dict[str, tuple[steps, values]] | None = None,
+        content: dict[str, tuple[Steps, Values]] | None = None,
         total_time: float = -1.0,
         total_steps: int = -1,
         final_opt_state: PyTree | None = None,
@@ -133,7 +133,7 @@ class History:
         self.content[key][0].append(step)
         self.content[key][1].append(value)
 
-    def __getitem__(self, name: str) -> tuple[steps, values]:
+    def __getitem__(self, name: str) -> tuple[Steps, Values]:
         if name not in self.content:
             raise KeyError(f"Metric '{name}' not found in history.")
         return self.content[name]
