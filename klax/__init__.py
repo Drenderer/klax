@@ -17,6 +17,11 @@ from ._callbacks import Callback as Callback
 from ._datahandler import BatchGenerator as BatchGenerator
 from ._datahandler import batch_data as batch_data
 from ._datahandler import split_data as split_data
+from ._initializers import Initializer as Initializer
+from ._initializers import SupportedInitializer as SupportedInitializer
+from ._initializers import canonicalize_initializer as canonicalize_initializer
+from ._initializers import hoedt_bias as hoedt_bias
+from ._initializers import hoedt_normal as hoedt_normal
 from ._logging import History as History
 from ._logging import LossMetric as LossMetric
 from ._logging import Metric as Metric
@@ -31,7 +36,7 @@ from ._serialization import (
 from ._serialization import (
     text_serialize_filter_spec as text_serialize_filter_spec,
 )
-from ._tools import count_parameters
+from ._tools import count_parameters as count_parameters
 from ._training import fit as fit
 from ._training import make_step as make_step
 from ._training import run_training_loop as run_training_loop
