@@ -7,7 +7,7 @@ from jaxtyping import PyTree
 from ._wrappers import NonTrainable
 
 
-def parameter_count(model: PyTree) -> int:
+def count_parameters(model: PyTree) -> int:
     """Count the number of trainable parameters in a model.
 
     Under the hood this just counts the number of inexact
