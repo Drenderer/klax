@@ -256,7 +256,7 @@ class TestMetricLogger:
         assert logger.history.content["m1"][0] == [2, 4]
 
     def test_verbose_print_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=True)
+        logger = MetricLogger(log_every=1, verbose=True, progress_bar=False)
         logger.add_metric("loss", lambda model: jnp.array(1.23), verbose=True)
 
         view = self._make_view(steps=10)
@@ -268,7 +268,7 @@ class TestMetricLogger:
         assert "loss: 1.2300e+00" in out
 
     def test_verbose_print_non_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=True)
+        logger = MetricLogger(log_every=1, verbose=True, progress_bar=False)
         logger.add_metric(
             "arr", lambda model: jnp.array([1.0, 2.0]), verbose=True
         )
