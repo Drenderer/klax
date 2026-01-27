@@ -1,3 +1,5 @@
+import operator
+
 import equinox as eqx
 import jax
 from jaxtyping import PyTree
@@ -27,14 +29,13 @@ def parameter_count(model: PyTree) -> int:
         Integer count of inexact inexact JAX/NumPy array elements.
 
     """
-    return sum(
-        jax.tree.flatten(
-            jax.tree.map(
-                lambda x: x.size
-                if eqx.is_inexact_array(x) and not isinstance(x, NonTrainable)
-                else 0,
-                model,
-                is_leaf=lambda x: isinstance(x, NonTrainable),
-            )
-        )[0]
+    return jax.tree.reduce(
+        operator.add,
+        jax.tree.map(
+            lambda x: x.size
+            if eqx.is_inexact_array(x) and not isinstance(x, NonTrainable)
+            else None,
+            model,
+            is_leaf=lambda x: isinstance(x, NonTrainable),
+        ),
     )
