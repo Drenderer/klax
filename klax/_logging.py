@@ -27,6 +27,14 @@ from klax._datahandler import BatchGenerator
 from klax._losses import Loss
 from klax._trainstate import TrainingView
 
+try:
+    from tqdm.auto import tqdm
+
+    _TQDM_AVAILABLE = True
+except ImportError:
+    tqdm = None
+    _TQDM_AVAILABLE = False
+
 
 class Metric(Protocol):
     """A Metric is any object that can be called on a model and returns a value."""
@@ -80,8 +88,8 @@ class LossMetric:
         return self.loss.value(model, batch, self.batch_axes)
 
 
-type steps = list[int]
-type values = list[Any]
+type Steps = list[int]
+type Values = list[Any]
 
 
 class History:
@@ -94,14 +102,14 @@ class History:
     to/from disk, plotting metrics, and extending the history.
     """
 
-    content: dict[str, tuple[steps, values]]
+    content: dict[str, tuple[Steps, Values]]
     total_time: float  #: Total time spent in training
     total_steps: int  #: Total number of steps used in the training
     final_opt_state: PyTree  #: Final optimizer state after training
 
     def __init__(
         self,
-        content: dict[str, tuple[steps, values]] | None = None,
+        content: dict[str, tuple[Steps, Values]] | None = None,
         total_time: float = -1.0,
         total_steps: int = -1,
         final_opt_state: PyTree | None = None,
@@ -125,7 +133,7 @@ class History:
         self.content[key][0].append(step)
         self.content[key][1].append(value)
 
-    def __getitem__(self, name: str) -> tuple[steps, values]:
+    def __getitem__(self, name: str) -> tuple[Steps, Values]:
         if name not in self.content:
             raise KeyError(f"Metric '{name}' not found in history.")
         return self.content[name]
@@ -267,12 +275,15 @@ class MetricLogger(Callback):
     steps_str_length: int = 0
     verbose: bool = True
     start_time: float = 0.0
+    progress_bar: bool
+    tqdm_bar: Any = None
 
     def __init__(
         self,
         log_every: int = 100,
         metric_defs: dict[str, (bool, Metric)] | None = None,
         verbose: bool = True,
+        progress_bar: bool = True,
     ):
         """Initialize the MetricLogger.
 
@@ -281,12 +292,17 @@ class MetricLogger(Callback):
             metric_defs: A dictionary mapping metric names to tuples of
                 (whether to print the metric, metric function).
             verbose: Whether to print logged metrics to the console.
+            progress_bar: Whether to show a progress bar during training.
 
         """
         self.metric_defs = metric_defs or {}
         self.log_every = log_every
         self.history = History()
         self.verbose = verbose
+        if progress_bar and not _TQDM_AVAILABLE:
+            print("Warning: tqdm not installed, progress bar disabled.")
+            progress_bar = False
+        self.progress_bar = progress_bar
 
     def add_metric(
         self, name: str, metric: Metric, verbose: bool = False
@@ -322,14 +338,24 @@ class MetricLogger(Callback):
                     message.append(f"{name}: {formatted_value}")
 
             if self.verbose:
-                print(
-                    f"Step {step:>{self.steps_str_length}}/{view.static.steps}: "
-                    + ", ".join(message)
-                )
+                postfix = ", ".join(message)
+                if self.progress_bar:
+                    self.tqdm_bar.set_postfix_str(postfix)
+                    if step != 0:
+                        self.tqdm_bar.update(self.log_every)
+                else:
+                    print(
+                        f"Step {step:>{self.steps_str_length}}/{view.static.steps}: "
+                        + postfix
+                    )
 
     def on_training_start(self, view: TrainingView, step: int) -> None:
         self.start_time = time()
         self.steps_str_length = len(str(view.static.steps))
+
+        if self.progress_bar:
+            self.tqdm_bar = tqdm(total=view.static.steps, dynamic_ncols=True)
+
         self.on_training_step(view, step)
 
     def on_training_end(self, view: TrainingView, step: int) -> None:
@@ -337,3 +363,6 @@ class MetricLogger(Callback):
         self.history.total_time = end_time - self.start_time
         self.history.total_steps = step
         self.history.final_opt_state = view.opt_state
+
+        if self.progress_bar:
+            self.tqdm_bar.close()
