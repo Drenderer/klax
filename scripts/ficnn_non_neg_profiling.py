@@ -27,9 +27,8 @@ from klax import (
 from klax._misc import default_floating_dtype
 from klax.nn import InputSplitLinear, Linear
 
+
 # %% FICNN implementation where the wrapper can be chosen
-
-
 class FICNN(eqx.Module, strict=True):
     """A fully input convex neural network (https://arxiv.org/abs/1609.07152).
 
@@ -304,11 +303,8 @@ for wrapper, color in zip(wrappers, colors):
 
     model_ = finalize(model)
 
-    hist.plot(
-        ax=ax,
-        loss_options=dict(label=name, color=color),
-        val_loss_options=dict(label="", color=color),
-    )
+    ax.plot(hist.steps, hist.metrics["training_loss"], label=name, color=color)
+    ax.plot(hist.steps, hist.metrics["validation_loss"], label="", color=color)
 
 
 ax.set(

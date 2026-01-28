@@ -28,7 +28,6 @@ from optax import contrib
 from optax import tree_utils as otu
 
 import klax
-from klax import HistoryCallback
 
 key = jr.key(0)
 
@@ -53,19 +52,24 @@ opt = optax.chain(
 )
 
 
-class TrackScaleHistory(HistoryCallback):
+class TrackScale(klax.Callback):
     scales: list
+    steps: list
+    log_every: int
 
-    def __init__(self, log_every: int = 100, verbose: bool = True):
-        super().__init__(log_every=log_every, verbose=verbose)
+    def __init__(self, log_every=100):
         self.scales = []
+        self.steps = []
+        self.log_every = log_every
 
-    def __call__(self, cbargs):
-        super().__call__(cbargs)
-        if cbargs.step % self.log_every == 0:
-            scale = otu.tree_get(cbargs.opt_state, "scale")
+    def on_training_step(self, view, step):
+        if step % self.log_every == 0:
+            scale = otu.tree_get(view.opt_state, "scale")
             self.scales.append(scale)
+            self.steps.append(step)
 
+
+scale_tracker = TrackScale(log_every=100)
 
 # Train
 model, hist = klax.fit(
@@ -73,7 +77,7 @@ model, hist = klax.fit(
     (x, y),
     steps=30000,
     optimizer=opt,
-    history=TrackScaleHistory(log_every=100, verbose=True),
+    callbacks=[scale_tracker],
     key=training_key,
 )
 
@@ -88,7 +92,7 @@ ax.set(
 ax.grid(True)
 
 ax = plt.subplot(1, 2, 2)
-ax.plot(hist.steps, hist.scales, label="Scale")
+ax.plot(scale_tracker.steps, scale_tracker.scales, label="Scale")
 ax.set(title="Learning rate scale", yscale="log")
 ax.grid(True)
 

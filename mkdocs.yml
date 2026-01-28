@@ -63,6 +63,7 @@ plugins:
       extra_public_objects:
         - klax._datahandler.BatchGenerator # TODO: This is currently a work around to avoid errors
         - optax.GradientTransformation
+        - optax.GradientTransformationExtraArgs
         - jax.nn.initializers.Initializer
         - jax.numpy.float64
   - mkdocstrings:
@@ -100,6 +101,7 @@ nav:
       - examples/training_without_data.ipynb
   - API Reference:
       - api/training.md
+      - api/logging.md
       - api/wrappers.md
       - api/losses.md
       - api/callbacks.md

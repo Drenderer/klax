@@ -50,11 +50,13 @@ for (
         key=model_key,
     )
 
+    logger = klax.MetricLogger(log_every=10)
+
     ficnn, history = klax.fit(
         ficnn,
         (x, y),
         steps=100_000,
-        history=klax.HistoryCallback(log_every=10),
+        logger=logger,
         key=train_key,
     )
     results[name] = dict(ficnn=ficnn, history=history)
@@ -65,20 +67,20 @@ fig, ax = plt.subplots()
 
 for name, result in results.items():
     history = result["history"]
-    (line,) = ax.plot(history.steps, history.loss, label=f"{name} loss")
-    ax.plot(
-        history.steps,
-        history.val_loss,
-        label=f"{name} val loss",
-        c=line.get_color(),
-        ls="--",
-    )
+    (line,) = ax.plot(*history["loss"], label=f"{name} loss")
+    # ax.plot(
+    #     *history["validation_loss"],
+    #     label=f"{name} val loss",
+    #     c=line.get_color(),
+    #     ls="--",
+    # )
 
 ax.set(
+    xscale="log",
     yscale="log",
     xlabel="Steps",
     ylabel="Loss",
     title="FICNN initialization comparison",
-    xlim=[0, 10000],
+    xlim=[10, 10000],
 )
 ax.legend()
