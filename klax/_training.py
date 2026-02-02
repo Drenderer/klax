@@ -111,12 +111,18 @@ def run_training_loop(
 
     """
     step = 0
+
+    # Warm up jit compilation
+    batch = next(static.batch)
+    make_step(state, batch, static)
+
     view = TrainingView(state, static)
     for callback in callbacks:
         callback.on_training_start(view, step)
 
     for step in range(1, static.steps + 1):
-        state = make_step(state, next(static.batch), static)
+        state = make_step(state, batch, static)
+        batch = next(static.batch)
 
         view = TrainingView(state, static)
         stop = False
