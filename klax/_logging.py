@@ -67,7 +67,7 @@ class Evaluator(Metric):
         *,
         key: PRNGKeyArray,
     ):
-        """Initialize the `DatasetMetric`.
+        """Initialize the `Evaluator`.
 
         Args:
             func: The evaluation function to compute. It should take the model,
