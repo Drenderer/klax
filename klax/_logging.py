@@ -48,7 +48,7 @@ class Metric(Protocol):
 class Evaluator(Metric):
     """Compute a metric value from the model and a random batch of data.
 
-    This is a convenience wrapper that allows you to easily define metrics
+    This is a convenience class that allows you to easily define metrics
     that depend on data batches, such as the training or validation loss.
     Internally, it uses its own batch generator to sample batches and
     unwraps the model before evaluating a provided function with signature
