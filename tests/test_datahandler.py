@@ -25,19 +25,19 @@ class TestBatchData:
     def test_with_single_array(self, getkey):
         x = jrandom.uniform(getkey(), (64,))
         data = x
-        generator = batch_data(data, key=getkey())
+        generator = batch_data(data, batch_size=32, key=getkey())
         assert jax.tree.structure(next(generator)) == jax.tree.structure(data)
 
     def test_with_nested_pytree(self, getkey):
         x = jrandom.uniform(getkey(), (10,))
         data = [x, (x, {"a": x, "b": x})]
-        generator = batch_data(data, key=getkey())
+        generator = batch_data(data, batch_size=32, key=getkey())
         assert jax.tree.structure(next(generator)) == jax.tree.structure(data)
 
     def test_batch_size(self, getkey):
         x = jrandom.uniform(getkey(), (33,))
         data = x
-        generator = batch_data(data, key=getkey())
+        generator = batch_data(data, batch_size=32, key=getkey())
         assert next(generator).shape[0] == 32
 
     def test_batch_size_larger_than_data(self, getkey):
@@ -70,7 +70,7 @@ class TestBatchData:
         x = jrandom.uniform(getkey(), (10,))
         y = jrandom.uniform(getkey(), (5,))
         data = (x, y)
-        generator = batch_data(data, key=getkey())
+        generator = batch_data(data, batch_size=32, key=getkey())
         with pytest.raises(
             ValueError, match="All batched arrays must have equal batch sizes."
         ):
