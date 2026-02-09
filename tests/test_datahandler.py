@@ -82,7 +82,7 @@ class TestBatchDataWithKey:
         x = jrandom.uniform(getkey(), (10,))
         data = x
         generator = batch_data_with_key(
-            data, batch_size=2, batch_axis=0, key=getkey()
+            data, batch_size=2, batch_axes=0, key=getkey()
         )
         batch, key = next(generator)
         assert jax.tree.structure(batch) == jax.tree.structure(data)
@@ -92,7 +92,7 @@ class TestBatchDataWithKey:
         x = jrandom.uniform(getkey(), (10,))
         data = [x, (x, {"a": x, "b": x})]
         generator = batch_data_with_key(
-            data, batch_size=2, batch_axis=0, key=getkey()
+            data, batch_size=2, batch_axes=0, key=getkey()
         )
         batch, key = next(generator)
         assert jax.tree.structure(batch) == jax.tree.structure(data)

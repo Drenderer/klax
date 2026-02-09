@@ -48,7 +48,7 @@ class TestMakeStep:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), key=getkey())
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
         state, static = klax.make_state_and_static(
             model=model,
@@ -97,7 +97,7 @@ class TestRunTrainingLoop:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), key=getkey())
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
         state, static = klax.make_state_and_static(
             model=model,
@@ -148,7 +148,7 @@ class TestRunTrainingLoop:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), key=getkey())
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
         state, static = klax.make_state_and_static(
             model=model,
@@ -196,7 +196,7 @@ class TestRunTrainingLoop:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), key=getkey())
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
         state, static = klax.make_state_and_static(
             model=model,
