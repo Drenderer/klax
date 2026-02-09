@@ -15,10 +15,12 @@
 """Utilities for logging during training."""
 
 import pickle
+from collections.abc import Callable
 from pathlib import Path
 from time import time
 from typing import Any, Protocol
 
+import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray, PyTree, Scalar
 
@@ -26,6 +28,7 @@ from klax._callbacks import Callback
 from klax._datahandler import BatchGenerator
 from klax._losses import Loss
 from klax._trainstate import TrainingView
+from klax._wrappers import unwrap
 
 try:
     from tqdm.auto import tqdm
@@ -42,50 +45,60 @@ class Metric(Protocol):
     def __call__(self, model: PyTree) -> Any: ...
 
 
-class LossMetric:
-    """Compute a scalar loss on a random batch of data.
+class Evaluator(Metric):
+    """Compute a metric value from the model and a random batch of data.
 
-    This metric samples a new batch of data on each call and computes the loss
-    value given the model and the sampled batch.
+    This is a convenience wrapper that allows you to easily define metrics
+    that depend on data batches, such as the training or validation loss.
+    Internally, it uses its own batch generator to sample batches and
+    unwraps the model before evaluating a provided function with signature
+    ``(model, batch, batch_axes) -> Any``.
     """
 
-    def __init__(
+    def __init__[T](
         self,
+        func: Callable[
+            [PyTree[Any], PyTree[Any, "T"], PyTree[int | None, "T ..."]], Any  # type: ignore
+        ],
+        data: PyTree[Any, "T"],
         batcher: BatchGenerator,
-        data: Any,
         batch_size: int,
-        batch_axes: Any,
-        loss: Loss,
+        batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
         *,
         key: PRNGKeyArray,
     ):
-        """Initialize the `LossMetric`.
+        """Initialize the `DatasetMetric`.
 
         Args:
             batcher: Batch generator function.
             data: The dataset to generate batches from.
             batch_size: The size of each batch.
             batch_axes: The axes corresponding to the batch dimension in the data.
-            loss: The loss function to compute.
+            func: The func function to compute.
             key: PRNG key for random number generation.
 
         """
         self.batch = batcher(data, batch_size, batch_axes, key=key)
         self.batch_axes = batch_axes
-        self.loss = loss
+        self.func = func
+
+    @eqx.filter_jit
+    def evaluate(self, model, batch):
+        model = unwrap(model)
+        return self.func(model, batch, self.batch_axes)
 
     def __call__(self, model: PyTree) -> Scalar:
-        """Compute the loss metric.
+        """Compute the metric.
 
         Args:
-            model: Model to evaluate on a batch.
+            model: Model to evaluate.
 
         Returns:
-            The loss value on the sampled batch.
+            The metric value on the sampled batch.
 
         """
         batch = next(self.batch)
-        return self.loss.value(model, batch, self.batch_axes)
+        return self.evaluate(model, batch)
 
 
 type Steps = list[int]
