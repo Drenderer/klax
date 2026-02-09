@@ -3,6 +3,7 @@ title: Calibration and Data Handling
 ---
 
 ::: klax.batch_data
+::: klax.batch_data_with_key
 ---
 ::: klax.split_data
 ::: klax.fit

@@ -13,97 +13,119 @@
 # limitations under the License.
 
 import equinox as eqx
+import jax
 import jax.random as jrandom
 import numpy as np
 import pytest
 
-from klax import batch_data, split_data
+from klax import batch_data, batch_data_with_key, split_data
 
 
-def test_batch_data(getkey):
-    # Sequence with one element
-    x = jrandom.uniform(getkey(), (10,))
-    data = (x,)
-    generator = batch_data(data, key=getkey())
-    assert isinstance(next(generator), tuple)
-    assert len(next(generator)) == 1
+class TestBatchData:
+    def test_with_single_array(self, getkey):
+        x = jrandom.uniform(getkey(), (64,))
+        data = x
+        generator = batch_data(data, batch_size=32, key=getkey())
+        assert jax.tree.structure(next(generator)) == jax.tree.structure(data)
 
-    # Nested PyTree
-    x = jrandom.uniform(getkey(), (10,))
-    data = [x, (x, {"a": x, "b": x})]
-    generator = batch_data(data, key=getkey())
-    assert isinstance(next(generator), list)
-    assert len(next(generator)) == 2
-    assert isinstance(next(generator)[1], tuple)
-    assert len(next(generator)[1]) == 2
-    assert isinstance(next(generator)[1][1], dict)
-    assert len(next(generator)[1][1]) == 2
+    def test_with_nested_pytree(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        data = [x, (x, {"a": x, "b": x})]
+        generator = batch_data(data, batch_size=32, key=getkey())
+        assert jax.tree.structure(next(generator)) == jax.tree.structure(data)
 
-    # Default batch size
-    x = jrandom.uniform(getkey(), (33,))
-    data = (x,)
-    generator = batch_data(data, key=getkey())
-    assert next(generator)[0].shape[0] == 32
+    def test_batch_size(self, getkey):
+        x = jrandom.uniform(getkey(), (33,))
+        data = x
+        generator = batch_data(data, batch_size=32, key=getkey())
+        assert next(generator).shape[0] == 32
 
-    # Batch mask
-    x = jrandom.uniform(getkey(), (10,))
-    data = (x, (x, x))
-    batch_axes = (0, (None, 0))
-    generator = batch_data(data, 2, batch_axes, key=getkey())
-    assert next(generator)[0].shape[0] == 2
-    assert next(generator)[1][0].shape[0] == 10
-    assert next(generator)[1][1].shape[0] == 2
+    def test_batch_size_larger_than_data(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        data = x
+        generator = batch_data(data, batch_size=128, key=getkey())
+        assert next(generator).shape == (10,)
 
-    # No batch dimensions
-    x = jrandom.uniform(getkey(), (10,))
-    data = (x,)
-    batch_axes = None
-    generator = batch_data(data, batch_axes=batch_axes, key=getkey())
-    assert next(generator) == data
+    def test_different_batch_axes(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        data = (x, (x, x))
+        batch_axes = (0, (None, 0))
+        generator = batch_data(
+            data, batch_size=2, batch_axes=batch_axes, key=getkey()
+        )
+        assert next(generator)[0].shape[0] == 2
+        assert next(generator)[1][0].shape[0] == 10
+        assert next(generator)[1][1].shape[0] == 2
 
-    # Different batch sizes
-    x = jrandom.uniform(getkey(), (10,))
-    y = jrandom.uniform(getkey(), (5,))
-    data = (x, y)
-    with pytest.raises(
-        ValueError, match="All batched arrays must have equal batch sizes."
-    ):
-        generator = batch_data(data, key=getkey())
-        next(generator)
+    def test_no_batch_axes(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        data = (x,)
+        batch_axes = None
+        generator = batch_data(
+            data, batch_size=2, batch_axes=batch_axes, key=getkey()
+        )
+        assert next(generator) == data
 
-    # Smaller data than batch dimension
-    x = jrandom.uniform(getkey(), (10,))
-    generator = batch_data(x, batch_size=128, key=getkey())
-    assert next(generator).shape == (10,)
+    def test_different_batch_sizes(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        y = jrandom.uniform(getkey(), (5,))
+        data = (x, y)
+        generator = batch_data(data, batch_size=32, key=getkey())
+        with pytest.raises(
+            ValueError, match="All batched arrays must have equal batch sizes."
+        ):
+            next(generator)
 
 
-def test_split_data(getkey):
-    # Nestes data structure with different batch axes
-    batch_size = 20
-    data = (
-        jrandom.uniform(getkey(), (batch_size, 2)),
-        [
-            jrandom.uniform(getkey(), (3, batch_size, 2)),
-            100.0,
-            "test",
-            None,
-        ],
-    )
-    proportions = (2, 1, 1)
-    batch_axes = (0, 1)
-    subsets = split_data(data, proportions, batch_axes, key=getkey())
+class TestBatchDataWithKey:
+    def test_with_single_array(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        data = x
+        generator = batch_data_with_key(
+            data, batch_size=2, batch_axis=0, key=getkey()
+        )
+        batch, key = next(generator)
+        assert jax.tree.structure(batch) == jax.tree.structure(data)
+        assert isinstance(key, jax.Array)
 
-    for s, p in zip(subsets, (0.5, 0.25, 0.25)):
-        assert s[0].shape == (round(p * batch_size), 2)
-        assert s[1][0].shape == (3, round(p * batch_size), 2)
-        assert eqx.tree_equal(s[1][1:], data[1][1:])
+    def test_with_nested_pytree(self, getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        data = [x, (x, {"a": x, "b": x})]
+        generator = batch_data_with_key(
+            data, batch_size=2, batch_axis=0, key=getkey()
+        )
+        batch, key = next(generator)
+        assert jax.tree.structure(batch) == jax.tree.structure(data)
+        assert isinstance(key, jax.Array)
 
-    # One-element data structure
-    data = np.arange(10)
-    (s,) = split_data(data, (1.0,), key=getkey())
-    assert np.array_equal(data, np.sort(s))
 
-    # Negative proportion
-    data = np.arange(10)
-    with pytest.raises(ValueError):
-        split_data(data, (-1.0,), key=getkey())
+class TestSplitData:
+    def test_split_data(self, getkey):
+        batch_size = 20
+        data = (
+            jrandom.uniform(getkey(), (batch_size, 2)),
+            [
+                jrandom.uniform(getkey(), (3, batch_size, 2)),
+                100.0,
+                "test",
+                None,
+            ],
+        )
+        proportions = (2, 1, 1)
+        batch_axes = (0, 1)
+        subsets = split_data(data, proportions, batch_axes, key=getkey())
+
+        for s, p in zip(subsets, (0.5, 0.25, 0.25)):
+            assert s[0].shape == (round(p * batch_size), 2)
+            assert s[1][0].shape == (3, round(p * batch_size), 2)
+            assert eqx.tree_equal(s[1][1:], data[1][1:])
+
+    def test_with_singleton_split(self, getkey):
+        data = np.arange(10)
+        (s,) = split_data(data, (1,), key=getkey())
+        assert np.array_equal(data, np.sort(s))
+
+    def test_with_zero_proportion(self, getkey):
+        data = np.arange(10)
+        with pytest.raises(ValueError):
+            split_data(data, (-1.0,), key=getkey())
