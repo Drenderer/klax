@@ -29,7 +29,7 @@ from ._datahandler import (
     BatchGenerator,
     batch_data,
 )
-from ._logging import History, LossMetric, MetricLogger
+from ._logging import Evaluator, History, MetricLogger
 from ._losses import Loss, mse
 from ._trainstate import (
     TrainingState,
@@ -178,7 +178,7 @@ def fit[T: eqx.Module, H: Callback](
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
             to None.)
-            Internally, the validation data is used to create a [LossMetric][klax.LossMetric]
+            Internally, the validation data is used to create a [Evaluator][klax.Evaluator]
             for logging. Each time the metric is evaluated, the loss is computed
             on a batch from the validation dataset and logged with batch size ``4*batch_size``.
         steps: Number of gradient updates to apply. (Defaults to 1000.)
@@ -216,8 +216,8 @@ def fit[T: eqx.Module, H: Callback](
                 )
             ```
             Any passed [`klax.MetricLogger`][] will have a training
-            [LossMetric][klax.LossMetric] and - if applicable - a validation
-            [LossMetric][klax.LossMetric] added automatically. If this is undesired,
+            [Evaluator][klax.Evaluator] and - if applicable - a validation
+            [Evaluator][klax.Evaluator] added automatically. If this is undesired,
             set `logger=None` and pass your logger as a callback via the
             `callbacks` argument. (Per default a new MetricLogger instance is created.)
         callbacks: Callback functions that are evaluated after every training
@@ -269,7 +269,7 @@ def fit[T: eqx.Module, H: Callback](
         bkey, key = jax.random.split(key)
         logger.add_metric(
             "loss",
-            LossMetric(batcher, data, batch_size, batch_axes, loss, key=bkey),
+            Evaluator(loss, data, batcher, batch_size, batch_axes, key=bkey),
             verbose=True,
         )
 
@@ -277,12 +277,12 @@ def fit[T: eqx.Module, H: Callback](
             bkey, key = jax.random.split(key)
             logger.add_metric(
                 "validation_loss",
-                LossMetric(
-                    batcher,
+                Evaluator(
+                    loss,
                     validation_data,
+                    batcher,
                     4 * batch_size,
                     batch_axes,
-                    loss,
                     key=bkey,
                 ),
                 verbose=True,

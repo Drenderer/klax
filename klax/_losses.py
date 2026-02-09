@@ -76,7 +76,6 @@ class Loss(ABC):
         """
         pass
 
-    @eqx.filter_jit
     def value[T](
         self,
         model: PyTree,
@@ -101,7 +100,6 @@ class Loss(ABC):
         model = unwrap(model)
         return self(model, batch, batch_axes)
 
-    @eqx.filter_jit
     def value_and_grad[T, M](
         self,
         model: PyTree[Any, "M"],
@@ -127,7 +125,6 @@ class Loss(ABC):
         """
         return eqx.filter_value_and_grad(self.value)(model, batch, batch_axes)
 
-    @eqx.filter_jit
     def partitioned_value[T](
         self,
         params: PyTree,

@@ -23,8 +23,8 @@ from ._initializers import SupportedInitializer as SupportedInitializer
 from ._initializers import canonicalize_initializer as canonicalize_initializer
 from ._initializers import hoedt_bias as hoedt_bias
 from ._initializers import hoedt_normal as hoedt_normal
+from ._logging import Evaluator as Evaluator
 from ._logging import History as History
-from ._logging import LossMetric as LossMetric
 from ._logging import Metric as Metric
 from ._logging import MetricLogger as MetricLogger
 from ._losses import Loss as Loss
