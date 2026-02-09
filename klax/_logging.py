@@ -70,11 +70,12 @@ class Evaluator(Metric):
         """Initialize the `DatasetMetric`.
 
         Args:
-            batcher: Batch generator function.
+            func: The evaluation function to compute. It should take the model,
+                a batch of data, and the batch axes as input.
             data: The dataset to generate batches from.
+            batcher: Batch generator function.
             batch_size: The size of each batch.
             batch_axes: The axes corresponding to the batch dimension in the data.
-            func: The func function to compute.
             key: PRNG key for random number generation.
 
         """
