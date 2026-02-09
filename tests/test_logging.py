@@ -6,14 +6,14 @@ import jax.random as jr
 import pytest
 
 import klax
-from klax import History, LossMetric, MetricLogger
+from klax import Evaluator, History, MetricLogger
 
 
-class TestLossMetric:
-    """Test suite for the LossMetric class."""
+class TestEvaluator:
+    """Test suite for the Evaluator class."""
 
     def test_initialization(self, getkey):
-        """Test LossMetric initialization with required parameters."""
+        """Test Evaluator initialization with required parameters."""
         data = (
             jr.uniform(getkey(), (100, 2)),
             jr.uniform(getkey(), (100, 1)),
@@ -21,17 +21,17 @@ class TestLossMetric:
         batch_size = 32
         batch_axes = 0
 
-        metric = LossMetric(
-            batcher=klax.batch_data,
+        metric = Evaluator(
+            func=klax.mse,
             data=data,
+            batcher=klax.batch_data,
             batch_size=batch_size,
             batch_axes=batch_axes,
-            loss=klax.mse,
             key=getkey(),
         )
 
         assert metric.batch_axes == batch_axes
-        assert metric.loss == klax.mse
+        assert metric.func == klax.mse
 
     def test_call(self, getkey):
         """Test __call__ method."""
@@ -42,12 +42,12 @@ class TestLossMetric:
         batch_size = 32
         batch_axes = 0
 
-        metric = LossMetric(
-            batcher=klax.batch_data,
+        metric = Evaluator(
+            func=klax.mse,
             data=data,
+            batcher=klax.batch_data,
             batch_size=batch_size,
             batch_axes=batch_axes,
-            loss=klax.mse,
             key=getkey(),
         )
 

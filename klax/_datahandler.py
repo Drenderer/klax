@@ -92,23 +92,23 @@ class BatchGenerator(Protocol):
         raise NotImplementedError
 
 
-def batch_data(
-    data: PyTree[Any],
-    batch_size: int = 32,
+def batch_data[T](
+    data: PyTree[Any, "T"],
+    batch_size: int,
     batch_axes: PyTree[int | None] = 0,
     convert_to_numpy: bool = True,
     *,
     key: PRNGKeyArray,
-) -> Generator[PyTree[Any], None, None]:
+) -> Generator[PyTree[Any, "T"], None, None]:
     """Create a `Generator` that draws subsets of data without replacement.
 
     The data can be any `PyTree` with `ArrayLike` leaves. If `batch_axes` is
     passed, batch axes (including `None` for no batching) can be specified for
-    every leaf individualy.
-    A generator is returned that indefinetly yields batches of data with size
+    every leaf individually.
+    A generator is returned that indefinitely yields batches of data with size
     `batch_size`. Examples are drawn without replacement until the remaining
     dataset is smaller than `batch_size`, at which point the dataset will be
-    reshuffeld and the process starts over.
+    reshuffled and the process starts over.
 
     Example:
         This is an example for a nested `PyTree`, where the elements x and y
@@ -123,7 +123,7 @@ def batch_data(
         >>> y = jnp.array([[1.], [2.]])
         >>> data = (x, {"a": 1.0, "b": y})
         >>> batch_axes = (0, {"a": None, "b": 0})
-        >>> iter_data = klax.batch_data(
+        >>> batch = klax.batch_data(
         ...     data,
         ...     32,
         ...     batch_axes,
@@ -149,16 +149,15 @@ def batch_data(
             generation. (Keyword only argument.)
 
     Returns:
-        A `Generator` that yields a random batch of data every time is is
-        called.
+        A `Generator` that yields a random batch of data.
 
     Yields:
         A `PyTree[ArrayLike]` with the same structure as `data`. Where all
-        batched leaves have `batch_size`.
+            batched leaves have `batch_size`.
 
     Note:
         Note that if the size of the dataset is smaller than `batch_size`, the
-        obtained batches will have dataset size.
+        used `batch_size` will be reduced.
 
     """
     batch_axes, dataset_size = broadcast_and_get_size(data, batch_axes)
@@ -192,6 +191,81 @@ def batch_data(
             )
             start = end
             end = start + batch_size
+
+
+def batch_data_with_key[T](
+    data: PyTree[Any, "T"],
+    batch_size: int,
+    batch_axes: PyTree[int | None] = 0,
+    convert_to_numpy: bool = True,
+    key_per_sample: bool = False,
+    *,
+    key: PRNGKeyArray,
+) -> Generator[tuple[PyTree[Any, "T"], PRNGKeyArray], None, None]:
+    """Create a `Generator` of `batch, key` tuples.
+
+    This is a wrapper around [`batch_data`][klax.batch_data] that also yields
+    a PRNG key together with the batch from [`batch_data`][klax.batch_data].
+    The key is updated every time a new
+    batch is drawn, so it can be used to provide randomness for the training
+    step that uses the batch. There are options to provide a key per batch
+    or per sample.
+
+
+    The data can be any `PyTree` with `ArrayLike` leaves. If `batch_axes` is
+    passed, batch axes (including `None` for no batching) can be specified for
+    every leaf individually.
+    A generator is returned that indefinitely yields batches of data with size
+    `batch_size`. Examples are drawn without replacement until the remaining
+    dataset is smaller than `batch_size`, at which point the dataset will be
+    reshuffled and the process starts over.
+
+    Args:
+        data: The data that shall be batched. It can be any `PyTree` with
+            `ArrayLike` leaves.
+        batch_size: The number of examples in a batch.
+        batch_axes: PyTree of the batch axis indices. `None` is used to
+            indicate that the corresponding leaf or subtree in data does not
+            have a batch axis. `batch_axes` must have the same structure as
+            `data` or have `data` as a prefix.
+            (Defaults to 0, meaning all leaves in `data` are
+            batched along their first dimension.)
+        convert_to_numpy: If `True`, batched data leafs will be converted to
+            Numpy arrays before batching. This is useful for performance
+            reasons, as Numpy's slicing is much faster than JAX's.
+        key_per_sample: If `True`, a separate key will be provided for each
+            sample in the batch. If `False`, a single key will be provided
+            for the whole batch.
+        key: A `jax.random.PRNGKey` used to provide randomness for batch
+            generation. (Keyword only argument.)
+
+    Returns:
+        A `Generator` that yields a random (batch, key) tuple.
+
+    Yields:
+        A tuple `(PyTree[ArrayLike], PRNGKeyArray)`. The pytree has the
+            same structure as `data` and all batched leaves have `batch_size`.
+            PRNGKeyArray is either a single key for the whole batch or an array
+            of keys for each sample in the batch.
+
+    Note:
+        Note that if the size of the dataset is smaller than `batch_size`, the
+        used `batch_size` will be reduced.
+
+    """
+    batcher_key, key = jax.random.split(key)
+    batch = batch_data(
+        data,
+        batch_size,
+        batch_axes,
+        convert_to_numpy=convert_to_numpy,
+        key=batcher_key,
+    )
+    while True:
+        key, batch_key = jax.random.split(key)
+        if key_per_sample:
+            batch_key = jax.random.split(batch_key, batch_size)
+        yield next(batch), batch_key
 
 
 def split_data(

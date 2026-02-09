@@ -28,6 +28,13 @@ class MyCallback(klax.Callback):
             )
 
 
+@klax.loss
+def my_loss(model, batch, batch_axes):
+    (x, y), key = batch
+    y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+    return jnp.mean((y - y_pred) ** 2)
+
+
 model, history = klax.fit(
     model,
     (x, y),
@@ -35,6 +42,8 @@ model, history = klax.fit(
     steps=30_000,
     logger=logger,
     # callbacks=[MyCallback()],
+    batcher=klax.batch_data_with_key,
+    loss=my_loss,
     key=train_key,
 )
 

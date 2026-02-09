@@ -38,12 +38,12 @@ def logger_factory():
     logger = klax.MetricLogger(log_every=10)
     logger.add_metric(
         "training_loss",
-        klax.LossMetric(
-            klax.batch_data,
+        klax.Evaluator(
+            klax.mse,
             (x, y),
+            klax.batch_data,
             batch_size=x.shape[0],
             batch_axes=0,
-            loss=klax.mse,
             key=data_key,
         ),
     )
@@ -111,16 +111,18 @@ history_reset.extend(history_reset_2)
 
 # D: Plot the recorded losses
 fig, ax = plt.subplots()
+legend_labels = []
 for histroy, label in zip(
     [history_complete, history_continued, history_reset],
     ["Continuous training", "Continued training", "Reset optimizer state"],
 ):
-    histroy.plot("training_loss", ax=ax, label="Recorded loss - " + label)
+    histroy.plot("training_loss", ax=ax)
+    legend_labels.append("Loss - " + label)
+ax.legend(legend_labels)
 ax.set(
     title="Comparison of training loss histories",
     yscale="log",
     xlabel="Training steps",
     ylabel="Loss",
 )
-ax.legend()
 plt.show()
