@@ -225,7 +225,7 @@ class History:
         keys = keys if keys else list(self.content.keys())
         for name in keys:
             steps, values = self.content[name]
-            kwargs.setdefault("label", name)
+            kwargs["label"] = name  # Overwrite label if provided
             ax.plot(steps, values, **kwargs)
         ax.legend()
         return ax
