@@ -40,7 +40,7 @@ from ._serialization import (
 from ._tools import count_parameters as count_parameters
 from ._training import fit as fit
 from ._training import make_step as make_step
-from ._training import run_training_loop as run_training_loop
+from ._training import simple_fit as simple_fit
 from ._trainstate import TrainingState as TrainingState
 from ._trainstate import TrainingStatic as TrainingStatic
 from ._trainstate import TrainingView as TrainingView

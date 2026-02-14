@@ -18,7 +18,7 @@ import pickle
 from collections.abc import Callable
 from pathlib import Path
 from time import time
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import equinox as eqx
 import jax
@@ -286,9 +286,9 @@ class MetricLogger(Callback):
 
     history: History
     log_every: int
-    metric_defs: dict[str, (bool, Metric)]
+    metric_defs: dict[str, tuple[bool, Metric]]
     steps_str_length: int = 0
-    verbose: bool = True
+    verbose: Literal[0, 1, 2]
     start_time: float = 0.0
     progress_bar: bool
     tqdm_bar: Any = None
@@ -296,9 +296,9 @@ class MetricLogger(Callback):
     def __init__(
         self,
         log_every: int = 100,
-        metric_defs: dict[str, (bool, Metric)] | None = None,
-        verbose: bool = True,
-        progress_bar: bool = True,
+        metric_defs: dict[str, tuple[bool, Metric]] | None = None,
+        verbose: Literal[0, 1, 2] = 2,
+        history: History | None = None,
     ):
         """Initialize the MetricLogger.
 
@@ -306,18 +306,22 @@ class MetricLogger(Callback):
             log_every: Frequency of logging metrics (in steps).
             metric_defs: A dictionary mapping metric names to tuples of
                 (whether to print the metric, metric function).
-            verbose: Whether to print logged metrics to the console.
-            progress_bar: Whether to show a progress bar during training.
+            verbose: Verbosity level for logging metrics to the console. If 0,
+                no metrics will be printed. If 1, the metrics are printed. If
+                2, a progress bar will be shown.
+            history: An existing history object to log metrics to. If `None`,
+                a new history object will be created.
 
         """
         self.metric_defs = metric_defs or {}
         self.log_every = log_every
-        self.history = History()
+        self.history = history if history is not None else History()
         self.verbose = verbose
-        if progress_bar and not _TQDM_AVAILABLE:
-            print("Warning: tqdm not installed, progress bar disabled.")
-            progress_bar = False
-        self.progress_bar = progress_bar
+        if (verbose == 2) and not _TQDM_AVAILABLE:
+            print(
+                "Warning: tqdm for progress bar not installed. Changing verbosity level to 1."
+            )
+            self.verbose = 1
 
     def add_metric(
         self, name: str, metric: Metric, verbose: bool = False
@@ -354,7 +358,7 @@ class MetricLogger(Callback):
 
             if self.verbose:
                 postfix = ", ".join(message)
-                if self.progress_bar:
+                if self.verbose > 1:
                     self.tqdm_bar.set_postfix_str(postfix)
                     if step != 0:
                         self.tqdm_bar.update(self.log_every)
@@ -368,7 +372,7 @@ class MetricLogger(Callback):
         self.start_time = time()
         self.steps_str_length = len(str(view.static.steps))
 
-        if self.progress_bar:
+        if self.verbose > 1:
             self.tqdm_bar = tqdm(total=view.static.steps, dynamic_ncols=True)
 
         self.on_training_step(view, step)
@@ -379,5 +383,8 @@ class MetricLogger(Callback):
         self.history.total_steps = step
         self.history.final_opt_state = view.opt_state
 
-        if self.progress_bar:
-            self.tqdm_bar.close()
+        if self.verbose > 1:
+            try:
+                self.tqdm_bar.close()
+            except Exception as e:
+                pass

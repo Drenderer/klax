@@ -6,7 +6,7 @@ import jax.random as jr
 import pytest
 
 import klax
-from klax import Evaluator, History, MetricLogger
+from klax import Evaluator, History, MetricLogger, TrainingView
 
 
 class TestEvaluator:
@@ -237,8 +237,8 @@ class TestMetricLogger:
         )
 
     def test_add_metric_and_logging_frequency(self):
-        logger = MetricLogger(log_every=2, verbose=False)
-        logger.add_metric("m1", lambda model: jnp.array(1.0), verbose=False)
+        metric_defs = {"m1": (False, lambda model: jnp.array(1.0))}
+        logger = MetricLogger(log_every=2, metric_defs=metric_defs, verbose=0)
 
         view = self._make_view(steps=10)
 
@@ -256,7 +256,7 @@ class TestMetricLogger:
         assert logger.history.content["m1"][0] == [2, 4]
 
     def test_verbose_print_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=True, progress_bar=False)
+        logger = MetricLogger(log_every=1, verbose=1)
         logger.add_metric("loss", lambda model: jnp.array(1.23), verbose=True)
 
         view = self._make_view(steps=10)
@@ -268,7 +268,7 @@ class TestMetricLogger:
         assert "loss: 1.2300e+00" in out
 
     def test_verbose_print_non_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=True, progress_bar=False)
+        logger = MetricLogger(log_every=1, verbose=1)
         logger.add_metric(
             "arr", lambda model: jnp.array([1.0, 2.0]), verbose=True
         )
@@ -282,7 +282,7 @@ class TestMetricLogger:
         assert "arr:" in out
 
     def test_on_training_start_and_end_sets_history(self):
-        logger = MetricLogger(log_every=1, verbose=False)
+        logger = MetricLogger(log_every=1, verbose=0)
         logger.add_metric("m", lambda model: jnp.array(0.0), verbose=False)
 
         sentinel_opt = {"state": 42}
@@ -300,7 +300,7 @@ class TestMetricLogger:
         assert logger.history.final_opt_state is sentinel_opt
 
     def test_add_metric_registers_with_verbose_flag(self):
-        logger = MetricLogger(log_every=10, verbose=False)
+        logger = MetricLogger(log_every=10, verbose=0)
         logger.add_metric("acc", lambda model: jnp.array(0.9), verbose=True)
 
         assert "acc" in logger.metric_defs

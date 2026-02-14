@@ -76,8 +76,8 @@ class TestMakeStep:
         )
 
 
-class TestRunTrainingLoop:
-    def test_run_training_loop_invokes_callbacks(self, getkey):
+class TestFit:
+    def test_fit_invokes_callbacks(self, getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -113,7 +113,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        updated_view = klax.run_training_loop(view, [callback])
+        updated_view = klax.fit(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -128,7 +128,7 @@ class TestRunTrainingLoop:
             )
         )
 
-    def test_run_training_loop_zero_steps_no_updates(self, getkey):
+    def test_fit_zero_steps_no_updates(self, getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -164,7 +164,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        updated_view = klax.run_training_loop(view, [callback])
+        updated_view = klax.fit(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -179,7 +179,7 @@ class TestRunTrainingLoop:
             )
         )
 
-    def test_run_training_loop_stops_on_callback(self, getkey):
+    def test_fit_stops_on_callback(self, getkey):
         class StopAfterOne(klax.Callback):
             def __init__(self):
                 self.steps = []
@@ -212,7 +212,7 @@ class TestRunTrainingLoop:
 
         callback = StopAfterOne()
 
-        updated_view = klax.run_training_loop(view, [callback])
+        updated_view = klax.fit(view, [callback])
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
@@ -227,62 +227,28 @@ class TestRunTrainingLoop:
         )
 
 
-class TestFit:
-    def test_fit_returns_history_with_loss(self, getkey):
-        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+def test_simple_fit(getkey):
+    model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
-        data = (
-            jr.uniform(getkey(), (100, 2)),
-            jr.uniform(getkey(), (100,)),
-        )
+    data = (
+        jr.uniform(getkey(), (100, 2)),
+        jr.uniform(getkey(), (100,)),
+    )
 
-        trained_model, history = klax.fit(
-            model,
-            data,
-            batch_size=5,
-            batch_axes=0,
-            steps=5,
-            loss=klax.mse,
-            optimizer=optax.sgd(0.1),
-            key=getkey(),
-        )
+    trained_model, history = klax.simple_fit(
+        model,
+        data,
+        batch_size=5,
+        batch_axes=0,
+        steps=5,
+        loss=klax.mse,
+        optimizer=optax.sgd(0.1),
+        key=getkey(),
+    )
 
-        assert isinstance(trained_model, klax.nn.FICNN)
-        assert history.total_steps == 5
-        assert "loss" in history.content
-        loss_steps, loss_values = history["loss"]
-        assert loss_steps == [0]
-        assert len(loss_values) == 1
-
-    def test_fit_without_logger_returns_empty_history(self, getkey):
-        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
-
-        data = (
-            jr.uniform(getkey(), (100, 2)),
-            jr.uniform(getkey(), (100,)),
-        )
-        trained_model, history = klax.fit(
-            model,
-            data,
-            batch_size=5,
-            batch_axes=0,
-            steps=5,
-            loss=klax.mse,
-            optimizer=optax.sgd(0.1),
-            logger=None,
-            key=getkey(),
-        )
-        initial_leaves = eqx.filter(model, eqx.is_inexact_array)
-
-        assert history.total_steps == -1
-        assert history.content == {}
-        updated_leaves = eqx.filter(trained_model, eqx.is_inexact_array)
-        assert not jax.tree.all(
-            jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
-                initial_leaves,
-                updated_leaves,
-            )
-        )
+    assert isinstance(trained_model, klax.nn.FICNN)
+    assert history.total_steps == 5
+    assert "loss" in history.content
+    loss_steps, loss_values = history["loss"]
+    assert loss_steps == [0]
+    assert len(loss_values) == 1
