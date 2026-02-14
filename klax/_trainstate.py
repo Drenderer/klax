@@ -14,13 +14,17 @@
 
 from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any
 
 import jax
 import optax
 from jaxtyping import PyTree, PyTreeDef
 
 from klax._losses import Loss
+
+# ====--------------------------------------------------------------------=== #
+# TrainingView classes
+# ====--------------------------------------------------------------------=== #
 
 
 @jax.tree_util.register_dataclass
@@ -75,58 +79,6 @@ class TrainingStatic:
         return leaves
 
 
-def make_state_and_static(
-    model: PyTree[Any],
-    optimizer: optax.GradientTransformation
-    | optax.GradientTransformationExtraArgs,
-    opt_state: PyTree[Any],
-    batch: Generator[PyTree[Any], None, None],
-    batch_axes: PyTree[int | None],
-    loss: Loss,
-    steps: int,
-) -> tuple[TrainingState, TrainingStatic]:
-    """Create the initial TrainingState and TrainingStatic from the model and optimizer.
-
-    Args:
-        model: The initial model parameters.
-        optimizer: The optimizer to use for training.
-        opt_state: The initial optimizer state.
-        batch: A generator that yields batches of data.
-        batch_axes: A PyTree indicating the batch axes for each component of the data.
-        loss: The loss function to use for training.
-        steps: The total number of training steps.
-
-    Returns:
-        A tuple of (TrainingState, TrainingStatic).
-
-    """
-    model_leaves, model_treedef = jax.tree.flatten(model)
-    opt_state_leaves, opt_state_treedef = jax.tree.flatten(opt_state)
-
-    optimizer = (
-        optax.with_extra_args_support(optimizer)
-        if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
-        else optimizer
-    )
-
-    state = TrainingState(
-        model_leaves=model_leaves,
-        opt_state_leaves=opt_state_leaves,
-    )
-
-    static = TrainingStatic(
-        model_tree_def=model_treedef,
-        optimizer=optimizer,
-        opt_state_tree_def=opt_state_treedef,
-        batch=batch,
-        batch_axes=batch_axes,
-        loss=loss,
-        steps=steps,
-    )
-
-    return state, static
-
-
 # This is similar to the old CallbackArgs, but ensures a clean separation
 # between mutable state (TrainingState) and static components (TrainingStatic),
 # while providing a nice public-facing interface to access and modify the model
@@ -179,3 +131,60 @@ class TrainingView:
     def opt_state(self, value):
         self.state.opt_state_leaves = self.static.disassemble_opt_state(value)
         self._opt_state = value
+
+
+# ====--------------------------------------------------------------------=== #
+# Factory methods
+# ====--------------------------------------------------------------------=== #
+
+
+def make_view(
+    model: PyTree[Any],
+    optimizer: optax.GradientTransformation
+    | optax.GradientTransformationExtraArgs,
+    opt_state: PyTree[Any],
+    batch: Generator[PyTree[Any], None, None],
+    batch_axes: PyTree[int | None],
+    loss: Loss,
+    steps: int,
+) -> TrainingView:
+    """Create the TrainingView from the model and optimizer.
+
+    Args:
+        model: The initial model parameters.
+        optimizer: The optimizer to use for training.
+        opt_state: The initial optimizer state.
+        batch: A generator that yields batches of data.
+        batch_axes: A PyTree indicating the batch axes for each component of the data.
+        loss: The loss function to use for training.
+        steps: The total number of training steps.
+
+    Returns:
+        A TrainingView.
+
+    """
+    model_leaves, model_treedef = jax.tree.flatten(model)
+    opt_state_leaves, opt_state_treedef = jax.tree.flatten(opt_state)
+
+    optimizer = (
+        optax.with_extra_args_support(optimizer)
+        if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
+        else optimizer
+    )
+
+    state = TrainingState(
+        model_leaves=model_leaves,
+        opt_state_leaves=opt_state_leaves,
+    )
+
+    static = TrainingStatic(
+        model_tree_def=model_treedef,
+        optimizer=optimizer,
+        opt_state_tree_def=opt_state_treedef,
+        batch=batch,
+        batch_axes=batch_axes,
+        loss=loss,
+        steps=steps,
+    )
+
+    return TrainingView(state, static)

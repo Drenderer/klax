@@ -35,7 +35,7 @@ from ._trainstate import (
     TrainingState,
     TrainingStatic,
     TrainingView,
-    make_state_and_static,
+    make_view,
 )
 from ._wrappers import apply
 
@@ -95,26 +95,25 @@ def make_step(
 
 
 def run_training_loop(
-    state: TrainingState,
-    static: TrainingStatic,
+    view: TrainingView,
     callbacks: Iterable[Callback],
-) -> TrainingState:
+) -> TrainingView:
     """Iterate [`make_step`][klax.make_step] in pure python with callback integration.
 
     Args:
-        state: Initial [TrainingState][klax.TrainingState]
-        static: [TrainingStatic][klax.TrainingStatic]
+        view: [TrainingView][klax.TrainingView]
         callbacks: Iterable of [Callback][klax.Callback] instances.
 
     Returns:
-        Final [TrainingState][klax.TrainingState].
+        Final [TrainingView][klax.TrainingView].
 
     """
     step = 0
-    view = TrainingView(state, static)
     for callback in callbacks:
         callback.on_training_start(view, step)
 
+    state = view.state
+    static = view.static
     for step in range(1, static.steps + 1):
         state = make_step(state, next(static.batch), static)
 
@@ -128,7 +127,8 @@ def run_training_loop(
     for callback in callbacks:
         callback.on_training_end(view, step)
 
-    return state
+    view = TrainingView(state, static)
+    return view
 
 
 def fit[T: eqx.Module, H: Callback](
@@ -249,7 +249,7 @@ def fit[T: eqx.Module, H: Callback](
 
     bkey, key = jax.random.split(key)
     batch = batcher(data, batch_size, batch_axes, key=bkey)
-    state, static = make_state_and_static(
+    view = make_view(
         model,
         optimizer,
         opt_state,
@@ -289,9 +289,9 @@ def fit[T: eqx.Module, H: Callback](
             )
         callbacks.append(logger)
 
-    state = run_training_loop(state, static, callbacks)
+    view = run_training_loop(view, callbacks)
 
-    model = static.assemble_model(state.model_leaves)
+    model = view.static.assemble_model(view.state.model_leaves)
 
     history = logger.history if logger is not None else History()
 

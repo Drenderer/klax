@@ -50,7 +50,7 @@ class TestMakeStep:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -60,7 +60,9 @@ class TestMakeStep:
             steps=5,
         )
 
-        new_state = klax.make_step(state, next(static.batch), static)
+        new_state = klax.make_step(
+            view.state, next(view.static.batch), view.static
+        )
 
         # State has changed
         assert not jax.tree.all(
@@ -68,7 +70,7 @@ class TestMakeStep:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
+                view.state.model_leaves,
                 new_state.model_leaves,
             )
         )
@@ -99,7 +101,7 @@ class TestRunTrainingLoop:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -111,7 +113,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        new_state = klax.run_training_loop(state, static, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -121,8 +123,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
-                new_state.model_leaves,
+                view.state.model_leaves,
+                updated_view.state.model_leaves,
             )
         )
 
@@ -150,7 +152,7 @@ class TestRunTrainingLoop:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -162,7 +164,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        new_state = klax.run_training_loop(state, static, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -172,8 +174,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
-                new_state.model_leaves,
+                view.state.model_leaves,
+                updated_view.state.model_leaves,
             )
         )
 
@@ -198,7 +200,7 @@ class TestRunTrainingLoop:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -210,7 +212,7 @@ class TestRunTrainingLoop:
 
         callback = StopAfterOne()
 
-        new_state = klax.run_training_loop(state, static, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
@@ -219,8 +221,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
-                new_state.model_leaves,
+                view.state.model_leaves,
+                updated_view.state.model_leaves,
             )
         )
 

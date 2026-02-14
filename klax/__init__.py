@@ -44,7 +44,7 @@ from ._training import run_training_loop as run_training_loop
 from ._trainstate import TrainingState as TrainingState
 from ._trainstate import TrainingStatic as TrainingStatic
 from ._trainstate import TrainingView as TrainingView
-from ._trainstate import make_state_and_static as make_state_and_static
+from ._trainstate import make_view as make_view
 from ._wrappers import Constraint as Constraint
 from ._wrappers import NonNegative as NonNegative
 from ._wrappers import NonTrainable as NonTrainable
