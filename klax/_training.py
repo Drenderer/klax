@@ -14,8 +14,8 @@
 
 """Implements a basic training loop."""
 
-from collections.abc import Iterable
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, Literal
 
 import equinox as eqx
 import jax
@@ -29,13 +29,13 @@ from ._datahandler import (
     BatchGenerator,
     batch_data,
 )
-from ._logging import Evaluator, History, MetricLogger
+from ._logging import BatchMetric, History, Metric, MetricLogger
 from ._losses import Loss, mse
 from ._trainstate import (
     TrainingState,
     TrainingStatic,
     TrainingView,
-    make_state_and_static,
+    make_view,
 )
 from ._wrappers import apply
 
@@ -95,26 +95,25 @@ def make_step(
 
 
 def run_training_loop(
-    state: TrainingState,
-    static: TrainingStatic,
-    callbacks: Iterable[Callback],
-) -> TrainingState:
+    view: TrainingView,
+    callbacks: Sequence[Callback],
+) -> TrainingView:
     """Iterate [`make_step`][klax.make_step] in pure python with callback integration.
 
     Args:
-        state: Initial [TrainingState][klax.TrainingState]
-        static: [TrainingStatic][klax.TrainingStatic]
-        callbacks: Iterable of [Callback][klax.Callback] instances.
+        view: [TrainingView][klax.TrainingView]
+        callbacks: Sequence of [Callback][klax.Callback] instances.
 
     Returns:
-        Final [TrainingState][klax.TrainingState].
+        Final [TrainingView][klax.TrainingView].
 
     """
     step = 0
-    view = TrainingView(state, static)
     for callback in callbacks:
         callback.on_training_start(view, step)
 
+    state = view._state
+    static = view._static
     for step in range(1, static.steps + 1):
         state = make_step(state, next(static.batch), static)
 
@@ -128,10 +127,11 @@ def run_training_loop(
     for callback in callbacks:
         callback.on_training_end(view, step)
 
-    return state
+    view = TrainingView(state, static)
+    return view
 
 
-def fit[T: eqx.Module, H: Callback](
+def fit[T: eqx.Module](
     model: T,
     data: PyTree[Any],
     *,
@@ -144,13 +144,15 @@ def fit[T: eqx.Module, H: Callback](
     | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
-    logger: MetricLogger | None = new_logger,
-    callbacks: Iterable[Callback] | None = None,
+    metrics: Sequence[Metric] | None = None,
+    log_every: int = 100,
+    verbose: Literal[0, 1, 2] = 2,
+    callbacks: Sequence[Callback] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[T, History]:
     """Train a model using an optimizer from optax.
 
-    This is a convenient wrapper around [`run_training_loop`][klax.run_training_loop]
+    This is a convenient wrapper around [`firun_training_loopt`][klax.run_training_loop]
     that sets up optimizer, training state and callbacks.
 
     Args:
@@ -178,9 +180,9 @@ def fit[T: eqx.Module, H: Callback](
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
             to None.)
-            Internally, the validation data is used to create a [Evaluator][klax.Evaluator]
+            Internally, the validation data is used to create a [BatchMetric][klax.BatchMetric]
             for logging. Each time the metric is evaluated, the loss is computed
-            on a batch from the validation dataset and logged with batch size ``4*batch_size``.
+            on a batch from the validation dataset with batch size `4*batch_size`.
         steps: Number of gradient updates to apply. (Defaults to 1000.)
         loss: The loss function with call signature
             `(model: PyTree, data: PyTree, batch_axes: int | None |
@@ -194,42 +196,25 @@ def fit[T: eqx.Module, H: Callback](
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        logger: A callback intended for tracking the training process. If no
-            custom MetricLogger instance is passed the [`klax.MetricLogger`][]
-            with a logging interval of 100 steps is used. To change the logging
-            increment or verbosity of this default callback, pass a
-            `MetricLogger` object to this argument, e.g.,
-            `logger=MetricLogger(log_every=10, verbose=False)` for logging
-            on every 10-th step without printing the loss. This can also be used
-            to log additional metrics during training, e.g.,
-            ```python
-                mylogger=MetricLogger(log_every=100)
-                mylogger.add_metric(
-                    "accuracy",
-                    lambda model: compute_accuracy(model)
-                )
-                model, history = fit(
-                    model,
-                    data,
-                    ...,
-                    logger=mylogger,
-                )
-            ```
-            Any passed [`klax.MetricLogger`][] will have a training
-            [Evaluator][klax.Evaluator] and - if applicable - a validation
-            [Evaluator][klax.Evaluator] added automatically. If this is undesired,
-            set `logger=None` and pass your logger as a callback via the
-            `callbacks` argument. (Per default a new MetricLogger instance is created.)
-        callbacks: Callback functions that are evaluated after every training
-            step. They can be used to implement early stopping, custom history
-            logging and more. The argument to the callback function is a
-            CallbackArgs object. (Defaults to `None`. Keyword only Argument)
+        metrics: Sequence of [metrics][klax.Metric] to be evaluated at regular
+            intervals during the training. You can overwrite the default "loss"
+            and "validation_loss" metrics, by adding custom metrics with the same
+            name.
+            (Defaults to `None`.)
+        log_every: Interval for both metric evaluation and progress logging.
+            A value `log_every=n` means that every `n` steps during the training
+            the metrics are evaluated and (if `verbose>0`) the training progress
+            and selected metric values are printed.
+        verbose: Integer controlling the verbosity during training.
+            - 0: Nothing is printed.
+            - 1: A message is printed every `log_every` steps.
+            - 2: A progressbar is used and updated every `log_every` steps.
+        callbacks: List of [Callbacks][klax.Callback]. They can be used to
+            implement early stopping, custom logging and more. The argument
+            to the callback function is aCallbackArgs object.
+            (Defaults to `None`.)
         key: A `jax.random.PRNGKey` used to provide randomness for batch
-            generation. (Keyword only argument.)
-
-    Note:
-        This function assumes that the batch dimension is always oriented along
-        the first axes of any `jax.Array`
+            generation.
 
     Returns:
         A tuple of the trained model and the loss history.
@@ -249,7 +234,7 @@ def fit[T: eqx.Module, H: Callback](
 
     bkey, key = jax.random.split(key)
     batch = batcher(data, batch_size, batch_axes, key=bkey)
-    state, static = make_state_and_static(
+    view = make_view(
         model,
         optimizer,
         opt_state,
@@ -262,36 +247,42 @@ def fit[T: eqx.Module, H: Callback](
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
 
-    # Initialize callback arguments and history
-    if logger is not None:
-        logger = MetricLogger() if logger is new_logger else logger
-
-        bkey, key = jax.random.split(key)
-        logger.add_metric(
+    # Initialize logging and default metrics
+    _metrics = []
+    _metrics.append(
+        BatchMetric(
             "loss",
-            Evaluator(loss, data, batcher, batch_size, batch_axes, key=bkey),
+            loss,
+            data,
+            batcher,
+            batch_size,
+            batch_axes,
             verbose=True,
+            key=bkey,
         )
-
-        if validation_data is not None:
-            bkey, key = jax.random.split(key)
-            logger.add_metric(
+    )
+    if validation_data is not None:
+        _metrics.append(
+            BatchMetric(
                 "validation_loss",
-                Evaluator(
-                    loss,
-                    validation_data,
-                    batcher,
-                    4 * batch_size,
-                    batch_axes,
-                    key=bkey,
-                ),
+                loss,
+                validation_data,
+                batcher,
+                4 * batch_size,
+                batch_axes,
                 verbose=True,
-            )
-        callbacks.append(logger)
+                key=bkey,
+            ),
+        )
+    if metrics is not None:
+        _metrics += metrics
+    logger = MetricLogger(log_every, _metrics, verbose)
 
-    state = run_training_loop(state, static, callbacks)
+    callbacks.append(logger)
 
-    model = static.assemble_model(state.model_leaves)
+    view = run_training_loop(view, callbacks)
+
+    model = view._static.assemble_model(view._state.model_leaves)
 
     history = logger.history if logger is not None else History()
 

@@ -6,14 +6,28 @@ import jax.random as jr
 import pytest
 
 import klax
-from klax import Evaluator, History, MetricLogger
+from klax import BatchMetric, History, MetricLogger, TrainingView
 
 
-class TestEvaluator:
-    """Test suite for the Evaluator class."""
+class TestMetricDecorator:
+    """Test the metric decorator."""
+
+    def test_attributes(self):
+        @klax.metric(name="my_metric", verbose=True)
+        def some_func(model):
+            """My docstring."""
+            return jnp.zeros(())
+
+        assert some_func.name == "my_metric"
+        assert some_func.verbose
+        assert some_func.__doc__ == """My docstring."""
+
+
+class TestBatchMetric:
+    """Test suite for the BatchMetric class."""
 
     def test_initialization(self, getkey):
-        """Test Evaluator initialization with required parameters."""
+        """Test BatchMetric initialization with required parameters."""
         data = (
             jr.uniform(getkey(), (100, 2)),
             jr.uniform(getkey(), (100, 1)),
@@ -21,17 +35,21 @@ class TestEvaluator:
         batch_size = 32
         batch_axes = 0
 
-        metric = Evaluator(
+        metric = BatchMetric(
+            name="my_metric",
             func=klax.mse,
             data=data,
             batcher=klax.batch_data,
             batch_size=batch_size,
             batch_axes=batch_axes,
+            verbose=False,
             key=getkey(),
         )
 
+        assert metric.name == "my_metric"
         assert metric.batch_axes == batch_axes
         assert metric.func == klax.mse
+        assert not metric.verbose
 
     def test_call(self, getkey):
         """Test __call__ method."""
@@ -42,7 +60,8 @@ class TestEvaluator:
         batch_size = 32
         batch_axes = 0
 
-        metric = Evaluator(
+        metric = BatchMetric(
+            name="my_metric",
             func=klax.mse,
             data=data,
             batcher=klax.batch_data,
@@ -232,13 +251,19 @@ class TestMetricLogger:
     ):
         return SimpleNamespace(
             model=model if model is not None else {"w": 1.0},
-            static=SimpleNamespace(steps=steps),
+            _static=SimpleNamespace(steps=steps),
             opt_state=opt_state if opt_state is not None else {"opt": 1},
         )
 
     def test_add_metric_and_logging_frequency(self):
-        logger = MetricLogger(log_every=2, verbose=False)
-        logger.add_metric("m1", lambda model: jnp.array(1.0), verbose=False)
+        my_metric = klax.metric(name="m1")(lambda model: jnp.array(1.0))
+        logger = MetricLogger(
+            log_every=2,
+            metrics=[
+                my_metric,
+            ],
+            verbose=0,
+        )
 
         view = self._make_view(steps=10)
 
@@ -256,8 +281,11 @@ class TestMetricLogger:
         assert logger.history.content["m1"][0] == [2, 4]
 
     def test_verbose_print_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=True, progress_bar=False)
-        logger.add_metric("loss", lambda model: jnp.array(1.23), verbose=True)
+        logger = MetricLogger(log_every=1, verbose=1)
+        my_metric = klax.metric(name="loss", verbose=True)(
+            lambda model: jnp.array(1.23)
+        )
+        logger.add_metric(my_metric)
 
         view = self._make_view(steps=10)
         logger.on_training_step(view, 0)
@@ -268,10 +296,12 @@ class TestMetricLogger:
         assert "loss: 1.2300e+00" in out
 
     def test_verbose_print_non_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=True, progress_bar=False)
-        logger.add_metric(
-            "arr", lambda model: jnp.array([1.0, 2.0]), verbose=True
+        logger = MetricLogger(log_every=1, verbose=1)
+
+        my_metric = klax.metric(name="arr", verbose=True)(
+            lambda model: jnp.array([1.0, 2.0])
         )
+        logger.add_metric(my_metric)
 
         view = self._make_view(steps=5)
         logger.on_training_step(view, 0)
@@ -282,8 +312,12 @@ class TestMetricLogger:
         assert "arr:" in out
 
     def test_on_training_start_and_end_sets_history(self):
-        logger = MetricLogger(log_every=1, verbose=False)
-        logger.add_metric("m", lambda model: jnp.array(0.0), verbose=False)
+        logger = MetricLogger(log_every=1, verbose=0)
+
+        my_metric = klax.metric(name="m", verbose=False)(
+            lambda model: jnp.array(0.0)
+        )
+        logger.add_metric(my_metric)
 
         sentinel_opt = {"state": 42}
         view = self._make_view(steps=7, opt_state=sentinel_opt)
@@ -299,11 +333,23 @@ class TestMetricLogger:
         assert logger.history.total_time >= 0.0
         assert logger.history.final_opt_state is sentinel_opt
 
-    def test_add_metric_registers_with_verbose_flag(self):
-        logger = MetricLogger(log_every=10, verbose=False)
-        logger.add_metric("acc", lambda model: jnp.array(0.9), verbose=True)
+    def test_logger_overwrites_metric(self):
+        """The logger should overwrite metrics with the same name."""
+        metric_a = klax.metric(name="loss", verbose=False)(lambda model: "A")
 
-        assert "acc" in logger.metric_defs
-        verbose_flag, metric_fn = logger.metric_defs["acc"]
-        assert verbose_flag is True
-        assert callable(metric_fn)
+        metric_b = klax.metric(name="loss", verbose=False)(lambda model: "B")
+
+        logger = MetricLogger(
+            log_every=1, metrics=[metric_a, metric_b], verbose=0
+        )
+        assert len(logger.metrics) == 1
+
+        sentinel_opt = {"state": 42}
+        view = self._make_view(steps=7, opt_state=sentinel_opt)
+        logger.on_training_start(view, 0)
+        assert logger.history.content["loss"][1] == ["B"]
+
+        logger.add_metric(metric_a)
+        logger.on_training_step(view, 1)
+
+        assert logger.history.content["loss"][1] == ["B", "A"]

@@ -23,10 +23,11 @@ from ._initializers import SupportedInitializer as SupportedInitializer
 from ._initializers import canonicalize_initializer as canonicalize_initializer
 from ._initializers import hoedt_bias as hoedt_bias
 from ._initializers import hoedt_normal as hoedt_normal
-from ._logging import Evaluator as Evaluator
+from ._logging import BatchMetric as BatchMetric
 from ._logging import History as History
 from ._logging import Metric as Metric
 from ._logging import MetricLogger as MetricLogger
+from ._logging import metric as metric
 from ._losses import Loss as Loss
 from ._losses import loss as loss
 from ._losses import mae as mae
@@ -44,7 +45,7 @@ from ._training import run_training_loop as run_training_loop
 from ._trainstate import TrainingState as TrainingState
 from ._trainstate import TrainingStatic as TrainingStatic
 from ._trainstate import TrainingView as TrainingView
-from ._trainstate import make_state_and_static as make_state_and_static
+from ._trainstate import make_view as make_view
 from ._wrappers import Constraint as Constraint
 from ._wrappers import NonNegative as NonNegative
 from ._wrappers import NonTrainable as NonTrainable

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Continued trainig example.
+"""Continued training example.
 
 This example demonstrates how to continue a training session.
 It shows how to initialize the optax initializer state with a previous training session's final state,
@@ -34,20 +34,19 @@ y = 2 * x.sum(axis=-1) + 1.0
 y += 0.01 * jr.normal(data_key, y.shape)  # Add some noise
 
 
-def logger_factory():
-    logger = klax.MetricLogger(log_every=10)
-    logger.add_metric(
-        "training_loss",
-        klax.Evaluator(
-            klax.mse,
-            (x, y),
-            klax.batch_data,
-            batch_size=x.shape[0],
-            batch_axes=0,
-            key=data_key,
-        ),
+def metrics_factory():
+    metric = klax.BatchMetric(
+        "loss",
+        klax.mse,
+        (x, y),
+        klax.batch_data,
+        batch_size=x.shape[0],
+        batch_axes=0,
+        key=data_key,
     )
-    return logger
+    return [
+        metric,
+    ]
 
 
 # A: Complete training for 2000 steps
@@ -57,7 +56,8 @@ model, history_complete = klax.fit(
     (x, y),
     steps=2000,
     optimizer=optax.adabelief(1e-5),
-    logger=logger_factory(),
+    log_every=10,
+    metrics=metrics_factory(),
     key=train1_key,
 )
 
@@ -72,7 +72,8 @@ model, history_continued = klax.fit(
     (x, y),
     steps=100,
     optimizer=optax.adabelief(1e-5),
-    logger=logger_factory(),
+    log_every=10,
+    metrics=metrics_factory(),
     key=train1_key,
 )
 
@@ -82,7 +83,8 @@ model, history_continued_2 = klax.fit(
     steps=1900,
     optimizer=optax.adabelief(1e-5),  # (!) Same optimizer as in first session
     init_opt_state=history_continued.final_opt_state,  # Initialize the optimizer state with the last state
-    logger=logger_factory(),
+    log_every=10,
+    metrics=metrics_factory(),
     key=train2_key,
 )
 history_continued.extend(history_continued_2)
@@ -94,7 +96,8 @@ model, history_reset = klax.fit(
     (x, y),
     steps=100,
     optimizer=optax.adabelief(1e-5),
-    logger=logger_factory(),
+    log_every=10,
+    metrics=metrics_factory(),
     key=train1_key,
 )
 
@@ -104,7 +107,8 @@ model, history_reset_2 = klax.fit(
     steps=1900,
     optimizer=optax.adabelief(1e-5),  # (!) Same optimizer as in first session
     init_opt_state=None,  # No optimizer state is provided, so the optimizer is again initialized from scratch
-    logger=logger_factory(),
+    log_every=10,
+    metrics=metrics_factory(),
     key=train2_key,
 )
 history_reset.extend(history_reset_2)
@@ -112,11 +116,11 @@ history_reset.extend(history_reset_2)
 # D: Plot the recorded losses
 fig, ax = plt.subplots()
 legend_labels = []
-for histroy, label in zip(
+for history, label in zip(
     [history_complete, history_continued, history_reset],
     ["Continuous training", "Continued training", "Reset optimizer state"],
 ):
-    histroy.plot("training_loss", ax=ax)
+    history.plot("loss", ax=ax)
     legend_labels.append("Loss - " + label)
 ax.legend(legend_labels)
 ax.set(

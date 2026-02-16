@@ -14,13 +14,17 @@
 
 from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any
 
 import jax
 import optax
 from jaxtyping import PyTree, PyTreeDef
 
 from klax._losses import Loss
+
+# ====--------------------------------------------------------------------=== #
+# TrainingView classes
+# ====--------------------------------------------------------------------=== #
 
 
 @jax.tree_util.register_dataclass
@@ -75,7 +79,96 @@ class TrainingStatic:
         return leaves
 
 
-def make_state_and_static(
+# This is similar to the old CallbackArgs, but ensures a clean separation
+# between mutable state (TrainingState) and static components (TrainingStatic),
+# while providing a nice public-facing interface to access and modify the model
+# and optimizer state.
+class TrainingView:
+    """Interface for accessing the training state and static components.
+
+    Provides properties to access and modify the model and optimizer state.
+
+    Attributes:
+        static: The immutable [training static][klax.TrainingStatic].
+        model: The model instance.
+        opt_state: The optimizer state.
+
+    """
+
+    _state: TrainingState
+    _static: TrainingStatic
+    _model: Any  # Cached model instance.
+    _opt_state: Any  # Cached optimizer state.
+
+    def __init__(self, state: TrainingState, static: TrainingStatic):
+        self._state = state
+        self._static = static
+        self._model = None
+        self._opt_state = None
+
+    @property
+    def model(self):
+        """Accessor for the model instance."""
+        if self._model is None:
+            self._model = self._static.assemble_model(self._state.model_leaves)
+        return self._model
+
+    @model.setter
+    def model(self, value):
+        self._state.model_leaves = self._static.disassemble_model(value)
+        self._model = value
+
+    @property
+    def opt_state(self):
+        """Accessor for the optimizer state."""
+        if self._opt_state is None:
+            self._opt_state = self._static.assemble_opt_state(
+                self._state.opt_state_leaves
+            )
+        return self._opt_state
+
+    @opt_state.setter
+    def opt_state(self, value):
+        self._state.opt_state_leaves = self._static.disassemble_opt_state(
+            value
+        )
+        self._opt_state = value
+
+    @property
+    def model_tree_def(self) -> PyTreeDef:  # pyright: ignore[reportInvalidTypeForm]
+        return self._static.model_tree_def
+
+    @property
+    def optimizer(self) -> optax.GradientTransformationExtraArgs:
+        return self._static.optimizer
+
+    @property
+    def opt_state_tree_def(self) -> PyTreeDef:  # pyright: ignore[reportInvalidTypeForm]
+        return self._static.opt_state_tree_def
+
+    @property
+    def batch(self) -> Generator[PyTree[Any], None, None]:
+        return self._static.batch
+
+    @property
+    def batch_axes(self) -> PyTree[int | None]:
+        return self._static.batch_axes
+
+    @property
+    def loss(self) -> Loss:
+        return self._static.loss
+
+    @property
+    def steps(self) -> int:
+        return self._static.steps
+
+
+# ====--------------------------------------------------------------------=== #
+# Factory methods
+# ====--------------------------------------------------------------------=== #
+
+
+def make_view(
     model: PyTree[Any],
     optimizer: optax.GradientTransformation
     | optax.GradientTransformationExtraArgs,
@@ -84,8 +177,8 @@ def make_state_and_static(
     batch_axes: PyTree[int | None],
     loss: Loss,
     steps: int,
-) -> tuple[TrainingState, TrainingStatic]:
-    """Create the initial TrainingState and TrainingStatic from the model and optimizer.
+) -> TrainingView:
+    """Create the TrainingView from the model and optimizer.
 
     Args:
         model: The initial model parameters.
@@ -97,7 +190,7 @@ def make_state_and_static(
         steps: The total number of training steps.
 
     Returns:
-        A tuple of (TrainingState, TrainingStatic).
+        A TrainingView.
 
     """
     model_leaves, model_treedef = jax.tree.flatten(model)
@@ -124,58 +217,4 @@ def make_state_and_static(
         steps=steps,
     )
 
-    return state, static
-
-
-# This is similar to the old CallbackArgs, but ensures a clean separation
-# between mutable state (TrainingState) and static components (TrainingStatic),
-# while providing a nice public-facing interface to access and modify the model
-# and optimizer state.
-class TrainingView:
-    """Interface for accessing the training state and static components.
-
-    Provides properties to access and modify the model and optimizer state.
-
-    Attributes:
-        static: The immutable [training static][klax.TrainingStatic].
-        model: The model instance.
-        opt_state: The optimizer state.
-
-    """
-
-    state: TrainingState
-    static: TrainingStatic
-    _model: Any  # Cached model instance.
-    _opt_state: Any  # Cached optimizer state.
-
-    def __init__(self, state: TrainingState, static: TrainingStatic):
-        self.state = state
-        self.static = static
-        self._model = None
-        self._opt_state = None
-
-    @property
-    def model(self):
-        """Accessor for the model instance."""
-        if self._model is None:
-            self._model = self.static.assemble_model(self.state.model_leaves)
-        return self._model
-
-    @model.setter
-    def model(self, value):
-        self.state.model_leaves = self.static.disassemble_model(value)
-        self._model = value
-
-    @property
-    def opt_state(self):
-        """Accessor for the optimizer state."""
-        if self._opt_state is None:
-            self._opt_state = self.static.assemble_opt_state(
-                self.state.opt_state_leaves
-            )
-        return self._opt_state
-
-    @opt_state.setter
-    def opt_state(self, value):
-        self.state.opt_state_leaves = self.static.disassemble_opt_state(value)
-        self._opt_state = value
+    return TrainingView(state, static)

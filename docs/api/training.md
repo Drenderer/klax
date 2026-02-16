@@ -10,6 +10,14 @@ title: Calibration and Data Handling
 
 ---
 
+::: klax.run_training_loop
+::: klax.make_step
+
+---
+
+::: klax.TrainingView
+    options:
+        members: false
 ::: klax.TrainingState
     options:
         members: false
@@ -20,5 +28,3 @@ title: Calibration and Data Handling
             - disassemble_model
             - assemble_opt_state
             - disassemble_opt_state
-::: klax.make_step
-::: klax.run_training_loop
