@@ -76,8 +76,8 @@ class TestMakeStep:
         )
 
 
-class TestFit:
-    def test_fit_invokes_callbacks(self, getkey):
+class TestRunTrainingLoop:
+    def test_invokes_callbacks(self, getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -113,7 +113,7 @@ class TestFit:
 
         callback = RecordingCallback()
 
-        updated_view = klax.fit(view, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -128,7 +128,7 @@ class TestFit:
             )
         )
 
-    def test_fit_zero_steps_no_updates(self, getkey):
+    def test_zero_steps_no_updates(self, getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -164,7 +164,7 @@ class TestFit:
 
         callback = RecordingCallback()
 
-        updated_view = klax.fit(view, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -179,7 +179,7 @@ class TestFit:
             )
         )
 
-    def test_fit_stops_on_callback(self, getkey):
+    def test_stops_on_callback(self, getkey):
         class StopAfterOne(klax.Callback):
             def __init__(self):
                 self.steps = []
@@ -212,7 +212,7 @@ class TestFit:
 
         callback = StopAfterOne()
 
-        updated_view = klax.fit(view, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
@@ -227,7 +227,7 @@ class TestFit:
         )
 
 
-def test_simple_fit(getkey):
+def test_fit(getkey):
     model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
     data = (
@@ -235,7 +235,7 @@ def test_simple_fit(getkey):
         jr.uniform(getkey(), (100,)),
     )
 
-    trained_model, history = klax.simple_fit(
+    trained_model, history = klax.fit(
         model,
         data,
         batch_size=5,
