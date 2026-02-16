@@ -196,7 +196,7 @@ def fit[T: eqx.Module](
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        metrics: Sequence of [metrics][klax.Metric ] to be evaluated at regular
+        metrics: Sequence of [metrics][klax.Metric] to be evaluated at regular
             intervals during the training. You can overwrite the default "loss"
             and "validation_loss" metrics, by adding custom metrics with the same
             name.
