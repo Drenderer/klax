@@ -227,28 +227,57 @@ class TestRunTrainingLoop:
         )
 
 
-def test_fit(getkey):
-    model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+class TestFit:
+    def test_basic_behavior(self, getkey):
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
-    data = (
-        jr.uniform(getkey(), (100, 2)),
-        jr.uniform(getkey(), (100,)),
-    )
+        data = (
+            jr.uniform(getkey(), (100, 2)),
+            jr.uniform(getkey(), (100,)),
+        )
 
-    trained_model, history = klax.fit(
-        model,
-        data,
-        batch_size=5,
-        batch_axes=0,
-        steps=5,
-        loss=klax.mse,
-        optimizer=optax.sgd(0.1),
-        key=getkey(),
-    )
+        trained_model, history = klax.fit(
+            model,
+            data,
+            batch_size=5,
+            batch_axes=0,
+            steps=5,
+            loss=klax.mse,
+            optimizer=optax.sgd(0.1),
+            key=getkey(),
+        )
 
-    assert isinstance(trained_model, klax.nn.FICNN)
-    assert history.total_steps == 5
-    assert "loss" in history.content
-    loss_steps, loss_values = history["loss"]
-    assert loss_steps == [0]
-    assert len(loss_values) == 1
+        assert isinstance(trained_model, klax.nn.FICNN)
+        assert history.total_steps == 5
+        assert "loss" in history.content
+        loss_steps, loss_values = history["loss"]
+        assert loss_steps == [0]
+        assert len(loss_values) == 1
+
+    def test_overwriting_default_metrics(self, getkey):
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+
+        data = (
+            jr.uniform(getkey(), (100, 2)),
+            jr.uniform(getkey(), (100,)),
+        )
+
+        def my_metric(model):
+            return "A"
+
+        my_metric.name = "loss"
+        my_metric.verbose = False
+
+        trained_model, history = klax.fit(
+            model,
+            data,
+            batch_size=5,
+            batch_axes=0,
+            steps=5,
+            loss=klax.mse,
+            optimizer=optax.sgd(0.1),
+            metrics=[my_metric],
+            key=getkey(),
+        )
+
+        assert history.content["loss"][1] == ["A"]

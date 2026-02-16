@@ -309,7 +309,7 @@ class MetricLogger(Callback):
 
     history: History
     log_every: int
-    metrics: list[Metric]
+    metrics: dict[str, Metric]
     steps_str_length: int = 0
     verbose: Literal[0, 1, 2]
     start_time: float = 0.0
@@ -328,6 +328,8 @@ class MetricLogger(Callback):
         Args:
             log_every: Frequency of logging metrics (in steps).
             metrics: Sequence of [metrics][klax.Metric] to evaluate.
+                If multiple metrics share the same name, the later metrics will
+                overwrite prior metrics.
             verbose: Verbosity level for logging metrics to the console. If 0,
                 no metrics will be printed. If 1, the metrics are printed. If
                 2, a progress bar will be shown.
@@ -335,7 +337,7 @@ class MetricLogger(Callback):
                 a new history object will be created.
 
         """
-        self.metrics = [] if metrics is None else list(metrics)
+        self.metrics = {} if metrics is None else {m.name: m for m in metrics}
         self.log_every = log_every
         self.history = History() if history is None else history
         self.verbose = verbose
@@ -348,11 +350,14 @@ class MetricLogger(Callback):
     def add_metric(self, metric: Metric) -> None:
         """Add a metric to be logged during training.
 
+        Warning:
+            Existing metrics sharing the same name will be overwritten.
+
         Args:
             metric: The metric to be added.
 
         """
-        self.metrics.append(metric)
+        self.metrics[metric.name] = metric
 
     def on_training_step(self, view: TrainingView, step: int) -> None:
         """Log metrics at the current training step.
@@ -364,7 +369,7 @@ class MetricLogger(Callback):
         """
         if step % self.log_every == 0:
             message = []
-            for metric in self.metrics:
+            for metric in self.metrics.values():
                 metric_value = jax.device_get(metric(view.model))
                 self.history.append(step, metric.name, metric_value)
                 if self.verbose and metric.verbose:

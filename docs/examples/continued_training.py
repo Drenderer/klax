@@ -36,7 +36,7 @@ y += 0.01 * jr.normal(data_key, y.shape)  # Add some noise
 
 def metrics_factory():
     metric = klax.BatchMetric(
-        "training_loss",
+        "loss",
         klax.mse,
         (x, y),
         klax.batch_data,
@@ -120,7 +120,7 @@ for history, label in zip(
     [history_complete, history_continued, history_reset],
     ["Continuous training", "Continued training", "Reset optimizer state"],
 ):
-    history.plot("training_loss", ax=ax)
+    history.plot("loss", ax=ax)
     legend_labels.append("Loss - " + label)
 ax.legend(legend_labels)
 ax.set(

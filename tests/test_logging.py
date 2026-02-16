@@ -332,3 +332,24 @@ class TestMetricLogger:
         assert isinstance(logger.history.total_time, float)
         assert logger.history.total_time >= 0.0
         assert logger.history.final_opt_state is sentinel_opt
+
+    def test_logger_overwrites_metric(self):
+        """The logger should overwrite metrics with the same name."""
+        metric_a = klax.metric(name="loss", verbose=False)(lambda model: "A")
+
+        metric_b = klax.metric(name="loss", verbose=False)(lambda model: "B")
+
+        logger = MetricLogger(
+            log_every=1, metrics=[metric_a, metric_b], verbose=0
+        )
+        assert len(logger.metrics) == 1
+
+        sentinel_opt = {"state": 42}
+        view = self._make_view(steps=7, opt_state=sentinel_opt)
+        logger.on_training_start(view, 0)
+        assert logger.history.content["loss"][1] == ["B"]
+
+        logger.add_metric(metric_a)
+        logger.on_training_step(view, 1)
+
+        assert logger.history.content["loss"][1] == ["B", "A"]

@@ -131,7 +131,7 @@ def run_training_loop(
     return view
 
 
-def fit[T: eqx.Module, H: History](
+def fit[T: eqx.Module](
     model: T,
     data: PyTree[Any],
     *,
@@ -145,12 +145,11 @@ def fit[T: eqx.Module, H: History](
     init_opt_state: PyTree[Any] = None,
     batcher: BatchGenerator = batch_data,
     metrics: Sequence[Metric] | None = None,
-    add_loss_metric: bool = True,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
     key: PRNGKeyArray,
-) -> tuple[T, H]:
+) -> tuple[T, History]:
     """Train a model using an optimizer from optax.
 
     This is a convenient wrapper around [`firun_training_loopt`][klax.run_training_loop]
@@ -197,12 +196,11 @@ def fit[T: eqx.Module, H: History](
             (Defaults to `None`.)
         batcher: The data loader that splits inputs and targets into batches.
             (Defaults to `batch_data`.)
-        metrics: Sequence of [metrics][klax.Metric] to be evaluated at regular
-            intervals during the training. (Defaults to `None`.)
-        add_loss_metric: If `True` automatically adds a [BatchMetric][klax.BatchMetric]
-            for computing the training loss to the logger. Each time the metric
-            is evaluated, the loss is computed on a batch from the training dataset
-            (`data`) with batch size `batch_size`.
+        metrics: Sequence of [metrics][klax.Metric ] to be evaluated at regular
+            intervals during the training. You can overwrite the default "loss"
+            and "validation_loss" metrics, by adding custom metrics with the same
+            name.
+            (Defaults to `None`.)
         log_every: Interval for both metric evaluation and progress logging.
             A value `log_every=n` means that every `n` steps during the training
             the metrics are evaluated and (if `verbose>0`) the training progress
@@ -217,10 +215,6 @@ def fit[T: eqx.Module, H: History](
             (Defaults to `None`.)
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
-
-    Note:
-        This function assumes that the batch dimension is always oriented along
-        the first axes of any `jax.Array`
 
     Returns:
         A tuple of the trained model and the loss history.
@@ -253,23 +247,22 @@ def fit[T: eqx.Module, H: History](
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
 
-    # Initialize callback arguments and history
-    metrics = [] if metrics is None else metrics
-    if add_loss_metric:
-        metrics.append(
-            BatchMetric(
-                "loss",
-                loss,
-                data,
-                batcher,
-                batch_size,
-                batch_axes,
-                verbose=True,
-                key=bkey,
-            )
+    # Initialize logging and default metrics
+    _metrics = []
+    _metrics.append(
+        BatchMetric(
+            "loss",
+            loss,
+            data,
+            batcher,
+            batch_size,
+            batch_axes,
+            verbose=True,
+            key=bkey,
         )
+    )
     if validation_data is not None:
-        metrics.append(
+        _metrics.append(
             BatchMetric(
                 "validation_loss",
                 loss,
@@ -281,7 +274,10 @@ def fit[T: eqx.Module, H: History](
                 key=bkey,
             ),
         )
-    logger = MetricLogger(log_every, metrics, verbose)
+    if metrics is not None:
+        _metrics += metrics
+    logger = MetricLogger(log_every, _metrics, verbose)
+
     callbacks.append(logger)
 
     view = run_training_loop(view, callbacks)
