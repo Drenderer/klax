@@ -387,16 +387,16 @@ class MetricLogger(Callback):
                         self.tqdm_bar.update(self.log_every)
                 else:
                     print(
-                        f"Step {step:>{self.steps_str_length}}/{view.static.steps}: "
+                        f"Step {step:>{self.steps_str_length}}/{view._static.steps}: "
                         + postfix
                     )
 
     def on_training_start(self, view: TrainingView, step: int) -> None:
         self.start_time = time()
-        self.steps_str_length = len(str(view.static.steps))
+        self.steps_str_length = len(str(view._static.steps))
 
         if self.verbose > 1:
-            self.tqdm_bar = tqdm(total=view.static.steps, dynamic_ncols=True)
+            self.tqdm_bar = tqdm(total=view._static.steps, dynamic_ncols=True)
 
         self.on_training_step(view, step)
 

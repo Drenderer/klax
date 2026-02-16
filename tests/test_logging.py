@@ -251,7 +251,7 @@ class TestMetricLogger:
     ):
         return SimpleNamespace(
             model=model if model is not None else {"w": 1.0},
-            static=SimpleNamespace(steps=steps),
+            _static=SimpleNamespace(steps=steps),
             opt_state=opt_state if opt_state is not None else {"opt": 1},
         )
 

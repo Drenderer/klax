@@ -61,7 +61,7 @@ class TestMakeStep:
         )
 
         new_state = klax.make_step(
-            view.state, next(view.static.batch), view.static
+            view._state, next(view._static.batch), view._static
         )
 
         # State has changed
@@ -70,7 +70,7 @@ class TestMakeStep:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view.state.model_leaves,
+                view._state.model_leaves,
                 new_state.model_leaves,
             )
         )
@@ -123,8 +123,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view.state.model_leaves,
-                updated_view.state.model_leaves,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
             )
         )
 
@@ -174,8 +174,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view.state.model_leaves,
-                updated_view.state.model_leaves,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
             )
         )
 
@@ -221,8 +221,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view.state.model_leaves,
-                updated_view.state.model_leaves,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
             )
         )
 

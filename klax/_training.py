@@ -112,8 +112,8 @@ def run_training_loop(
     for callback in callbacks:
         callback.on_training_start(view, step)
 
-    state = view.state
-    static = view.static
+    state = view._state
+    static = view._static
     for step in range(1, static.steps + 1):
         state = make_step(state, next(static.batch), static)
 
@@ -282,7 +282,7 @@ def fit[T: eqx.Module](
 
     view = run_training_loop(view, callbacks)
 
-    model = view.static.assemble_model(view.state.model_leaves)
+    model = view._static.assemble_model(view._state.model_leaves)
 
     history = logger.history if logger is not None else History()
 
