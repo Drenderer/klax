@@ -247,10 +247,10 @@ class InputSplitLinear(eqx.Module, strict=True):
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
-            For klax intializers (such as input-size dependent bias initializers)
+            For klax initializers (such as input-size dependent bias initializers)
             the `fan_in` argument for the `bias_init` is calculated as the sum
             of the sizes of all inputs, while for the `weight_inits` the `fan_in`
             corresponds to the number of `in_features` for this matrix.

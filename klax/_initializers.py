@@ -33,8 +33,7 @@ class Initializer(Protocol):
         shape: Shape,
         fan_in: int,
         dtype: DTypeLikeInexact = jnp.float_,
-    ) -> Array:
-        raise NotImplementedError
+    ) -> Array: ...
 
 
 type SupportedInitializer = Initializer | jax.nn.initializers.Initializer

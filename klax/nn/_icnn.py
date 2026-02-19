@@ -19,11 +19,11 @@ from typing import Literal, cast
 
 import equinox as eqx
 import jax
-import jax.random as jrandom
+import jax.random as jr
 from jax.nn.initializers import he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
-from .._initializers import Initializer, hoedt_bias, hoedt_normal
+from .._initializers import SupportedInitializer, hoedt_bias, hoedt_normal
 from .._misc import default_floating_dtype
 from .._wrappers import NonNegative
 from ._linear import InputSplitLinear, Linear
@@ -55,10 +55,10 @@ class FICNN(eqx.Module, strict=True):
         width_sizes: Sequence[int],
         use_passthrough: bool = True,
         non_decreasing: bool = False,
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
-        constrained_weight_init: Initializer | None = hoedt_normal(),
-        constrained_bias_init: Initializer | None = hoedt_bias(),
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
+        constrained_weight_init: SupportedInitializer | None = hoedt_normal(),
+        constrained_bias_init: SupportedInitializer | None = hoedt_bias(),
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -87,18 +87,18 @@ class FICNN(eqx.Module, strict=True):
                 function of some other quantity `z`. If the FICNN `f(x(z))` is
                 non-decreasing then f preserves the convexity with respect to
                 `z`. Defaults to False.
-            weight_init: The weight initializer of type `Initializer`
+            weight_init: The weight initializer of type `SupportedInitializer`
                 used for *unconstrained weights*.
                 Defaults to he_normal().
-            bias_init: The bias initializer of type `Initializer` used
+            bias_init: The bias initializer of type `SupportedInitializer` used
                 for the biases of *unconstrained layers*.
                 Defaults to zeros.
             constrained_weight_init: The weight initializer of type
-                `Initializer` used for *constrained weights*.
+                `SupportedInitializer` used for *constrained weights*.
                 If None, then `weight_init` is used for constrained weights as well.
                 Defaults to [`klax.hoedt_normal`][].
             constrained_bias_init: The bias initializer of type
-                `Initializer` used for the biases of *constrained layers*.
+                `SupportedInitializer` used for the biases of *constrained layers*.
                 If None, then `bias_init` is used for the biases in constrained
                 layers as well.
                 Defaults to zeros.
@@ -133,7 +133,7 @@ class FICNN(eqx.Module, strict=True):
         in_sizes = (in_size,) + width_sizes
         out_sizes = width_sizes + (out_size,)
         use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
-        keys = jrandom.split(key, len(in_sizes))
+        keys = jr.split(key, len(in_sizes))
 
         constrained_weight_init = (
             weight_init
