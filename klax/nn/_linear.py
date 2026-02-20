@@ -111,7 +111,7 @@ class Linear(eqx.Module, strict=True):
         weight = weight_init(wkey, wshape, in_features_, dtype)
         self.weight = weight if weight_wrap is None else weight_wrap(weight)
         bshape = (out_features_,)
-        if use_bias is None:
+        if not use_bias:
             self.bias = None
         else:
             bias_init = canonicalize_initializer(bias_init)
@@ -313,7 +313,7 @@ class InputSplitLinear(eqx.Module, strict=True):
         self.weights = tuple(weights)
 
         bshape = (out_features_,)
-        if use_bias is None:
+        if not use_bias:
             self.bias = None
         else:
             bias_init = canonicalize_initializer(bias_init)
