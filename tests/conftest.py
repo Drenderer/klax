@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import typing
 
 import jax
@@ -26,6 +27,17 @@ typing.TESTING = True  # pyright: ignore
 # jax.config.update("jax_numpy_dtype_promotion", "strict")
 
 jax.config.update("jax_numpy_rank_promotion", "raise")
+
+
+@pytest.fixture
+def allow_rank_promotion():
+    """Disable the jax_numpy_rank_promotion for the current test."""
+    old = jax.config.jax_numpy_rank_promotion
+    jax.config.update("jax_numpy_rank_promotion", "allow")
+    try:
+        yield
+    finally:
+        jax.config.update("jax_numpy_rank_promotion", old)
 
 
 @pytest.fixture

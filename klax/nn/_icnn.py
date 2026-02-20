@@ -20,8 +20,8 @@ from typing import Literal, cast
 import equinox as eqx
 import jax
 import jax.random as jr
-from jax.nn.initializers import he_normal, zeros
-from jaxtyping import Array, PRNGKeyArray
+from jax.nn.initializers import he_normal, ones, zeros
+from jaxtyping import Array, Float, PRNGKeyArray
 
 from .._initializers import SupportedInitializer, hoedt_bias, hoedt_normal
 from .._misc import default_floating_dtype
@@ -116,7 +116,7 @@ class FICNN(eqx.Module, strict=True):
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         """
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -257,3 +257,230 @@ class FICNN(eqx.Module, strict=True):
             y = eqx.filter_vmap(lambda a, b: a(b))(self.final_activation, y)
 
         return y
+
+
+class PICNNLayer(eqx.Module, strict=True):
+    linear_y: InputSplitLinear
+    linear_u: Linear
+    linear_yu: Linear
+    linear_xu: Linear | None
+    activation_y: Callable
+    activation_u: Callable
+    activation_yu: Callable
+    activation_xu: Callable
+    use_bias: bool = eqx.field(static=True)
+    use_passthrough: bool = eqx.field(static=True)
+    enforce_nonnegative: bool = eqx.field(static=True)
+
+    def __init__(
+        self,
+        y_in_size: int,
+        u_in_size: int,
+        x_size: int,
+        y_out_size: int,
+        u_out_size: int,
+        *,
+        activation_y: Callable = jax.nn.softplus,
+        activation_u: Callable = jax.nn.softplus,
+        activation_yu: Callable = jax.nn.softplus,
+        activation_xu: Callable = lambda x: x,
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
+        constrained_weight_init: SupportedInitializer | None = hoedt_normal(),
+        constrained_bias_init: SupportedInitializer | None = hoedt_bias(),
+        interconnect_weight_init: SupportedInitializer | None = zeros,
+        interconnect_bias_init: SupportedInitializer | None = ones,
+        use_passthrough: bool = True,
+        enforce_nonnegative: bool = True,
+        use_bias: bool = True,
+        dtype: type | None = None,
+        key: PRNGKeyArray,
+    ):
+        """Initialize the PICNN layer.
+
+        Info: Explanation of the variable names and intuition.
+            A PICNN is essentially a FICNN, where the weight matrices
+            and the bias are functions of an additional input `p`.
+            This way, the output is convex in the original input `x`,
+            but has an arbitrary relationship to the input `p` - the
+            input `p` modulates the network.
+
+        Args:
+            y_in_size: Size of the convex-path input.
+            y_out_size: Size of the convex-path output.
+            u_in_size: Size of the arbitrary-path input.
+            u_out_size: Size of the arbitrary-path output.
+            x_size: Size of the passthrough-path input
+            activation_y: Activation applied to the convex-path output.
+                Defaults to jax.nn.softplus().
+            activation_u: Activation applied to the arbitrary-path output.
+                Defaults to jax.nn.softplus().
+            activation_yu: Activation applied to the interconnection weight
+                modulation that acts on the convex-path weight.
+                Defaults to jax.nn.softplus().
+            activation_xu: Activation applied to the interconnection weight
+                modulation that acts on the passthrough weight.
+                Defaults to the identity (`lambda x: x`).
+            weight_init: Default weight initialization. Defaults to he_normal().
+            bias_init: Default bias initialization. Defaults to zeros.
+            constrained_weight_init: The weight initializer used for
+                *nonnegative constrained weights*.
+                If None, then `weight_init` is used for constrained weights as well.
+                Note that if `enforce_nonnegative=True` then this argument is ignored
+                and the default `weight_init` is used instead.
+                Defaults to [`klax.hoedt_normal`][].
+            constrained_bias_init: The bias initializer used for biases in layers
+                with *nonnegative constrained weights*.
+                Defaults to hoedt_bias().
+            interconnect_weight_init: Weight initializer for weights in the
+                interconnection path from the arbitrary path to the convex path.
+                Defaults to `zeros`.
+            interconnect_bias_init: Bias initializer for weights in the
+                interconnection path from the arbitrary path to the convex path.
+                Defaults to `ones`.
+            use_passthrough: If true, the original input `x` is used for the
+                calculation of the output `y`.
+                Defaults to True.
+            enforce_nonnegative: If true, applies the [nonnegative][klax.NonNegative]
+                weight wrapper to the appropriate weight to ensure convexity of the
+                output `y` with respect to the input `y`. However, note that the first
+                PICNN layer in a PICNN should not enforce this positivity, unless
+                the PICNN output is supposed to be non-decreasing in the convex input
+                as well.
+                Defaults to True.
+            use_bias: Whether to use a bias in the convex path. All layers in the
+                arbitrary and interconnection paths will use biases regardless of
+                this arguments value.
+                Defaults to True.
+            dtype: The dtype to use for all the weights and biases in this MLP.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialization.
+
+        """
+        dtype = default_floating_dtype() if dtype is None else dtype
+
+        constrained_weight_init = (
+            weight_init
+            if constrained_weight_init is None
+            else constrained_weight_init
+        )
+        constrained_bias_init = (
+            bias_init
+            if constrained_bias_init is None
+            else constrained_bias_init
+        )
+        interconnect_weight_init = (
+            weight_init
+            if interconnect_weight_init is None
+            else interconnect_weight_init
+        )
+        interconnect_bias_init = (
+            bias_init
+            if interconnect_bias_init is None
+            else interconnect_bias_init
+        )
+
+        key_y, key_u, key_yu, key_xu = jr.split(key, 4)
+        if use_passthrough:
+            self.linear_y = InputSplitLinear(
+                (y_in_size, x_size, u_in_size),
+                y_out_size,
+                weight_inits=(
+                    constrained_weight_init
+                    if enforce_nonnegative
+                    else weight_init,
+                    weight_init,
+                    interconnect_weight_init,
+                ),
+                bias_init=constrained_bias_init
+                if enforce_nonnegative
+                else bias_init,
+                use_bias=use_bias,
+                weight_wraps=(NonNegative, None, None)
+                if enforce_nonnegative
+                else None,
+                dtype=dtype,
+                key=key_y,
+            )
+            self.linear_xu = Linear(
+                u_in_size,
+                x_size,
+                weight_init=interconnect_weight_init,
+                bias_init=interconnect_bias_init,
+                use_bias=True,
+                dtype=dtype,
+                key=key_xu,
+            )
+        else:
+            self.linear_y = InputSplitLinear(
+                (y_in_size, u_in_size),
+                y_out_size,
+                weight_inits=(
+                    constrained_weight_init
+                    if enforce_nonnegative
+                    else weight_init,
+                    interconnect_weight_init,
+                ),
+                bias_init=constrained_bias_init,
+                use_bias=use_bias,
+                weight_wraps=(NonNegative, None)
+                if enforce_nonnegative
+                else None,
+                dtype=dtype,
+                key=key_y,
+            )
+            self.linear_xu = None
+        self.linear_u = Linear(
+            u_in_size,
+            u_out_size,
+            weight_init=weight_init,
+            bias_init=bias_init,
+            use_bias=True,
+            dtype=dtype,
+            key=key_u,
+        )
+        self.linear_yu = Linear(
+            u_in_size,
+            y_in_size,
+            weight_init=interconnect_weight_init,
+            bias_init=interconnect_bias_init,
+            use_bias=True,
+            dtype=dtype,
+            key=key_yu,
+        )
+        self.activation_y = activation_y
+        self.activation_u = activation_u
+        self.activation_yu = activation_yu
+        self.activation_xu = activation_xu
+
+        self.use_bias = use_bias
+        self.use_passthrough = use_passthrough
+        self.enforce_nonnegative = enforce_nonnegative
+
+    def __call__(
+        self,
+        y: Float[Array, "... y_in_size"],
+        u: Float[Array, "... u_in_size"],
+        x: Float[Array, "... x_size"],
+        *,
+        key: PRNGKeyArray | None = None,
+    ) -> tuple[
+        Float[Array, "... y_out_size"],
+        Float[Array, "... u_out_size"],
+        Float[Array, "... x_size"],
+    ]:
+        w_y = self.activation_yu(self.linear_yu(u)) * y
+        if self.use_passthrough:
+            w_x = self.activation_xu(self.linear_xu(u)) * x
+            y = self.activation_y(self.linear_y(w_y, w_x, u))
+        else:
+            y = self.activation_y(self.linear_y(w_y, u))
+        u = self.activation_u(self.linear_u(u))
+
+        return y, u, x
+
+
+class PICNN(eqx.Module, strict=True):
+    pass

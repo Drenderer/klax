@@ -31,6 +31,7 @@ from klax.nn import (
     SkewSymmetricMatrix,
     SPDMatrix,
 )
+from klax.nn._icnn import PICNNLayer
 
 
 def test_linear(getkey, getzerowrap):
@@ -311,3 +312,279 @@ def test_matrices(getkey):
     assert output.shape == (2, 3, 3)
     assert jnp.allclose(output, jnp.conjugate(output.mT))
     assert jnp.all(jnp.linalg.eigvalsh(output) > 0.0)
+
+
+class TestPICNNLayer:
+    """Test suite for the PICNNLayer implementation."""
+
+    def test_basic_shapes(self, getkey):
+        """Test that the layer outputs the correct shapes."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            key=getkey(),
+        )
+        layer = klax.finalize(layer)
+
+        y = jrandom.normal(getkey(), (3,))
+        u = jrandom.normal(getkey(), (2,))
+        x = jrandom.normal(getkey(), (4,))
+
+        y_out, u_out, x_out = layer(y, u, x)
+        assert y_out.shape == (5,)
+        assert u_out.shape == (6,)
+        assert x_out.shape == (4,)
+
+    def test_enforce_nonnegative_true(self, getkey):
+        """Test that enforce_nonnegative=True applies NonNegative wrapper."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            enforce_nonnegative=True,
+            use_passthrough=True,
+            key=getkey(),
+        )
+
+        # Check that the first weight in linear_y is wrapped with NonNegative
+        assert isinstance(layer.linear_y.weights[0], klax.NonNegative)
+        # The second and third weights (x and u paths) should not be wrapped
+        assert isinstance(layer.linear_y.weights[1], jax.Array)
+        assert isinstance(layer.linear_y.weights[2], jax.Array)
+
+        # Verify the wrapped weight is actually non-negative
+        finalized_layer = klax.finalize(layer)
+        weight = finalized_layer.linear_y.weights[0]
+        assert jnp.all(weight >= 0.0)
+
+    def test_enforce_nonnegative_false(self, getkey):
+        """Test that enforce_nonnegative=False does not apply wrapper."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            enforce_nonnegative=False,
+            use_passthrough=True,
+            key=getkey(),
+        )
+
+        # Check that none of the weights in linear_y are wrapped
+        assert isinstance(layer.linear_y.weights[0], jax.Array)
+        assert isinstance(layer.linear_y.weights[1], jax.Array)
+        assert isinstance(layer.linear_y.weights[2], jax.Array)
+
+    def test_use_passthrough_true(self, getkey):
+        """Test that use_passthrough=True creates linear_xu layer."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            use_passthrough=True,
+            key=getkey(),
+        )
+
+        # linear_xu should exist
+        assert layer.linear_xu is not None
+        assert isinstance(layer.linear_xu, Linear)
+
+        # linear_y should be InputSplitLinear with 3 inputs
+        assert isinstance(layer.linear_y, InputSplitLinear)
+        assert len(layer.linear_y.weights) == 3
+
+    def test_use_passthrough_false(self, getkey):
+        """Test that use_passthrough=False does not create linear_xu."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            use_passthrough=False,
+            key=getkey(),
+        )
+
+        # linear_xu should not exist
+        assert layer.linear_xu is None
+
+        # linear_y should be InputSplitLinear with only 2 inputs
+        assert isinstance(layer.linear_y, InputSplitLinear)
+        assert len(layer.linear_y.weights) == 2
+
+    def test_use_bias_true(self, getkey):
+        """Test that use_bias=True adds bias to linear_y."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            use_bias=True,
+            key=getkey(),
+        )
+
+        # linear_y should have a bias
+        assert layer.linear_y.use_bias is True
+        assert layer.linear_y.bias is not None
+
+    def test_use_bias_false(self, getkey):
+        """Test that use_bias=False removes bias from linear_y."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            use_bias=False,
+            key=getkey(),
+        )
+
+        # linear_y should not have a bias
+        assert layer.linear_y.use_bias is False
+        assert layer.linear_y.bias is None
+
+    def test_batched_call_single_batch(self, getkey, allow_rank_promotion):
+        """Test that the layer supports batched calls (single batch dim)."""
+        layer = klax.finalize(
+            PICNNLayer(
+                y_in_size=3,
+                u_in_size=2,
+                x_size=4,
+                y_out_size=5,
+                u_out_size=6,
+                key=getkey(),
+            )
+        )
+
+        batch_size = 10
+        y = jrandom.normal(getkey(), (batch_size, 3))
+        u = jrandom.normal(getkey(), (batch_size, 2))
+        x = jrandom.normal(getkey(), (batch_size, 4))
+
+        y_out, u_out, x_out = layer(y, u, x)
+        assert y_out.shape == (batch_size, 5)
+        assert u_out.shape == (batch_size, 6)
+        assert x_out.shape == (batch_size, 4)
+
+    def test_batched_call_multiple_batch_dims(
+        self, getkey, allow_rank_promotion
+    ):
+        """Test that the layer supports multiple batch dimensions."""
+        layer = klax.finalize(
+            PICNNLayer(
+                y_in_size=3,
+                u_in_size=2,
+                x_size=4,
+                y_out_size=5,
+                u_out_size=6,
+                key=getkey(),
+            )
+        )
+
+        batch_shape = (7, 10)
+        y = jrandom.normal(getkey(), batch_shape + (3,))
+        u = jrandom.normal(getkey(), batch_shape + (2,))
+        x = jrandom.normal(getkey(), batch_shape + (4,))
+
+        y_out, u_out, x_out = layer(y, u, x)
+        assert y_out.shape == batch_shape + (5,)
+        assert u_out.shape == batch_shape + (6,)
+        assert x_out.shape == batch_shape + (4,)
+
+    def test_custom_activations(self, getkey):
+        """Test that custom activation functions work correctly."""
+        layer = klax.finalize(
+            PICNNLayer(
+                y_in_size=3,
+                u_in_size=2,
+                x_size=4,
+                y_out_size=5,
+                u_out_size=6,
+                activation_y=jax.nn.relu,
+                activation_u=jax.nn.tanh,
+                activation_yu=jax.nn.sigmoid,
+                activation_xu=jnp.square,
+                key=getkey(),
+            )
+        )
+
+        y = jrandom.normal(getkey(), (3,))
+        u = jrandom.normal(getkey(), (2,))
+        x = jrandom.normal(getkey(), (4,))
+
+        # Just verify it runs without error
+        y_out, u_out, x_out = layer(y, u, x)
+        assert y_out.shape == (5,)
+        assert u_out.shape == (6,)
+        assert x_out.shape == (4,)
+
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
+    def test_dtype_preservation(self, dtype, getkey):
+        """Test that the layer preserves the specified dtype."""
+        layer = klax.finalize(
+            PICNNLayer(
+                y_in_size=3,
+                u_in_size=2,
+                x_size=4,
+                y_out_size=5,
+                u_out_size=6,
+                dtype=dtype,
+                key=getkey(),
+            )
+        )
+
+        y = jrandom.normal(getkey(), (3,), dtype=dtype)
+        u = jrandom.normal(getkey(), (2,), dtype=dtype)
+        x = jrandom.normal(getkey(), (4,), dtype=dtype)
+
+        y_out, u_out, x_out = layer(y, u, x)
+        assert y_out.dtype == dtype
+        assert u_out.dtype == dtype
+        assert x_out.dtype == dtype
+
+    def test_x_passthrough_unchanged(self, getkey):
+        """Test that x is passed through unchanged."""
+        layer = klax.finalize(
+            PICNNLayer(
+                y_in_size=3,
+                u_in_size=2,
+                x_size=4,
+                y_out_size=5,
+                u_out_size=6,
+                key=getkey(),
+            )
+        )
+
+        y = jrandom.normal(getkey(), (3,))
+        u = jrandom.normal(getkey(), (2,))
+        x = jrandom.normal(getkey(), (4,))
+
+        y_out, u_out, x_out = layer(y, u, x)
+        # x should be returned unchanged
+        assert jnp.allclose(x_out, x)
+
+    def test_interconnect_initialization(self, getkey):
+        """Test custom interconnect weight and bias initialization."""
+        layer = PICNNLayer(
+            y_in_size=3,
+            u_in_size=2,
+            x_size=4,
+            y_out_size=5,
+            u_out_size=6,
+            interconnect_weight_init=uniform(),
+            interconnect_bias_init=uniform(),
+            key=getkey(),
+        )
+
+        # Just verify the layer is created without error
+        assert layer.linear_yu is not None
+        if layer.use_passthrough:
+            assert layer.linear_xu is not None
