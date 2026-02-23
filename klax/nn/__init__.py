@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from ._icnn import FICNN as FICNN
+from ._icnn import PICNN as PICNN
 from ._linear import InputSplitLinear as InputSplitLinear
 from ._linear import Linear as Linear
 from ._matrices import ConstantMatrix as ConstantMatrix
