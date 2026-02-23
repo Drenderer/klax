@@ -104,6 +104,7 @@ def hoedt_normal(
     def init(
         key: PRNGKeyArray, shape: Shape, dtype: DTypeLikeInexact = dtype
     ) -> Array:
+        dtype = jax.dtypes.canonicalize_dtype(dtype)
         fan_in = shape[in_axis]
         mean_square = 3.440115731272907 / (
             fan_in * (1.3450928843923602 + fan_in)
@@ -145,6 +146,7 @@ def hoedt_bias() -> Initializer:
         fan_in: int,
         dtype: DTypeLikeInexact = jnp.float_,
     ) -> Array:
+        dtype = jax.dtypes.canonicalize_dtype(dtype)
         mean = jnp.sqrt(
             0.5475114234402735 * fan_in / (1.3450928843923602 + fan_in)
         )
