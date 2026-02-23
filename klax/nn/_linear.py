@@ -111,7 +111,7 @@ class Linear(eqx.Module, strict=True):
         weight = weight_init(wkey, wshape, in_features_, dtype)
         self.weight = weight if weight_wrap is None else weight_wrap(weight)
         bshape = (out_features_,)
-        if use_bias is None:
+        if not use_bias:
             self.bias = None
         else:
             bias_init = canonicalize_initializer(bias_init)
@@ -247,10 +247,10 @@ class InputSplitLinear(eqx.Module, strict=True):
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
-            For klax intializers (such as input-size dependent bias initializers)
+            For klax initializers (such as input-size dependent bias initializers)
             the `fan_in` argument for the `bias_init` is calculated as the sum
             of the sizes of all inputs, while for the `weight_inits` the `fan_in`
             corresponds to the number of `in_features` for this matrix.
@@ -313,7 +313,7 @@ class InputSplitLinear(eqx.Module, strict=True):
         self.weights = tuple(weights)
 
         bshape = (out_features_,)
-        if use_bias is None:
+        if not use_bias:
             self.bias = None
         else:
             bias_init = canonicalize_initializer(bias_init)

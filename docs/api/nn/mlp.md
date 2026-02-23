@@ -15,3 +15,9 @@ title: Multi-layer perceptrons
         members:
             - __init__
             - __call__
+
+::: klax.nn.PICNN
+    options:
+        members:
+            - __init__
+            - __call__
