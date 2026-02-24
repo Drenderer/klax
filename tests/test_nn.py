@@ -659,6 +659,7 @@ class TestPICNN:
     @pytest.mark.parametrize(
         "width_sizes",
         [
+            [2, 3, 4],
             [(2, 3)],
             [(4, 5), (6, 7)],
             [(3, 4), (5, 6), (7, 8), (9, 10)],

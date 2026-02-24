@@ -693,7 +693,9 @@ class PICNN(eqx.Module, strict=True):
         """
         dtype = default_floating_dtype() if dtype is None else dtype
 
-        width_sizes = tuple(width_sizes)
+        width_sizes = tuple(
+            (n, n) if isinstance(n, int) else n for n in width_sizes
+        )
         in_sizes = ((x_size, p_size),) + width_sizes
         out_sizes = width_sizes + ((out_size, None),)
         use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
