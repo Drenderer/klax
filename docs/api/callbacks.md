@@ -13,9 +13,3 @@ a jax-incompatible way.
             - on_training_start
             - on_training_step
             - on_training_end
-
----
-
-::: klax.TrainingView
-    options:
-        members: false

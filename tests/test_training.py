@@ -50,7 +50,7 @@ class TestMakeStep:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -60,7 +60,9 @@ class TestMakeStep:
             steps=5,
         )
 
-        new_state = klax.make_step(state, next(static.batch), static)
+        new_state = klax.make_step(
+            view._state, next(view._static.batch), view._static
+        )
 
         # State has changed
         assert not jax.tree.all(
@@ -68,14 +70,14 @@ class TestMakeStep:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
+                view._state.model_leaves,
                 new_state.model_leaves,
             )
         )
 
 
 class TestRunTrainingLoop:
-    def test_run_training_loop_invokes_callbacks(self, getkey):
+    def test_invokes_callbacks(self, getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -99,7 +101,7 @@ class TestRunTrainingLoop:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -111,7 +113,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        new_state = klax.run_training_loop(state, static, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -121,12 +123,12 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
-                new_state.model_leaves,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
             )
         )
 
-    def test_run_training_loop_zero_steps_no_updates(self, getkey):
+    def test_zero_steps_no_updates(self, getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -150,7 +152,7 @@ class TestRunTrainingLoop:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -162,7 +164,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        new_state = klax.run_training_loop(state, static, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -172,12 +174,12 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
-                new_state.model_leaves,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
             )
         )
 
-    def test_run_training_loop_stops_on_callback(self, getkey):
+    def test_stops_on_callback(self, getkey):
         class StopAfterOne(klax.Callback):
             def __init__(self):
                 self.steps = []
@@ -198,7 +200,7 @@ class TestRunTrainingLoop:
         y = jnp.array([3.0, 7.0])
         batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        state, static = klax.make_state_and_static(
+        view = klax.make_view(
             model=model,
             optimizer=optimizer,
             opt_state=opt_state,
@@ -210,7 +212,7 @@ class TestRunTrainingLoop:
 
         callback = StopAfterOne()
 
-        new_state = klax.run_training_loop(state, static, [callback])
+        updated_view = klax.run_training_loop(view, [callback])
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
@@ -219,14 +221,14 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state.model_leaves,
-                new_state.model_leaves,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
             )
         )
 
 
 class TestFit:
-    def test_fit_returns_history_with_loss(self, getkey):
+    def test_basic_behavior(self, getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
         data = (
@@ -252,13 +254,20 @@ class TestFit:
         assert loss_steps == [0]
         assert len(loss_values) == 1
 
-    def test_fit_without_logger_returns_empty_history(self, getkey):
+    def test_overwriting_default_metrics(self, getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
         data = (
             jr.uniform(getkey(), (100, 2)),
             jr.uniform(getkey(), (100,)),
         )
+
+        def my_metric(model):
+            return "A"
+
+        my_metric.name = "loss"
+        my_metric.verbose = False
+
         trained_model, history = klax.fit(
             model,
             data,
@@ -267,20 +276,8 @@ class TestFit:
             steps=5,
             loss=klax.mse,
             optimizer=optax.sgd(0.1),
-            logger=None,
+            metrics=[my_metric],
             key=getkey(),
         )
-        initial_leaves = eqx.filter(model, eqx.is_inexact_array)
 
-        assert history.total_steps == -1
-        assert history.content == {}
-        updated_leaves = eqx.filter(trained_model, eqx.is_inexact_array)
-        assert not jax.tree.all(
-            jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
-                initial_leaves,
-                updated_leaves,
-            )
-        )
+        assert history.content["loss"][1] == ["A"]

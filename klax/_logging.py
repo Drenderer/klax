@@ -15,10 +15,12 @@
 """Utilities for logging during training."""
 
 import pickle
-from collections.abc import Callable
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
+from functools import update_wrapper
 from pathlib import Path
 from time import time
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol, cast
 
 import equinox as eqx
 import jax
@@ -40,12 +42,44 @@ except ImportError:
 
 
 class Metric(Protocol):
-    """A Metric is any object that can be called on a model and returns a value."""
+    """A Metric is any object that can be called on a model and returns a value.
+
+    Furthermore, metrics must have attributes `name: str` and `verbose: bool`.
+    """
+
+    name: str
+    verbose: bool
 
     def __call__(self, model: PyTree) -> Any: ...
 
 
-class Evaluator(Metric):
+def metric[T](
+    name: str, verbose: bool = False
+) -> Callable[[Callable[[PyTree], T]], Callable[[PyTree], T]]:
+    """Turn a function into a [Metric][klax.Metric] using a decorator factory.
+
+    Intended usage:
+    ```python
+    @metric(name="my_metric", verbose=False)
+    def compute_my_metric(model): ...
+    ```
+
+    Args:
+        name: Name of the metric.
+        verbose: Verbosity level for the metric. Defaults to False.
+
+    """
+
+    def make_metric(func):
+        func.name = name
+        func.verbose = verbose
+
+        return cast(Metric, func)
+
+    return make_metric
+
+
+class BatchMetric:
     """Compute a metric value from the model and a random batch of data.
 
     This is a convenience class that allows you to easily define metrics
@@ -57,6 +91,7 @@ class Evaluator(Metric):
 
     def __init__[T](
         self,
+        name: str,
         func: Callable[
             [PyTree[Any], PyTree[Any, "T"], PyTree[int | None, "T ..."]], Any  # type: ignore
         ],
@@ -64,21 +99,26 @@ class Evaluator(Metric):
         batcher: BatchGenerator,
         batch_size: int,
         batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
+        verbose: bool = False,
         *,
         key: PRNGKeyArray,
     ):
-        """Initialize the `Evaluator`.
+        """Initialize the `BatchMetric`.
 
         Args:
+            name: Name of the metric.
             func: The evaluation function to compute. It should take the model,
                 a batch of data, and the batch axes as input.
             data: The dataset to generate batches from.
             batcher: Batch generator function.
             batch_size: The size of each batch.
             batch_axes: The axes corresponding to the batch dimension in the data.
+            verbose: Verbosity level for the metric. Defaults to False.
             key: PRNG key for random number generation.
 
         """
+        self.name = name
+        self.verbose = verbose
         self.batch = batcher(data, batch_size, batch_axes, key=key)
         self.batch_axes = batch_axes
         self.func = func
@@ -248,7 +288,7 @@ class History:
         """Extend this history with the contents of another history.
 
         Args:
-            other: Another History instance to extend from.
+            other: Another History instance to extend with.
 
         """
         for key, (other_steps, other_values) in other.content.items():
@@ -265,30 +305,13 @@ class History:
 
 
 class MetricLogger(Callback):
-    """Callback for logging metrics in a History during training.
-
-    Example:
-        ```python
-            mylogger=MetricLogger(log_every=100)
-            mylogger.add_metric(
-                "accuracy",
-                lambda model: compute_accuracy(model)
-            )
-            model, history = fit(
-                model,
-                data,
-                ...,
-                logger=mylogger,
-            )
-        ```
-
-    """
+    """Callback for logging metrics in a History during training."""
 
     history: History
     log_every: int
-    metric_defs: dict[str, (bool, Metric)]
+    metrics: dict[str, Metric]
     steps_str_length: int = 0
-    verbose: bool = True
+    verbose: Literal[0, 1, 2]
     start_time: float = 0.0
     progress_bar: bool
     tqdm_bar: Any = None
@@ -296,41 +319,45 @@ class MetricLogger(Callback):
     def __init__(
         self,
         log_every: int = 100,
-        metric_defs: dict[str, (bool, Metric)] | None = None,
-        verbose: bool = True,
-        progress_bar: bool = True,
+        metrics: Sequence[Metric] | None = None,
+        verbose: Literal[0, 1, 2] = 2,
+        history: History | None = None,
     ):
         """Initialize the MetricLogger.
 
         Args:
             log_every: Frequency of logging metrics (in steps).
-            metric_defs: A dictionary mapping metric names to tuples of
-                (whether to print the metric, metric function).
-            verbose: Whether to print logged metrics to the console.
-            progress_bar: Whether to show a progress bar during training.
+            metrics: Sequence of [metrics][klax.Metric] to evaluate.
+                If multiple metrics share the same name, the later metrics will
+                overwrite prior metrics.
+            verbose: Verbosity level for logging metrics to the console. If 0,
+                no metrics will be printed. If 1, the metrics are printed. If
+                2, a progress bar will be shown.
+            history: An existing history object to log metrics to. If `None`,
+                a new history object will be created.
 
         """
-        self.metric_defs = metric_defs or {}
+        self.metrics = {} if metrics is None else {m.name: m for m in metrics}
         self.log_every = log_every
-        self.history = History()
+        self.history = History() if history is None else history
         self.verbose = verbose
-        if progress_bar and not _TQDM_AVAILABLE:
-            print("Warning: tqdm not installed, progress bar disabled.")
-            progress_bar = False
-        self.progress_bar = progress_bar
+        if (verbose == 2) and not _TQDM_AVAILABLE:
+            print(
+                "Warning: tqdm for progress bar not installed. Changing verbosity level to 1."
+            )
+            self.verbose = 1
 
-    def add_metric(
-        self, name: str, metric: Metric, verbose: bool = False
-    ) -> None:
+    def add_metric(self, metric: Metric) -> None:
         """Add a metric to be logged during training.
 
+        Warning:
+            Existing metrics sharing the same name will be overwritten.
+
         Args:
-            name: Name of the metric.
-            metric: A callable that computes the metric given the model.
-            verbose: Whether to print the metric during logging.
+            metric: The metric to be added.
 
         """
-        self.metric_defs[name] = (verbose, metric)
+        self.metrics[metric.name] = metric
 
     def on_training_step(self, view: TrainingView, step: int) -> None:
         """Log metrics at the current training step.
@@ -342,34 +369,34 @@ class MetricLogger(Callback):
         """
         if step % self.log_every == 0:
             message = []
-            for name, (verbose, metric_fn) in self.metric_defs.items():
-                metric_value = jax.device_get(metric_fn(view.model))
-                self.history.append(step, name, metric_value)
-                if self.verbose and verbose:
+            for metric in self.metrics.values():
+                metric_value = jax.device_get(metric(view.model))
+                self.history.append(step, metric.name, metric_value)
+                if self.verbose and metric.verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
                     except TypeError:
                         formatted_value = str(metric_value)
-                    message.append(f"{name}: {formatted_value}")
+                    message.append(f"{metric.name}: {formatted_value}")
 
             if self.verbose:
                 postfix = ", ".join(message)
-                if self.progress_bar:
+                if self.verbose > 1:
                     self.tqdm_bar.set_postfix_str(postfix)
                     if step != 0:
                         self.tqdm_bar.update(self.log_every)
                 else:
                     print(
-                        f"Step {step:>{self.steps_str_length}}/{view.static.steps}: "
+                        f"Step {step:>{self.steps_str_length}}/{view._static.steps}: "
                         + postfix
                     )
 
     def on_training_start(self, view: TrainingView, step: int) -> None:
         self.start_time = time()
-        self.steps_str_length = len(str(view.static.steps))
+        self.steps_str_length = len(str(view._static.steps))
 
-        if self.progress_bar:
-            self.tqdm_bar = tqdm(total=view.static.steps, dynamic_ncols=True)
+        if self.verbose > 1:
+            self.tqdm_bar = tqdm(total=view._static.steps, dynamic_ncols=True)
 
         self.on_training_step(view, step)
 
@@ -379,5 +406,8 @@ class MetricLogger(Callback):
         self.history.total_steps = step
         self.history.final_opt_state = view.opt_state
 
-        if self.progress_bar:
-            self.tqdm_bar.close()
+        if self.verbose > 1:
+            try:
+                self.tqdm_bar.close()
+            except Exception as e:
+                pass
