@@ -120,13 +120,12 @@ class BatchMetric:
         self.name = name
         self.verbose = verbose
         self.batch = batcher(data, batch_size, batch_axes, key=key)
-        self.batch_axes = batch_axes
         self.func = func
 
     @eqx.filter_jit
-    def evaluate(self, model, batch):
+    def evaluate(self, model, batch, aux):
         model = unwrap(model)
-        return self.func(model, batch, self.batch_axes)
+        return self.func(model, batch, aux)
 
     def __call__(self, model: PyTree) -> Scalar:
         """Compute the metric.

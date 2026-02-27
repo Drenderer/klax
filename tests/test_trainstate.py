@@ -36,7 +36,7 @@ class TestTrainingView:
             optimizer=optimizer,
             opt_state=opt_state,
             batch=dummy_batch(),
-            batch_axes=0,
+            aux=0,
             loss=object(),
             steps=5,
         )
@@ -61,7 +61,7 @@ class TestTrainingView:
             optimizer=wrapped,
             opt_state=opt_state,
             batch=dummy_batch(),
-            batch_axes=0,
+            aux=0,
             loss=object(),
             steps=3,
         )
@@ -163,14 +163,14 @@ class TestTrainingView:
         opt_state = {"m": {"w": jnp.zeros(2), "b": jnp.zeros(())}}
         optimizer = optax.adam(1e-3)
         loss = object()
-        batch_axes = 0
+        aux = 0
         steps = 2
         view = make_view(
             model,
             optimizer,
             opt_state,
             dummy_batch(),
-            batch_axes=batch_axes,
+            aux=aux,
             loss=loss,
             steps=steps,
         )
@@ -193,9 +193,9 @@ class TestTrainingView:
         with pytest.raises(AttributeError):
             view.batch = "something"
 
-        assert view.batch_axes == batch_axes
+        assert view.aux == aux
         with pytest.raises(AttributeError):
-            view.batch_axes = "something"
+            view.aux_tree_def = "something"
 
         assert view.loss is loss
         with pytest.raises(AttributeError):

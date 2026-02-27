@@ -44,9 +44,9 @@ class Loss(ABC):
 
         ```python
         >>> class MSE(klax.Loss):
-        ...     def __call__(self, model, data, batch_axes):
+        ...     def __call__(self, model, data, aux):
         ...         x, y = data
-        ...         y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+        ...         y_pred = jax.vmap(model)(x)
         ...         return jnp.mean(jnp.square(y_pred - y))
         ```
 
@@ -60,15 +60,14 @@ class Loss(ABC):
         self,
         model: PyTree,
         batch: PyTree[Any, "T"],
-        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+        aux: PyTree[Any],
     ) -> Scalar:
         """Abstract method to compute the loss for a given model and data.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
             batch: The input data or structure used for loss computation.
-            batch_axes: Specifies the axis or axes corresponding to the batch
-                dimension in the data.
+            aux: Auxiliary, user-defined state.
 
         Returns:
             Scalar: The computed loss value.
@@ -80,7 +79,7 @@ class Loss(ABC):
         self,
         model: PyTree,
         batch: PyTree[Any, "T"],
-        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+        aux: PyTree[Any],
     ) -> Scalar:
         """Compute the loss value used during training.
 
@@ -90,21 +89,20 @@ class Loss(ABC):
         Args:
             model: The model parameters or structure to evaluate the loss.
             batch: The input data or structure used for loss computation.
-            batch_axes: Specifies the axis or axes corresponding to the batch
-                dimension in the data.
+            aux: Auxiliary, user-defined state.
 
         Returns:
             Scalar: The computed loss value.
 
         """
         model = unwrap(model)
-        return self(model, batch, batch_axes)
+        return self(model, batch, aux)
 
     def value_and_grad[T, M](
         self,
         model: PyTree[Any, "M"],
         batch: PyTree[Any, "T"],
-        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+        aux: PyTree[Any],
     ) -> tuple[Scalar, PyTree[Any, "M"]]:
         """Compute the loss value and gradient during training.
 
@@ -115,22 +113,20 @@ class Loss(ABC):
         Args:
             model: The model parameters or structure to evaluate the loss.
             batch: The input data or structure used for loss computation.
-            batch_axes: Specifies the axis or axes corresponding to the batch
-                dimension in the data. Can be an integer, None, or a sequence
-                of values.
+            aux: Auxiliary, user-defined state.
 
         Returns:
             Tuple of loss value and gradient with respect to the model.
 
         """
-        return eqx.filter_value_and_grad(self.value)(model, batch, batch_axes)
+        return eqx.filter_value_and_grad(self.value)(model, batch, aux)
 
     def partitioned_value[T](
         self,
         params: PyTree,
         static: PyTree,
         batch: PyTree[Any, "T"],
-        batch_axes: PyTree[int | None, "T ..."],  # type: ignore
+        aux: PyTree[Any],
     ) -> Scalar:
         """Compute the loss value for partitioned models.
 
@@ -143,15 +139,14 @@ class Loss(ABC):
             params: The parameter part of the partitioned model.
             static: The static part of the partitioned model.
             batch: The input data or structure used for loss computation.
-            batch_axes: Specifies the axis or axes corresponding to the batch
-                dimension in the data.
+            aux: Auxiliary, user-defined state.
 
         Returns:
             Scalar: The computed loss value.
 
         """
         model = eqx.combine(params, static)
-        return self.value(model, batch, batch_axes)
+        return self.value(model, batch, aux)
 
 
 def loss(func: Callable) -> Loss:
@@ -161,15 +156,15 @@ def loss(func: Callable) -> Loss:
         To create a mean squared error loss using this decorator, you can do:
         ```python
         @loss
-        def mse(model, data, batch_axes):
+        def mse(model, data, aux):
             x, y = data
-            y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+            y_pred = jax.vmap(model)(x)
             return jnp.mean(jnp.square(y_pred - y))
         ```
 
     Args:
         func: Function that computes the loss. It must have the signature
-            `(model: PyTree, batch: PyTree, batch_axes: PyTree) -> Scalar`.
+            `(model: PyTree, batch: PyTree, aux: PyTree) -> Scalar`.
 
     Returns:
         Loss: An instance of a subclass of [`klax.Loss`][] that wraps the given
@@ -178,31 +173,31 @@ def loss(func: Callable) -> Loss:
     """
 
     class FuncLoss(Loss):
-        def __call__(self, model, batch, batch_axes):
-            return func(model, batch, batch_axes)
+        def __call__(self, model, batch, aux):
+            return func(model, batch, aux)
 
     return update_wrapper(FuncLoss(), func)
 
 
 @loss
-def mse(model, data, batch_axes):
+def mse(model, data, aux):
     """Mean squared error for a tuple of data `(x, y)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
     """
     x, y = data
-    y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+    y_pred = jax.vmap(model)(x)
     return jnp.mean(jnp.square(y_pred - y))
 
 
 @loss
-def mae(model, data, batch_axes):
+def mae(model, data, aux):
     """Mean absolute error for a tuple of data `(x, y)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
     """
     x, y = data
-    y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+    y_pred = jax.vmap(model)(x)
     return jnp.mean(jnp.abs(y_pred - y))

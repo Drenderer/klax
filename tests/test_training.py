@@ -55,7 +55,7 @@ class TestMakeStep:
             optimizer=optimizer,
             opt_state=opt_state,
             batch=batch,
-            batch_axes=0,
+            aux=None,
             loss=klax.mse,
             steps=5,
         )
@@ -106,7 +106,7 @@ class TestRunTrainingLoop:
             optimizer=optimizer,
             opt_state=opt_state,
             batch=batch,
-            batch_axes=0,
+            aux=None,
             loss=klax.mse,
             steps=3,
         )
@@ -157,7 +157,7 @@ class TestRunTrainingLoop:
             optimizer=optimizer,
             opt_state=opt_state,
             batch=batch,
-            batch_axes=0,
+            aux=None,
             loss=klax.mse,
             steps=0,
         )
@@ -205,7 +205,7 @@ class TestRunTrainingLoop:
             optimizer=optimizer,
             opt_state=opt_state,
             batch=batch,
-            batch_axes=0,
+            aux=None,
             loss=klax.mse,
             steps=5,
         )

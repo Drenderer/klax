@@ -38,6 +38,7 @@ class TrainingState:
 
     model_leaves: list
     opt_state_leaves: list
+    aux_leaves: list
 
 
 @dataclass(frozen=True)
@@ -55,8 +56,8 @@ class TrainingStatic:
     model_tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
     optimizer: optax.GradientTransformationExtraArgs
     opt_state_tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
+    aux_tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
     batch: Generator[PyTree[Any], None, None]
-    batch_axes: PyTree[int | None]
     loss: Loss
     steps: int
 
@@ -76,6 +77,15 @@ class TrainingStatic:
         leaves, treedef = jax.tree.flatten(opt_state)
         if treedef != self.opt_state_tree_def:
             raise ValueError("Opt state structure changed")
+        return leaves
+
+    def assemble_aux(self, aux_leaves):
+        return jax.tree.unflatten(self.aux_tree_def, aux_leaves)
+
+    def disassemble_aux(self, aux):
+        leaves, treedef = jax.tree.flatten(aux)
+        if treedef != self.aux_tree_def:
+            raise ValueError("Aux state structure changed")
         return leaves
 
 
@@ -99,12 +109,14 @@ class TrainingView:
     _static: TrainingStatic
     _model: Any  # Cached model instance.
     _opt_state: Any  # Cached optimizer state.
+    _aux: Any  # Cached auxiliary state
 
     def __init__(self, state: TrainingState, static: TrainingStatic):
         self._state = state
         self._static = static
         self._model = None
         self._opt_state = None
+        self._aux = None
 
     @property
     def model(self):
@@ -135,6 +147,18 @@ class TrainingView:
         self._opt_state = value
 
     @property
+    def aux(self):
+        """Accessor for the auxiliary state."""
+        if self._aux is None:
+            self._aux = self._static.assemble_aux(self._state.aux_leaves)
+        return self._aux
+
+    @aux.setter
+    def aux(self, value):
+        self._state.aux_leaves = self._static.disassemble_aux(value)
+        self._aux = value
+
+    @property
     def model_tree_def(self) -> PyTreeDef:  # pyright: ignore[reportInvalidTypeForm]
         return self._static.model_tree_def
 
@@ -145,6 +169,10 @@ class TrainingView:
     @property
     def opt_state_tree_def(self) -> PyTreeDef:  # pyright: ignore[reportInvalidTypeForm]
         return self._static.opt_state_tree_def
+
+    @property
+    def aux_tree_def(self) -> PyTreeDef:  # pyright: ignore[reportInvalidTypeForm]
+        return self._static.aux_tree_def
 
     @property
     def batch(self) -> Generator[PyTree[Any], None, None]:
@@ -174,7 +202,7 @@ def make_view(
     | optax.GradientTransformationExtraArgs,
     opt_state: PyTree[Any],
     batch: Generator[PyTree[Any], None, None],
-    batch_axes: PyTree[int | None],
+    aux: PyTree[Any],
     loss: Loss,
     steps: int,
 ) -> TrainingView:
@@ -185,7 +213,7 @@ def make_view(
         optimizer: The optimizer to use for training.
         opt_state: The initial optimizer state.
         batch: A generator that yields batches of data.
-        batch_axes: A PyTree indicating the batch axes for each component of the data.
+        aux: An arbitrary PyTree passed to the loss function.
         loss: The loss function to use for training.
         steps: The total number of training steps.
 
@@ -193,8 +221,9 @@ def make_view(
         A TrainingView.
 
     """
-    model_leaves, model_treedef = jax.tree.flatten(model)
-    opt_state_leaves, opt_state_treedef = jax.tree.flatten(opt_state)
+    model_leaves, model_tree_def = jax.tree.flatten(model)
+    opt_state_leaves, opt_state_tree_def = jax.tree.flatten(opt_state)
+    aux_leaves, aux_tree_def = jax.tree.flatten(aux)
 
     optimizer = (
         optax.with_extra_args_support(optimizer)
@@ -205,14 +234,15 @@ def make_view(
     state = TrainingState(
         model_leaves=model_leaves,
         opt_state_leaves=opt_state_leaves,
+        aux_leaves=aux_leaves,
     )
 
     static = TrainingStatic(
-        model_tree_def=model_treedef,
+        model_tree_def=model_tree_def,
         optimizer=optimizer,
-        opt_state_tree_def=opt_state_treedef,
+        opt_state_tree_def=opt_state_tree_def,
+        aux_tree_def=aux_tree_def,
         batch=batch,
-        batch_axes=batch_axes,
         loss=loss,
         steps=steps,
     )

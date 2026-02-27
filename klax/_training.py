@@ -42,7 +42,7 @@ from ._wrappers import apply
 new_logger = object()
 
 
-@eqx.filter_jit
+@eqx.filter_jit  # TODO: This should be @jax.jit(static_argnums=2)
 def make_step(
     state: TrainingState, batch: PyTree, static: TrainingStatic
 ) -> TrainingState:
@@ -66,9 +66,10 @@ def make_step(
     """
     model = static.assemble_model(state.model_leaves)
     opt_state = static.assemble_opt_state(state.opt_state_leaves)
+    aux = static.assemble_aux(state.aux_leaves)
 
     model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
-    value, grad = static.loss.value_and_grad(model, batch, static.batch_axes)
+    value, grad = static.loss.value_and_grad(model, batch, aux)
     updates, opt_state = static.optimizer.update(
         grad,
         opt_state,
@@ -79,7 +80,7 @@ def make_step(
             static.loss.partitioned_value,
             static=model_static,
             batch=batch,
-            batch_axes=static.batch_axes,
+            aux=aux,
         ),
     )
     model_params = optax.apply_updates(model_params, updates)
@@ -91,6 +92,7 @@ def make_step(
     return TrainingState(
         model_leaves=static.disassemble_model(model),
         opt_state_leaves=static.disassemble_opt_state(opt_state),
+        aux_leaves=static.disassemble_aux(aux),
     )
 
 
@@ -137,6 +139,7 @@ def fit[T: eqx.Module](
     *,
     batch_size: int = 32,
     batch_axes: PyTree[int | None] = 0,
+    aux: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
@@ -177,30 +180,37 @@ def fit[T: eqx.Module](
             the batch axis for `x` is the first axis (0), for `y1` also
             the first axis (0), for `y2` the second axis (1) and for the
             string there is no batch axis (`None`).
+            Defaults to `0`.
+        aux: Auxiliary input to the loss function. Can be updated via a
+            callback.
+            Defaults to `None`.
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
             to None.)
             Internally, the validation data is used to create a [BatchMetric][klax.BatchMetric]
             for logging. Each time the metric is evaluated, the loss is computed
             on a batch from the validation dataset with batch size `4*batch_size`.
-        steps: Number of gradient updates to apply. (Defaults to 1000.)
+            Defaults to `None`
+        steps: Number of gradient updates to apply.
+            Defaults to 1000.
         loss: The loss function with call signature
-            `(model: PyTree, data: PyTree, batch_axes: int | None |
-            Sequence[Any]) -> float`. (Defaults to `mse`.)
+            `(model: PyTree, data: PyTree, aux: PyTree) -> float`.
+            Defaults to `mse`.
         optimizer: The optimizer. Any optax gradient transform to calculate
-            the updates for the model. (Defaults to optax.adam(1e-3).)
+            the updates for the model.
+            Defaults to optax.adam(1e-3).
         init_opt_state: The initial state of the optimizer. If `None`, the
             optimizer is initialized from scratch. By providing a value for
             `init_opt_state`, the user can resume training from a previous
             state (e.g., obtained from the `HistoryCallback.last_opt_state`).
-            (Defaults to `None`.)
+            Defaults to `None`.
         batcher: The data loader that splits inputs and targets into batches.
-            (Defaults to `batch_data`.)
+            Defaults to `batch_data`.
         metrics: Sequence of [metrics][klax.Metric] to be evaluated at regular
             intervals during the training. You can overwrite the default "loss"
             and "validation_loss" metrics, by adding custom metrics with the same
             name.
-            (Defaults to `None`.)
+            Defaults to `None`.
         log_every: Interval for both metric evaluation and progress logging.
             A value `log_every=n` means that every `n` steps during the training
             the metrics are evaluated and (if `verbose>0`) the training progress
@@ -209,10 +219,11 @@ def fit[T: eqx.Module](
             - 0: Nothing is printed.
             - 1: A message is printed every `log_every` steps.
             - 2: A progressbar is used and updated every `log_every` steps.
+            Defaults to `2`.
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
             implement early stopping, custom logging and more. The argument
             to the callback function is aCallbackArgs object.
-            (Defaults to `None`.)
+            Defaults to `None`.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
 
@@ -239,7 +250,7 @@ def fit[T: eqx.Module](
         optimizer,
         opt_state,
         batch,
-        batch_axes,
+        aux,
         loss,
         steps,
     )
