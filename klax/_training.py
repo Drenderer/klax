@@ -103,10 +103,7 @@ def run_training_loop(
         stop = False
         for callback in callbacks:
             stop |= bool(callback.on_training_step(context))
-        if stop:
-            break
-
-        if context.step == context.steps:
+        if stop or context.step == context.steps:
             break
 
     for callback in callbacks:
@@ -137,7 +134,7 @@ def fit[T: eqx.Module](
 ) -> tuple[T, History]:
     """Train a model using an optimizer from optax.
 
-    This is a convenient wrapper around [`firun_training_loopt`][klax.run_training_loop]
+    This is a convenient wrapper around [`run_training_loop`][klax.run_training_loop]
     that sets up optimizer, training state and callbacks.
 
     Args:
