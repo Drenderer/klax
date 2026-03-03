@@ -131,7 +131,7 @@ class BatchMetric:
 
         """
         batch = next(self.batch)
-        return self.evaluate(context.model, batch, context.aux_state)
+        return self.evaluate(context.model, batch, context.aux)
 
 
 type Steps = list[int]

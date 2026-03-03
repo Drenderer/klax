@@ -17,7 +17,8 @@ from dataclasses import dataclass
 
 import jax
 import optax
-from jaxtyping import PyTree
+from jax import numpy as jnp
+from jaxtyping import Array, Int, PyTree, PyTreeDef
 
 from klax._losses import Loss
 
@@ -29,14 +30,16 @@ class TrainingState:
 
     model: PyTree
     opt_state: PyTree
-    aux_state: PyTree
-    step: int
+    aux: PyTree
+    step: Int[Array, ""]
 
 
 class TrainingContext:
     """Dataclass of things that are expected to remain static during training."""
 
-    state: TrainingState
+    _state: TrainingState | None
+    _state_treedef: PyTreeDef  # type: ignore
+    _state_leaves: list
     optimizer: optax.GradientTransformationExtraArgs
     loss: Loss
     batch_generator: Generator[PyTree, None, None]
@@ -49,7 +52,7 @@ class TrainingContext:
         | optax.GradientTransformationExtraArgs,
         opt_state: PyTree,
         batch_generator: Generator[PyTree, None, None],
-        aux_state: PyTree,
+        aux: PyTree,
         loss: Loss,
         steps: int,
     ):
@@ -58,12 +61,35 @@ class TrainingContext:
             if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
             else optimizer
         )
+        state = TrainingState(
+            model, opt_state, aux, jnp.array(0, dtype=jnp.int32)
+        )
 
-        self.state = TrainingState(model, opt_state, aux_state, 0)
+        self._state = state
+        self._state_leaves, self._state_treedef = jax.tree.flatten(state)
         self.optimizer = optimizer
         self.loss = loss
         self.batch_generator = batch_generator
         self.steps = steps
+
+    @property
+    def state(self) -> TrainingState:
+        if self._state is None:
+            state = jax.tree.unflatten(self._state_treedef, self._state_leaves)
+            self._state = state
+
+        return self._state
+
+    @state.setter
+    def state(self, value) -> None:
+        if jax.tree.structure != self._state_treedef:
+            raise ValueError("PyTree strucutre of state changed.")
+        self._state = value
+        self._state_leaves, _ = jax.tree.flatten(value)
+
+    def update_state(self, leaves):
+        self._state = None
+        self._state_leaves = leaves
 
     @property
     def model(self) -> PyTree:
@@ -82,12 +108,12 @@ class TrainingContext:
         self.state.opt_state = value
 
     @property
-    def aux_state(self) -> PyTree:
-        return self.state.aux_state
+    def aux(self) -> PyTree:
+        return self.state.aux
 
-    @aux_state.setter
-    def aux_state(self, value) -> None:
-        self.state.aux_state = value
+    @aux.setter
+    def aux(self, value) -> None:
+        self.state.aux = value
 
     @property
     def step(self) -> int:

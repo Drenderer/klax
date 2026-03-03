@@ -20,7 +20,7 @@ from typing import Any, Literal
 import equinox as eqx
 import jax
 import optax
-from jaxtyping import PRNGKeyArray, PyTree
+from jaxtyping import PRNGKeyArray, PyTree, PyTreeDef
 
 from klax._losses import Loss
 
@@ -39,18 +39,21 @@ new_logger = object()
 
 @eqx.filter_jit
 def make_step(
-    state: TrainingState,
+    state_leaves: list,
+    state_treedef: PyTreeDef,  # type: ignore
     batch: PyTree,
     loss: Loss,
     optimizer: optax.GradientTransformationExtraArgs,
-) -> TrainingState:
+) -> tuple[list, PyTreeDef]:  # type: ignore
+    state = jax.tree.unflatten(state_treedef, state_leaves)
+
     model = state.model
-    aux_state = state.aux_state
+    aux = state.aux
     opt_state = state.opt_state
     step = state.step
 
     model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
-    value, grad = loss.value_and_grad(model, batch, aux_state)
+    value, grad = loss.value_and_grad(model, batch, aux)
     updates, opt_state = optimizer.update(
         grad,
         opt_state,
@@ -61,7 +64,7 @@ def make_step(
             loss.partitioned_value,
             static=model_static,
             batch=batch,
-            aux=aux_state,
+            aux=aux,
         ),
     )
     model_params = optax.apply_updates(model_params, updates)
@@ -72,26 +75,30 @@ def make_step(
 
     step += 1
 
-    return TrainingState(model, opt_state, aux_state, step)
+    state = TrainingState(model, opt_state, aux, step)
+
+    return jax.tree.flatten(state)
 
 
 def run_training_loop(
     context: TrainingContext,
     callbacks: Sequence[Callback],
 ) -> TrainingContext:
-    state = context.state
+    state_leaves = context._state_leaves
+    state_treedef = context._state_treedef
 
     for callback in callbacks:
         callback.on_training_start(context)
 
     for batch in context.batch_generator:
-        state = make_step(
-            state,
+        state_leaves, _ = make_step(
+            state_leaves,
+            state_treedef,
             batch,
             context.loss,
             context.optimizer,
         )
-        context.state = state
+        context.update_state(state_leaves)
 
         stop = False
         for callback in callbacks:
@@ -114,7 +121,7 @@ def fit[T: eqx.Module](
     *,
     batch_size: int = 32,
     batch_axes: PyTree[int | None] = 0,
-    aux_state: PyTree[Any] = None,
+    aux: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
@@ -156,7 +163,7 @@ def fit[T: eqx.Module](
             the first axis (0), for `y2` the second axis (1) and for the
             string there is no batch axis (`None`).
             Defaults to `0`.
-        aux_state: Auxiliary input to the loss function. Can be updated via a
+        aux: Auxiliary input to the loss function. Can be updated via a
             callback.
             Defaults to `None`.
         validation_data: Arbitrary `PyTree` used for validation during
@@ -221,7 +228,7 @@ def fit[T: eqx.Module](
     bkey, key = jax.random.split(key)
     batch_generator = batcher(data, batch_size, batch_axes, key=bkey)
     context = TrainingContext(
-        model, optimizer, opt_state, batch_generator, aux_state, loss, steps
+        model, optimizer, opt_state, batch_generator, aux, loss, steps
     )
 
     # Make callbacks iterable
