@@ -101,7 +101,7 @@ class BatchMetric:
         Args:
             name: Name of the metric.
             func: The evaluation function to compute. It should take the model,
-                a batch of data, and the batch axes as input.
+                a batch of data, and the auxiliary state as input.
             data: The dataset to generate batches from.
             batcher: Batch generator factory.
             batch_size: The size of each batch.
@@ -112,7 +112,7 @@ class BatchMetric:
         """
         self.name = name
         self.verbose = verbose
-        self.batch = batcher(data, batch_size, batch_axes, key=key)
+        self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
         self.func = func
 
     @eqx.filter_jit
@@ -130,7 +130,7 @@ class BatchMetric:
             The metric value on the sampled batch.
 
         """
-        batch = next(self.batch)
+        batch = next(self.batch_generator)
         return self.evaluate(context.model, batch, context.aux)
 
 
