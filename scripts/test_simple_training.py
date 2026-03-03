@@ -15,32 +15,34 @@ y = jnp.sin(x)
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 
-class UpdateAux(klax.Callback):
-    def on_training_step(self, view, step):
-        view.aux = jnp.array(step, dtype=jnp.float_)
+@klax.metric("bias")
+def get_bias(context):
+    return context.model.layers[0].bias
 
 
 @klax.loss
 def my_loss(model, batch, aux):
     x, y = batch
     y_pred = jax.vmap(model)(x)
-    loss = jnp.mean((y - y_pred) ** 2)
-    return aux
+    return jnp.mean((y - y_pred) ** 2)
 
 
 model, history = klax.fit(
     model,
     (x, y),
     validation_data=(x, y),
-    steps=3_000,
-    callbacks=[UpdateAux()],
-    aux=jnp.array(0, dtype=jnp.float_),
+    steps=30_000,
+    metrics=[get_bias],
+    # callbacks=[MyCallback()],
+    batcher=klax.batch_data,
     loss=my_loss,
     key=train_key,
 )
 
-ax = history.plot("loss")
-ax.set(yscale="linear", title="Training History (Linear Scale)")
+steps, values = history["bias"]
+fig, ax = plt.subplots()
+ax.plot(steps, values)
+ax.set(xlabel="step", yscale="linear", title="Recorded bias values")
 plt.show()
 
 ax = history.plot("loss", "validation_loss")

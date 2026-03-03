@@ -7,45 +7,41 @@ from jax import random as jr
 import klax
 
 key = jr.key(0)
-model_key, train_key = jr.split(key, 2)
-
-x = jnp.linspace(-3, 3, 100)
-y = jnp.sin(x)
+model_key, train_key, aux_key = jr.split(key, 3)
 
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 
-@klax.metric("parameter")
-def get_bias(context):
-    return context.model.layers[0].bias
+class UpdateAux(klax.Callback):
+    @eqx.filter_jit
+    def on_training_step(self, context):
+        context.aux, _ = jr.split(context.aux)
 
 
 @klax.loss
 def my_loss(model, batch, aux):
-    x, y = batch
+    key = aux
+    x = jr.normal(key, (64,))
+    y = jnp.sin(x)
     y_pred = jax.vmap(model)(x)
     return jnp.mean((y - y_pred) ** 2)
 
 
 model, history = klax.fit(
     model,
-    (x, y),
-    validation_data=(x, y),
+    data=None,
     steps=30_000,
-    metrics=[get_bias],
-    # callbacks=[MyCallback()],
-    batcher=klax.batch_data,
+    callbacks=[UpdateAux()],
+    aux=aux_key,
     loss=my_loss,
     key=train_key,
 )
 
-ax = history.plot("parameter")
-ax.set(yscale="linear", title="Training History (Linear Scale)")
-plt.show()
+x = jnp.linspace(-4, 4, 100)
+y = jnp.sin(x)
 
-ax = history.plot("loss", "validation_loss")
+ax = history.plot("loss")
 plt.show()
-
 y_pred = jax.vmap(model)(x)
 fig, ax = plt.subplots()
 ax.plot(x, y, label="True", marker="o", markevery=10)
