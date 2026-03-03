@@ -39,16 +39,14 @@ class Callback(ABC):
     create a custom callback.
     """
 
-    def on_training_start(self, context: TrainingContext, step: int) -> None:
+    def on_training_start(self, context: TrainingContext) -> None:
         """Execute at the beginning of training, before any parameter updates."""
         pass
 
-    def on_training_step(
-        self, context: TrainingContext, step: int
-    ) -> bool | None:
+    def on_training_step(self, context: TrainingContext) -> bool | None:
         """Execute after each parameter update during training."""
         pass
 
-    def on_training_end(self, context: TrainingContext, step: int) -> None:
+    def on_training_end(self, context: TrainingContext) -> None:
         """Execute at the end of training."""
         pass
