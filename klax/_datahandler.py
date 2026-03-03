@@ -80,7 +80,7 @@ def broadcast_and_get_size[T](
 
 
 @typing.runtime_checkable
-class BatchGenerator(Protocol):
+class Batcher(Protocol):
     def __call__(
         self,
         data: PyTree[Any],

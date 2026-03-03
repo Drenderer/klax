@@ -14,24 +14,16 @@ y = jnp.sin(x)
 
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
-get_bias = lambda m: m.layers[0].bias
 
-logger = klax.MetricLogger(log_every=100)
-logger.add_metric("parameter", lambda model: get_bias(model))
-
-
-class MyCallback(klax.Callback):
-    def on_training_step(self, view, step):
-        if step % 1000 == 0:
-            view.model = eqx.tree_at(
-                get_bias, view.model, jnp.roll(get_bias(view.model), shift=1)
-            )
+@klax.metric("parameter")
+def get_bias(context):
+    return context.model.layers[0].bias
 
 
 @klax.loss
-def my_loss(model, batch, batch_axes):
-    (x, y), key = batch
-    y_pred = jax.vmap(model, in_axes=batch_axes)(x)
+def my_loss(model, batch, aux):
+    x, y = batch
+    y_pred = jax.vmap(model)(x)
     return jnp.mean((y - y_pred) ** 2)
 
 
@@ -40,9 +32,9 @@ model, history = klax.fit(
     (x, y),
     validation_data=(x, y),
     steps=30_000,
-    logger=logger,
+    metrics=[get_bias],
     # callbacks=[MyCallback()],
-    batcher=klax.batch_data_with_key,
+    batcher=klax.batch_data,
     loss=my_loss,
     key=train_key,
 )

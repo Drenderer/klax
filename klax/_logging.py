@@ -27,9 +27,9 @@ import jax
 from jaxtyping import PRNGKeyArray, PyTree, Scalar
 
 from klax._callbacks import Callback
-from klax._datahandler import BatchGenerator
+from klax._datahandler import Batcher
 from klax._losses import Loss
-from klax._trainstate import TrainingView
+from klax._trainstate import TrainingContext
 from klax._wrappers import unwrap
 
 try:
@@ -42,15 +42,10 @@ except ImportError:
 
 
 class Metric(Protocol):
-    """A Metric is any object that can be called on a model and returns a value.
-
-    Furthermore, metrics must have attributes `name: str` and `verbose: bool`.
-    """
-
     name: str
     verbose: bool
 
-    def __call__(self, model: PyTree) -> Any: ...
+    def __call__(self, context: TrainingContext) -> Any: ...
 
 
 def metric[T](
@@ -61,7 +56,7 @@ def metric[T](
     Intended usage:
     ```python
     @metric(name="my_metric", verbose=False)
-    def compute_my_metric(model): ...
+    def compute_my_metric(context): ...
     ```
 
     Args:
@@ -92,11 +87,9 @@ class BatchMetric:
     def __init__[T](
         self,
         name: str,
-        func: Callable[
-            [PyTree[Any], PyTree[Any, "T"], PyTree[int | None, "T ..."]], Any  # type: ignore
-        ],
+        func: Callable[[PyTree, PyTree[Any, "T"], PyTree], Any],
         data: PyTree[Any, "T"],
-        batcher: BatchGenerator,
+        batcher: Batcher,
         batch_size: int,
         batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
         verbose: bool = False,
@@ -110,7 +103,7 @@ class BatchMetric:
             func: The evaluation function to compute. It should take the model,
                 a batch of data, and the batch axes as input.
             data: The dataset to generate batches from.
-            batcher: Batch generator function.
+            batcher: Batch generator factory.
             batch_size: The size of each batch.
             batch_axes: The axes corresponding to the batch dimension in the data.
             verbose: Verbosity level for the metric. Defaults to False.
@@ -127,18 +120,18 @@ class BatchMetric:
         model = unwrap(model)
         return self.func(model, batch, aux)
 
-    def __call__(self, model: PyTree) -> Scalar:
+    def __call__(self, context: TrainingContext):
         """Compute the metric.
 
         Args:
-            model: Model to evaluate.
+            context: TrainingContext to evaluate in.
 
         Returns:
             The metric value on the sampled batch.
 
         """
         batch = next(self.batch)
-        return self.evaluate(model, batch)
+        return self.evaluate(context.model, batch, context.aux_state)
 
 
 type Steps = list[int]
@@ -358,19 +351,18 @@ class MetricLogger(Callback):
         """
         self.metrics[metric.name] = metric
 
-    def on_training_step(self, view: TrainingView, step: int) -> None:
+    def on_training_step(self, context: TrainingContext) -> None:
         """Log metrics at the current training step.
 
         Args:
-            view: The current TrainingView containing state and static info.
-            step: The current training step.
+            context: Current training context.
 
         """
-        if step % self.log_every == 0:
+        if context.step % self.log_every == 0:
             message = []
             for metric in self.metrics.values():
-                metric_value = jax.device_get(metric(view.model))
-                self.history.append(step, metric.name, metric_value)
+                metric_value = jax.device_get(metric(context))
+                self.history.append(context.step, metric.name, metric_value)
                 if self.verbose and metric.verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
@@ -382,28 +374,28 @@ class MetricLogger(Callback):
                 postfix = ", ".join(message)
                 if self.verbose > 1:
                     self.tqdm_bar.set_postfix_str(postfix)
-                    if step != 0:
+                    if context.step != 0:
                         self.tqdm_bar.update(self.log_every)
                 else:
                     print(
-                        f"Step {step:>{self.steps_str_length}}/{view._static.steps}: "
+                        f"Step {context.step:>{self.steps_str_length}}/{context.steps}: "
                         + postfix
                     )
 
-    def on_training_start(self, view: TrainingView, step: int) -> None:
+    def on_training_start(self, context: TrainingContext) -> None:
         self.start_time = time()
-        self.steps_str_length = len(str(view._static.steps))
+        self.steps_str_length = len(str(context.steps))
 
         if self.verbose > 1:
-            self.tqdm_bar = tqdm(total=view._static.steps, dynamic_ncols=True)
+            self.tqdm_bar = tqdm(total=context.steps, dynamic_ncols=True)
 
-        self.on_training_step(view, step)
+        self.on_training_step(context)
 
-    def on_training_end(self, view: TrainingView, step: int) -> None:
+    def on_training_end(self, context: TrainingContext) -> None:
         end_time = time()
         self.history.total_time = end_time - self.start_time
-        self.history.total_steps = step
-        self.history.final_opt_state = view.opt_state
+        self.history.total_steps = context.step
+        self.history.final_opt_state = context.opt_state
 
         if self.verbose > 1:
             try:

@@ -15,7 +15,7 @@
 
 from abc import ABC
 
-from ._trainstate import TrainingView
+from ._trainstate import TrainingContext
 
 
 class Callback(ABC):
@@ -39,14 +39,16 @@ class Callback(ABC):
     create a custom callback.
     """
 
-    def on_training_start(self, view: TrainingView, step: int) -> None:
+    def on_training_start(self, context: TrainingContext, step: int) -> None:
         """Execute at the beginning of training, before any parameter updates."""
         pass
 
-    def on_training_step(self, view: TrainingView, step: int) -> bool | None:
+    def on_training_step(
+        self, context: TrainingContext, step: int
+    ) -> bool | None:
         """Execute after each parameter update during training."""
         pass
 
-    def on_training_end(self, view: TrainingView, step: int) -> None:
+    def on_training_end(self, context: TrainingContext, step: int) -> None:
         """Execute at the end of training."""
         pass

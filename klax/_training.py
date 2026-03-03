@@ -26,61 +26,42 @@ from klax._losses import Loss
 
 from ._callbacks import Callback
 from ._datahandler import (
-    BatchGenerator,
+    Batcher,
     batch_data,
 )
 from ._logging import BatchMetric, History, Metric, MetricLogger
 from ._losses import Loss, mse
-from ._trainstate import (
-    TrainingState,
-    TrainingStatic,
-    TrainingView,
-    make_view,
-)
+from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
 
 new_logger = object()
 
 
-@eqx.filter_jit  # TODO: This should be @jax.jit(static_argnums=2)
+@eqx.filter_jit
 def make_step(
-    state: TrainingState, batch: PyTree, static: TrainingStatic
+    state: TrainingState,
+    batch: PyTree,
+    loss: Loss,
+    optimizer: optax.GradientTransformationExtraArgs,
 ) -> TrainingState:
-    """Update the training state by one optimization step.
-
-    This function implements the unflattening trick described in
-    [low-overhead training loops](https://docs.kidger.site/equinox/tricks/),
-    slightly reducing JAX's overhead when repeatedly passing through the
-    jit boundary of the `make_step` function in a training loop.
-    It is furthermore compatible with all optimizers from the optax library.
-    After each update, any constraints in the model are [applied][klax.apply].
-
-    Args:
-        state: [TrainingState][klax.TrainingState].
-        batch: Batch of training data.
-        static: [TrainingStatic][klax.TrainingStatic].
-
-    Returns:
-        Updated training state.
-
-    """
-    model = static.assemble_model(state.model_leaves)
-    opt_state = static.assemble_opt_state(state.opt_state_leaves)
-    aux = static.assemble_aux(state.aux_leaves)
+    model = state.model
+    aux_state = state.aux_state
+    opt_state = state.opt_state
+    step = state.step
 
     model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
-    value, grad = static.loss.value_and_grad(model, batch, aux)
-    updates, opt_state = static.optimizer.update(
+    value, grad = loss.value_and_grad(model, batch, aux_state)
+    updates, opt_state = optimizer.update(
         grad,
         opt_state,
         model_params,
         value=value,
         grad=grad,
         value_fn=jax.tree_util.Partial(
-            static.loss.partitioned_value,
+            loss.partitioned_value,
             static=model_static,
             batch=batch,
-            aux=aux,
+            aux=aux_state,
         ),
     )
     model_params = optax.apply_updates(model_params, updates)
@@ -89,48 +70,42 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    return TrainingState(
-        model_leaves=static.disassemble_model(model),
-        opt_state_leaves=static.disassemble_opt_state(opt_state),
-        aux_leaves=static.disassemble_aux(aux),
-    )
+    step += 1
+
+    return TrainingState(model, opt_state, aux_state, step)
 
 
 def run_training_loop(
-    view: TrainingView,
+    context: TrainingContext,
     callbacks: Sequence[Callback],
-) -> TrainingView:
-    """Iterate [`make_step`][klax.make_step] in pure python with callback integration.
+) -> TrainingContext:
+    state = context.state
 
-    Args:
-        view: [TrainingView][klax.TrainingView]
-        callbacks: Sequence of [Callback][klax.Callback] instances.
-
-    Returns:
-        Final [TrainingView][klax.TrainingView].
-
-    """
-    step = 0
     for callback in callbacks:
-        callback.on_training_start(view, step)
+        callback.on_training_start(context)
 
-    state = view._state
-    static = view._static
-    for step in range(1, static.steps + 1):
-        state = make_step(state, next(static.batch), static)
+    for batch in context.batch_generator:
+        state = make_step(
+            state,
+            batch,
+            context.loss,
+            context.optimizer,
+        )
+        context.state = state
 
-        view = TrainingView(state, static)
         stop = False
         for callback in callbacks:
-            stop |= bool(callback.on_training_step(view, step))
+            stop |= bool(callback.on_training_step(context))
         if stop:
             break
 
-    for callback in callbacks:
-        callback.on_training_end(view, step)
+        if context.step == context.steps:
+            break
 
-    view = TrainingView(state, static)
-    return view
+    for callback in callbacks:
+        callback.on_training_end(context)
+
+    return context
 
 
 def fit[T: eqx.Module](
@@ -139,14 +114,14 @@ def fit[T: eqx.Module](
     *,
     batch_size: int = 32,
     batch_axes: PyTree[int | None] = 0,
-    aux: PyTree[Any] = None,
+    aux_state: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
     optimizer: optax.GradientTransformation
     | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
-    batcher: BatchGenerator = batch_data,
+    batcher: Batcher = batch_data,
     metrics: Sequence[Metric] | None = None,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
@@ -181,7 +156,7 @@ def fit[T: eqx.Module](
             the first axis (0), for `y2` the second axis (1) and for the
             string there is no batch axis (`None`).
             Defaults to `0`.
-        aux: Auxiliary input to the loss function. Can be updated via a
+        aux_state: Auxiliary input to the loss function. Can be updated via a
             callback.
             Defaults to `None`.
         validation_data: Arbitrary `PyTree` used for validation during
@@ -244,15 +219,9 @@ def fit[T: eqx.Module](
     model = apply(model)
 
     bkey, key = jax.random.split(key)
-    batch = batcher(data, batch_size, batch_axes, key=bkey)
-    view = make_view(
-        model,
-        optimizer,
-        opt_state,
-        batch,
-        aux,
-        loss,
-        steps,
+    batch_generator = batcher(data, batch_size, batch_axes, key=bkey)
+    context = TrainingContext(
+        model, optimizer, opt_state, batch_generator, aux_state, loss, steps
     )
 
     # Make callbacks iterable
@@ -291,9 +260,9 @@ def fit[T: eqx.Module](
 
     callbacks.append(logger)
 
-    view = run_training_loop(view, callbacks)
+    context = run_training_loop(context, callbacks)
 
-    model = view._static.assemble_model(view._state.model_leaves)
+    model = context.state.model
 
     history = logger.history if logger is not None else History()
 
