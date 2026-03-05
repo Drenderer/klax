@@ -48,21 +48,22 @@ class TestMakeStep:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        view = klax.make_view(
-            model=model,
-            optimizer=optimizer,
-            opt_state=opt_state,
-            batch=batch,
-            aux=None,
+        state = klax.TrainingState(
+            model, opt_state, aux=None, step=jnp.array(0.0)
+        )
+        state_leaves, state_treedef = jax.tree.flatten(state)
+
+        new_state_leaves, new_state_treedef = klax.make_step(
+            state_leaves,
+            state_treedef,
+            batch=(x, y),
             loss=klax.mse,
-            steps=5,
+            optimizer=optimizer,
         )
 
-        new_state = klax.make_step(
-            view._state, next(view._static.batch), view._static
-        )
+        # State structure has not changed
+        assert new_state_treedef == state_treedef
 
         # State has changed
         assert not jax.tree.all(
@@ -70,8 +71,8 @@ class TestMakeStep:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view._state.model_leaves,
-                new_state.model_leaves,
+                state_leaves,
+                new_state_leaves,
             )
         )
 
@@ -84,14 +85,14 @@ class TestRunTrainingLoop:
                 self.steps = []
                 self.end_steps = []
 
-            def on_training_start(self, view, step):
-                self.start_steps.append(step)
+            def on_training_start(self, context):
+                self.start_steps.append(context.step)
 
-            def on_training_step(self, view, step):
-                self.steps.append(step)
+            def on_training_step(self, context):
+                self.steps.append(context.step)
 
-            def on_training_end(self, view, step):
-                self.end_steps.append(step)
+            def on_training_end(self, context):
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -99,13 +100,13 @@ class TestRunTrainingLoop:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
+        batch_generator = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        view = klax.make_view(
-            model=model,
-            optimizer=optimizer,
-            opt_state=opt_state,
-            batch=batch,
+        context = klax.TrainingContext(
+            model,
+            optimizer,
+            opt_state,
+            batch_generator,
             aux=None,
             loss=klax.mse,
             steps=3,
@@ -113,7 +114,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        updated_view = klax.run_training_loop(view, [callback])
+        context = klax.run_training_loop(context, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -123,8 +124,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view._state.model_leaves,
-                updated_view._state.model_leaves,
+                model,
+                context.model,
             )
         )
 
@@ -135,14 +136,14 @@ class TestRunTrainingLoop:
                 self.steps = []
                 self.end_steps = []
 
-            def on_training_start(self, view, step):
-                self.start_steps.append(step)
+            def on_training_start(self, context):
+                self.start_steps.append(context.step)
 
-            def __call__(self, view, step):
-                self.steps.append(step)
+            def on_training_step(self, context):
+                self.steps.append(context.step)
 
-            def on_training_end(self, view, step):
-                self.end_steps.append(step)
+            def on_training_end(self, context):
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -150,13 +151,13 @@ class TestRunTrainingLoop:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
+        batch_generator = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        view = klax.make_view(
-            model=model,
-            optimizer=optimizer,
-            opt_state=opt_state,
-            batch=batch,
+        context = klax.TrainingContext(
+            model,
+            optimizer,
+            opt_state,
+            batch_generator,
             aux=None,
             loss=klax.mse,
             steps=0,
@@ -164,7 +165,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        updated_view = klax.run_training_loop(view, [callback])
+        updated_view = klax.run_training_loop(context, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -174,8 +175,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view._state.model_leaves,
-                updated_view._state.model_leaves,
+                model,
+                context.model,
             )
         )
 
@@ -185,12 +186,12 @@ class TestRunTrainingLoop:
                 self.steps = []
                 self.end_steps = []
 
-            def on_training_step(self, view, step):
-                self.steps.append(step)
+            def on_training_step(self, context):
+                self.steps.append(context.step)
                 return True  # request stop after first step
 
-            def on_training_end(self, view, step):
-                self.end_steps.append(step)
+            def on_training_end(self, context):
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -198,21 +199,21 @@ class TestRunTrainingLoop:
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
-        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
+        batch_generator = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-        view = klax.make_view(
-            model=model,
-            optimizer=optimizer,
-            opt_state=opt_state,
-            batch=batch,
+        context = klax.TrainingContext(
+            model,
+            optimizer,
+            opt_state,
+            batch_generator,
             aux=None,
             loss=klax.mse,
-            steps=5,
+            steps=10,
         )
 
         callback = StopAfterOne()
 
-        updated_view = klax.run_training_loop(view, [callback])
+        context = klax.run_training_loop(context, [callback])
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
@@ -221,8 +222,8 @@ class TestRunTrainingLoop:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                view._state.model_leaves,
-                updated_view._state.model_leaves,
+                model,
+                context.model,
             )
         )
 
