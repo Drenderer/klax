@@ -34,29 +34,26 @@ from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
 
-new_logger = object()
+type Leaf = Any
 
 
 @eqx.filter_jit
 def make_step(
-    state_leaves: list,
-    state_treedef: PyTreeDef,  # type: ignore
+    state_leaves: list[Leaf],
+    state_treedef: Any,
     batch: PyTree,
     loss: Loss,
     optimizer: optax.GradientTransformationExtraArgs,
-) -> tuple[list, PyTreeDef]:  # type: ignore
+) -> tuple[list[Leaf], Any]:
     state = jax.tree.unflatten(state_treedef, state_leaves)
 
-    model = state.model
-    aux = state.aux
-    opt_state = state.opt_state
-    step = state.step
-
-    model_params, model_static = eqx.partition(model, eqx.is_inexact_array)
-    value, grad = loss.value_and_grad(model, batch, aux)
+    model_params, model_static = eqx.partition(
+        state.model, eqx.is_inexact_array
+    )
+    value, grad = loss.value_and_grad(state.model, batch, state.aux)
     updates, opt_state = optimizer.update(
         grad,
-        opt_state,
+        state.opt_state,
         model_params,
         value=value,
         grad=grad,
@@ -64,7 +61,7 @@ def make_step(
             loss.partitioned_value,
             static=model_static,
             batch=batch,
-            aux=aux,
+            aux=state.aux,
         ),
     )
     model_params = optax.apply_updates(model_params, updates)
@@ -73,9 +70,9 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    step += 1
+    step = state.step + 1
 
-    state = TrainingState(model, opt_state, aux, step)
+    state = TrainingState(model, opt_state, state.aux, step)
 
     return jax.tree.flatten(state)
 
@@ -91,6 +88,9 @@ def run_training_loop(
         callback.on_training_start(context)
 
     for batch in context.batch_generator:
+        if context.step >= context.steps:
+            break
+
         state_leaves, _ = make_step(
             state_leaves,
             state_treedef,
@@ -103,7 +103,7 @@ def run_training_loop(
         stop = False
         for callback in callbacks:
             stop |= bool(callback.on_training_step(context))
-        if stop or context.step == context.steps:
+        if stop:
             break
 
     for callback in callbacks:
@@ -207,7 +207,7 @@ def fit[T: eqx.Module](
             generation.
 
     Returns:
-        A tuple of the trained model and the loss history.
+        A tuple of the trained model and the training history.
 
     """
     if init_opt_state is None:
@@ -266,7 +266,7 @@ def fit[T: eqx.Module](
 
     context = run_training_loop(context, callbacks)
 
-    model = context.state.model
+    model = context.model
 
     history = logger.history if logger is not None else History()
 

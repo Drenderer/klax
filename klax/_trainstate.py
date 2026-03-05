@@ -35,7 +35,7 @@ class TrainingState:
 
 
 class TrainingContext:
-    """Dataclass of things that are expected to remain static during training."""
+    """Class of all training relevant objects."""
 
     _state: TrainingState | None
     _state_treedef: PyTreeDef  # type: ignore
