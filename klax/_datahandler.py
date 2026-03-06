@@ -129,7 +129,6 @@ def batch_data[T](
         ...     batch_axes,
         ...     key=jax.random.key(0)
         ... )
-        >>>
         ```
 
     Args:

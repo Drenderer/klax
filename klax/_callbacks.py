@@ -27,11 +27,11 @@ class Callback(ABC):
             during training.
         - `on_training_end`: Executed once at the end of training.
 
-    Each method receives the current step and a [`TrainingView`][klax.TrainingView]
-    object that provides read and write access to the current
-    training state (model and optimizer state) as well as read-only
-    access to static training information (loss function, optimizer,
-    batch axes, etc). The `on_training_step` method can optionally
+    Each method receives the current [`TrainingContext`][klax.TrainingContext],
+    which provides access to the [TrainingState][klax.TrainingState] (model,
+    optimizer state, auxiliary state and current step count), as well as the
+    [Loss][klax.Loss], optimizer, batch generator and total scheduled step count.
+    The `on_training_step` method can optionally
     return a boolean "stop signal", that - if `True` - will stop the
     training at the current step.
 
