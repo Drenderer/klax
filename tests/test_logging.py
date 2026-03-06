@@ -260,9 +260,9 @@ class TestMetricLogger:
             state=SimpleNamespace(
                 model=model if model is not None else {"w": 1.0},
                 step=jnp.array(step, dtype=int),
-                steps=steps,
                 opt_state=opt_state,
-            )
+            ),
+            steps=steps,
         )
 
     def test_add_metric_and_logging_frequency(self):
