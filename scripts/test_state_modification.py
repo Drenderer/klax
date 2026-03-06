@@ -17,15 +17,15 @@ model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 @klax.metric("bias")
 def get_bias(context):
-    return context.model.layers[0].bias
+    return context.state.model.layers[0].bias
 
 
 class ResetBias(klax.Callback):
     def on_training_step(self, context):
-        if context.step % 1000 == 0:
-            context.model = eqx.tree_at(
+        if context.state.step % 1000 == 0:
+            context.state.model = eqx.tree_at(
                 lambda m: m.layers[0].bias,
-                context.model,
+                context.state.model,
                 replace_fn=lambda x: jnp.zeros(shape=x.shape),
             )
 

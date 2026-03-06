@@ -88,7 +88,7 @@ def run_training_loop(
         callback.on_training_start(context)
 
     for batch in context.batch_generator:
-        if context.step >= context.steps:
+        if context.state.step >= context.steps:
             break
 
         state_leaves, _ = make_step(
@@ -266,7 +266,7 @@ def fit[T: eqx.Module](
 
     context = run_training_loop(context, callbacks)
 
-    model = context.model
+    model = context.state.model
 
     history = logger.history if logger is not None else History()
 

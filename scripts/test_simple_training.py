@@ -17,7 +17,7 @@ model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 @klax.metric("bias")
 def get_bias(context):
-    return context.model.layers[0].bias
+    return context.state.model.layers[0].bias
 
 
 @klax.loss

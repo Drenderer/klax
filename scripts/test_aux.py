@@ -15,7 +15,7 @@ model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 class UpdateAux(klax.Callback):
     @eqx.filter_jit
     def on_training_step(self, context):
-        context.run_state, _ = jr.split(context.run_state)
+        context.state.run_state, _ = jr.split(context.state.run_state)
 
 
 @klax.loss

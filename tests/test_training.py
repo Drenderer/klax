@@ -86,13 +86,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.step)
+                self.start_steps.append(context.state.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.step)
+                self.steps.append(context.state.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.step)
+                self.end_steps.append(context.state.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -125,7 +125,7 @@ class TestRunTrainingLoop:
                 if isinstance(a, jnp.ndarray)
                 else a == b,
                 model,
-                context.model,
+                context.state.model,
             )
         )
 
@@ -137,13 +137,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.step)
+                self.start_steps.append(context.state.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.step)
+                self.steps.append(context.state.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.step)
+                self.end_steps.append(context.state.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -176,7 +176,7 @@ class TestRunTrainingLoop:
                 if isinstance(a, jnp.ndarray)
                 else a == b,
                 model,
-                context.model,
+                context.state.model,
             )
         )
 
@@ -187,11 +187,11 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_step(self, context):
-                self.steps.append(context.step)
+                self.steps.append(context.state.step)
                 return True  # request stop after first step
 
             def on_training_end(self, context):
-                self.end_steps.append(context.step)
+                self.end_steps.append(context.state.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -223,7 +223,7 @@ class TestRunTrainingLoop:
                 if isinstance(a, jnp.ndarray)
                 else a == b,
                 model,
-                context.model,
+                context.state.model,
             )
         )
 

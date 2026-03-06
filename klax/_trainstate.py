@@ -91,31 +91,3 @@ class TrainingContext:
     def update_state(self, leaves):
         self._state = None
         self._state_leaves = leaves
-
-    @property
-    def model(self) -> PyTree:
-        return self.state.model
-
-    @model.setter
-    def model(self, value) -> None:
-        self.state.model = value
-
-    @property
-    def opt_state(self) -> PyTree:
-        return self.state.opt_state
-
-    @opt_state.setter
-    def opt_state(self, value) -> None:
-        self.state.opt_state = value
-
-    @property
-    def run_state(self) -> PyTree:
-        return self.state.run_state
-
-    @run_state.setter
-    def run_state(self, value) -> None:
-        self.state.run_state = value
-
-    @property
-    def step(self) -> int:
-        return self.state.step
