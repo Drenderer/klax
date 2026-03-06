@@ -42,6 +42,7 @@ class TestBatchMetric:
             batch_size=batch_size,
             batch_axes=batch_axes,
             verbose=False,
+            jit_compile=False,
             key=getkey(),
         )
 

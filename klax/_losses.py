@@ -31,11 +31,14 @@ class Loss(ABC):
     Inherit from this class to define a custom loss that can be passed to
     [`fit`][klax.fit].
     An instance of the loss class has two methods that are required for
-    [`fit`][klax.fit]: `value` and `value_and_grad`. In most cases the default
-    implementation should be used. `value` just [unwraps][klax.unwrap] the model
-    before computing the loss as specified in `__call__`, while `value_and_grad`
-    per default applies `jax.value_and_grad` to `value`. These functions can be
-    overwritten, for example to enable custom calculations of the gradients.
+    [`fit`][klax.fit]: `value` and `value_and_grad`, which determine how
+    the loss value and it's gradients are calculated.
+    To define a custom loss, implement a custom `value` method. When calling
+    the loss instance, the model will first be [unwrapped][klax.unwrap], and
+    then passed to the `value` method.
+    The `value_and_grad` function per default computes the gradient based on
+    the `value` function. You should only overwrite it to specify a custom
+    gradient computation.
 
     Example:
         A simple custom loss that computes the mean squared error between
@@ -44,19 +47,16 @@ class Loss(ABC):
 
         ```python
         >>> class MSE(klax.Loss):
-        ...     def __call__(self, model, data, aux):
+        ...     def value(self, model, data, aux):
         ...         x, y = data
         ...         y_pred = jax.vmap(model)(x)
         ...         return jnp.mean(jnp.square(y_pred - y))
         ```
 
-        Note that, since we a aim to provide a maximum of flexibility the users
-        have to take care of applying `jax.vmap` to the model themselves.
-
     """
 
     @abstractmethod
-    def __call__[T](
+    def value[T](
         self,
         model: PyTree,
         batch: PyTree[Any, "T"],
@@ -75,7 +75,7 @@ class Loss(ABC):
         """
         pass
 
-    def value[T](
+    def __call__[T](
         self,
         model: PyTree,
         batch: PyTree[Any, "T"],
@@ -84,7 +84,7 @@ class Loss(ABC):
         """Compute the loss value used during training.
 
         This method unwraps the model before computing the loss by calling
-        the `__call__` method.
+        the `value` method.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
@@ -96,7 +96,7 @@ class Loss(ABC):
 
         """
         model = unwrap(model)
-        return self(model, batch, aux)
+        return self.value(model, batch, aux)
 
     def value_and_grad[T, M](
         self,
@@ -104,10 +104,10 @@ class Loss(ABC):
         batch: PyTree[Any, "T"],
         aux: PyTree[Any],
     ) -> tuple[Scalar, PyTree[Any, "M"]]:
-        """Compute the loss value and gradient during training.
+        """Compute the loss value and its gradient.
 
         This method computes the loss value and its gradient with respect to
-        the model parameters by applying `jax.value_and_grad` to the `value`
+        the model parameters by applying `eqx.filter_value_and_grad` to the `value`
         method.
 
         Args:
@@ -119,7 +119,7 @@ class Loss(ABC):
             Tuple of loss value and gradient with respect to the model.
 
         """
-        return eqx.filter_value_and_grad(self.value)(model, batch, aux)
+        return eqx.filter_value_and_grad(self)(model, batch, aux)
 
     def partitioned_value[T](
         self,
@@ -131,8 +131,8 @@ class Loss(ABC):
         """Compute the loss value for partitioned models.
 
         This method is useful when working with models that have been
-        partitioned using Equinox's `partition` functionality. It separates
-        the model into its parameter and static parts before computing the
+        partitioned using Equinox's `partition` functionality. It combines
+        the model from its parameter and static parts before computing the
         loss.
 
         Args:
@@ -146,10 +146,10 @@ class Loss(ABC):
 
         """
         model = eqx.combine(params, static)
-        return self.value(model, batch, aux)
+        return self(model, batch, aux)
 
 
-def loss(func: Callable) -> Loss:
+def loss(func: Callable[[PyTree, PyTree, PyTree], Scalar]) -> Loss:
     """Convert a function into a [`klax.Loss`][] object.
 
     Example:
@@ -173,7 +173,7 @@ def loss(func: Callable) -> Loss:
     """
 
     class FuncLoss(Loss):
-        def __call__(self, model, batch, aux):
+        def value(self, model, batch, aux):
             return func(model, batch, aux)
 
     return update_wrapper(FuncLoss(), func)

@@ -42,6 +42,15 @@ except ImportError:
 
 
 class Metric(Protocol):
+    """A Metric computes values that should be recorded in the training history.
+
+    Metrics callables, that take the current [`TrainingContext`][klax.TrainingContext]
+    and return some value to be added to the training history by the
+    [`MetricLogger`][klax.MetricLogger].
+    Additionally Metrics have a `name` and `verbose` property, that determines
+    how they are logged.
+    """
+
     name: str
     verbose: bool
 
@@ -61,7 +70,8 @@ def metric[T](
 
     Args:
         name: Name of the metric.
-        verbose: Verbosity level for the metric. Defaults to False.
+        verbose: Wether to print the Metrics values to the console during training.
+            Defaults to False.
 
     """
 
@@ -75,13 +85,10 @@ def metric[T](
 
 
 class BatchMetric:
-    """Compute a metric value from the model and a random batch of data.
+    """Loss-like function [`Metric`][klax.Metric].
 
-    This is a convenience class that allows you to easily define metrics
-    that depend on data batches, such as the training or validation loss.
-    Internally, it uses its own batch generator to sample batches and
-    unwraps the model before evaluating a provided function with signature
-    ``(model, batch, batch_axes) -> Any``.
+    A `BatchMetric` uses it's own batch generator and data, to turn a
+    [loss][klax.Loss]-like function evaluation into a [`Metric`][klax.Metric].
     """
 
     def __init__[T](
@@ -93,6 +100,7 @@ class BatchMetric:
         batch_size: int,
         batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
         verbose: bool = False,
+        jit_compile: bool = True,
         *,
         key: PRNGKeyArray,
     ):
@@ -107,18 +115,14 @@ class BatchMetric:
             batch_size: The size of each batch.
             batch_axes: The axes corresponding to the batch dimension in the data.
             verbose: Verbosity level for the metric. Defaults to False.
+            jit_compile: If true, `eqx.filter_jit` is used to jit compile `func`.
             key: PRNG key for random number generation.
 
         """
         self.name = name
         self.verbose = verbose
         self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
-        self.func = func
-
-    @eqx.filter_jit
-    def evaluate(self, model, batch, aux):
-        model = unwrap(model)
-        return self.func(model, batch, aux)
+        self.func = eqx.filter_jit(func) if jit_compile else func
 
     def __call__(self, context: TrainingContext):
         """Compute the metric.
@@ -131,7 +135,7 @@ class BatchMetric:
 
         """
         batch = next(self.batch_generator)
-        return self.evaluate(context.model, batch, context.aux)
+        return self.func(context.model, batch, context.aux)
 
 
 type Steps = list[int]
