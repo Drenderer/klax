@@ -15,22 +15,18 @@
 """Utilities for logging during training."""
 
 import pickle
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from functools import update_wrapper
 from pathlib import Path
 from time import time
 from typing import Any, Literal, Protocol, cast
 
 import equinox as eqx
 import jax
-from jaxtyping import PRNGKeyArray, PyTree, Scalar
+from jaxtyping import PRNGKeyArray, PyTree
 
 from klax._callbacks import Callback
 from klax._datahandler import Batcher
-from klax._losses import Loss
 from klax._trainstate import TrainingContext
-from klax._wrappers import unwrap
 
 try:
     from tqdm.auto import tqdm

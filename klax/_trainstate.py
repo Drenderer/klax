@@ -27,7 +27,15 @@ from klax._losses import Loss
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
-    """Dataclass of things that are expected to change during training."""
+    """Dataclass of things that are expected to change during training.
+
+    This consists of:
+      * `model`: The `eqx.Module` representing the trainable model.
+      * `opt_state`: The state of the `optax` optimizer.
+      * `run_state`: The user-defined state of the training run, which is
+        passed to the loss function and may be modified via callbacks.
+      * `step`: The current optimization step count of the training.
+    """
 
     model: PyTree
     opt_state: PyTree
@@ -36,7 +44,17 @@ class TrainingState:
 
 
 class TrainingContext:
-    """Class of all training relevant objects."""
+    """Collection of all training relevant objects.
+
+    This includes:
+      * `state`: The [`TrainingState`][klax.TrainingState]
+      * `optimizer`: The optax optimizer
+      * `loss`: The [Loss][klax.Loss] function
+      * `batch_generator`: The generator object responsible for creating data
+        batches
+      * `steps`: The total number of scheduled optimization steps for the
+        training run
+    """
 
     _state: TrainingState | None
     _state_treedef: PyTreeDef  # type: ignore

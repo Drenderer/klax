@@ -20,7 +20,7 @@ from typing import Any, Literal
 import equinox as eqx
 import jax
 import optax
-from jaxtyping import PRNGKeyArray, PyTree, PyTreeDef
+from jaxtyping import PRNGKeyArray, PyTree
 
 from klax._losses import Loss
 
