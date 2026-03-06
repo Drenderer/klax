@@ -23,6 +23,7 @@ from jaxtyping import Array, Int, PyTree, PyTreeDef
 from klax._losses import Loss
 
 
+# NOTE: Unfortunately step cannot be int, otherwise filter_jit does not trace it
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
@@ -82,7 +83,7 @@ class TrainingContext:
 
     @state.setter
     def state(self, value) -> None:
-        if jax.tree.structure != self._state_treedef:
+        if jax.tree.structure(value) != self._state_treedef:
             raise ValueError("PyTree strucutre of state changed.")
         self._state = value
         self._state_leaves, _ = jax.tree.flatten(value)
