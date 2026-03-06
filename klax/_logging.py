@@ -120,7 +120,7 @@ class BatchMetric:
         self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
         self.func = eqx.filter_jit(func) if jit_compile else func
 
-    def __call__(self, context: TrainingContext):
+    def __call__(self, context: TrainingContext) -> Any:
         """Compute the metric.
 
         Args:

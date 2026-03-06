@@ -30,11 +30,13 @@ class TrainingState:
     """Dataclass of things that are expected to change during training.
 
     This consists of:
-      * `model`: The `eqx.Module` representing the trainable model.
-      * `opt_state`: The state of the `optax` optimizer.
-      * `run_state`: The user-defined state of the training run, which is
+
+    * `model`: The `eqx.Module` (or more generally any PyTree)
+        representing the trainable model.
+    * `opt_state`: The state of the `optax` optimizer.
+    * `run_state`: The user-defined state of the training run, which is
         passed to the loss function and may be modified via callbacks.
-      * `step`: The current optimization step count of the training.
+    * `step`: The current optimization step count of the training.
     """
 
     model: PyTree
@@ -47,12 +49,13 @@ class TrainingContext:
     """Collection of all training relevant objects.
 
     This includes:
-      * `state`: The [`TrainingState`][klax.TrainingState]
-      * `optimizer`: The optax optimizer
-      * `loss`: The [Loss][klax.Loss] function
-      * `batch_generator`: The generator object responsible for creating data
+
+    * `state`: The [`TrainingState`][klax.TrainingState]
+    * `optimizer`: The optax optimizer
+    * `loss`: The [Loss][klax.Loss] function
+    * `batch_generator`: The generator object responsible for creating data
         batches
-      * `steps`: The total number of scheduled optimization steps for the
+    * `steps`: The total number of scheduled optimization steps for the
         training run
     """
 
