@@ -21,7 +21,7 @@ def get_bias(context):
 
 
 @klax.loss
-def my_loss(model, batch, aux):
+def my_loss(model, batch, run_state):
     x, y = batch
     y_pred = jax.vmap(model)(x)
     return jnp.mean((y - y_pred) ** 2)

@@ -31,7 +31,7 @@ class TrainingState:
 
     model: PyTree
     opt_state: PyTree
-    aux: PyTree
+    run_state: PyTree
     step: Int[Array, ""]
 
 
@@ -53,7 +53,7 @@ class TrainingContext:
         | optax.GradientTransformationExtraArgs,
         opt_state: PyTree,
         batch_generator: Generator[PyTree, None, None],
-        aux: PyTree,
+        run_state: PyTree,
         loss: Loss,
         steps: int,
     ):
@@ -63,7 +63,7 @@ class TrainingContext:
             else optimizer
         )
         state = TrainingState(
-            model, opt_state, aux, jnp.array(0, dtype=jnp.int32)
+            model, opt_state, run_state, jnp.array(0, dtype=jnp.int32)
         )
 
         self._state = state
@@ -109,12 +109,12 @@ class TrainingContext:
         self.state.opt_state = value
 
     @property
-    def aux(self) -> PyTree:
-        return self.state.aux
+    def run_state(self) -> PyTree:
+        return self.state.run_state
 
-    @aux.setter
-    def aux(self, value) -> None:
-        self.state.aux = value
+    @run_state.setter
+    def run_state(self, value) -> None:
+        self.state.run_state = value
 
     @property
     def step(self) -> int:

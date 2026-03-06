@@ -70,7 +70,7 @@ class TestBatchMetric:
         )
 
         model = eqx.nn.Linear(2, 1, key=getkey())
-        context = SimpleNamespace(model=model, aux=None)
+        context = SimpleNamespace(model=model, run_state=None)
         result = metric(context)
 
         assert isinstance(result, jnp.ndarray)

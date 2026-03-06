@@ -15,12 +15,12 @@ model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 class UpdateAux(klax.Callback):
     @eqx.filter_jit
     def on_training_step(self, context):
-        context.aux, _ = jr.split(context.aux)
+        context.run_state, _ = jr.split(context.run_state)
 
 
 @klax.loss
-def my_loss(model, batch, aux):
-    key = aux
+def my_loss(model, batch, run_state):
+    key = run_state
     x = jr.normal(key, (64,))
     y = jnp.sin(x)
     y_pred = jax.vmap(model)(x)
@@ -32,7 +32,7 @@ model, history = klax.fit(
     data=None,
     steps=30_000,
     callbacks=[UpdateAux()],
-    aux=aux_key,
+    run_state=aux_key,
     loss=my_loss,
     key=train_key,
 )

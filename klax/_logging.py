@@ -109,7 +109,7 @@ class BatchMetric:
         Args:
             name: Name of the metric.
             func: The evaluation function to compute. It should take the model,
-                a batch of data, and the auxiliary state as input.
+                a batch of data, and the auxiliary runtime state as input.
             data: The dataset to generate batches from.
             batcher: Batch generator factory.
             batch_size: The size of each batch.
@@ -135,7 +135,7 @@ class BatchMetric:
 
         """
         batch = next(self.batch_generator)
-        return self.func(context.model, batch, context.aux)
+        return self.func(context.model, batch, context.run_state)
 
 
 type Steps = list[int]

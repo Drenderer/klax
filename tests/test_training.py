@@ -50,7 +50,7 @@ class TestMakeStep:
         y = jnp.array([3.0, 7.0])
 
         state = klax.TrainingState(
-            model, opt_state, aux=None, step=jnp.array(0.0)
+            model, opt_state, run_state=None, step=jnp.array(0.0)
         )
         state_leaves, state_treedef = jax.tree.flatten(state)
 
@@ -107,7 +107,7 @@ class TestRunTrainingLoop:
             optimizer,
             opt_state,
             batch_generator,
-            aux=None,
+            run_state=None,
             loss=klax.mse,
             steps=3,
         )
@@ -158,7 +158,7 @@ class TestRunTrainingLoop:
             optimizer,
             opt_state,
             batch_generator,
-            aux=None,
+            run_state=None,
             loss=klax.mse,
             steps=0,
         )
@@ -206,7 +206,7 @@ class TestRunTrainingLoop:
             optimizer,
             opt_state,
             batch_generator,
-            aux=None,
+            run_state=None,
             loss=klax.mse,
             steps=10,
         )

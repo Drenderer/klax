@@ -50,7 +50,7 @@ def make_step(
     model_params, model_static = eqx.partition(
         state.model, eqx.is_inexact_array
     )
-    value, grad = loss.value_and_grad(state.model, batch, state.aux)
+    value, grad = loss.value_and_grad(state.model, batch, state.run_state)
     updates, opt_state = optimizer.update(
         grad,
         state.opt_state,
@@ -61,7 +61,7 @@ def make_step(
             loss.partitioned_value,
             static=model_static,
             batch=batch,
-            aux=state.aux,
+            run_state=state.run_state,
         ),
     )
     model_params = optax.apply_updates(model_params, updates)
@@ -72,7 +72,7 @@ def make_step(
 
     step = state.step + 1
 
-    state = TrainingState(model, opt_state, state.aux, step)
+    state = TrainingState(model, opt_state, state.run_state, step)
 
     return jax.tree.flatten(state)
 
@@ -118,7 +118,7 @@ def fit[T: eqx.Module](
     *,
     batch_size: int = 32,
     batch_axes: PyTree[int | None] = 0,
-    aux: PyTree[Any] = None,
+    run_state: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
     loss: Loss = mse,
@@ -160,8 +160,8 @@ def fit[T: eqx.Module](
             the first axis (0), for `y2` the second axis (1) and for the
             string there is no batch axis (`None`).
             Defaults to `0`.
-        aux: Auxiliary input to the loss function. Can be updated via a
-            callback.
+        run_state: Auxiliary runtime state, that is passed to the loss function.
+            Can be updated via callbacks.
             Defaults to `None`.
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
@@ -173,7 +173,7 @@ def fit[T: eqx.Module](
         steps: Number of gradient updates to apply.
             Defaults to 1000.
         loss: The loss function with call signature
-            `(model: PyTree, data: PyTree, aux: PyTree) -> float`.
+            `(model: PyTree, data: PyTree, run_state: PyTree) -> float`.
             Defaults to `mse`.
         optimizer: The optimizer. Any optax gradient transform to calculate
             the updates for the model.
@@ -225,7 +225,7 @@ def fit[T: eqx.Module](
     bkey, key = jax.random.split(key)
     batch_generator = batcher(data, batch_size, batch_axes, key=bkey)
     context = TrainingContext(
-        model, optimizer, opt_state, batch_generator, aux, loss, steps
+        model, optimizer, opt_state, batch_generator, run_state, loss, steps
     )
 
     # Make callbacks iterable
