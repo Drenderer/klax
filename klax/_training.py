@@ -126,12 +126,13 @@ def fit[T: eqx.Module](
     | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
     batcher: Batcher = batch_data,
+    make_logger: bool = True,
     metrics: Sequence[Metric] | None = None,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
     key: PRNGKeyArray,
-) -> tuple[T, History]:
+) -> tuple[T, History | None]:
     """Train a model using an optimizer from optax.
 
     This is a convenient wrapper around [`run_training_loop`][klax.run_training_loop]
@@ -185,6 +186,10 @@ def fit[T: eqx.Module](
             Defaults to `None`.
         batcher: The data loader that splits inputs and targets into batches.
             Defaults to `batch_data`.
+        make_logger: Wether to create a [`MetricLogger`][klax.MetricLogger].
+            If `False` the arguments `metrics`, `log_every` and `verbose`
+            don't have any effect and `fit` will return `None` instead of a
+            `History`. This is useful for implementing custom logging.
         metrics: Sequence of [metrics][klax.Metric] to be evaluated at regular
             intervals during the training. You can overwrite the default "loss"
             and "validation_loss" metrics, by adding custom metrics with the same
@@ -209,6 +214,9 @@ def fit[T: eqx.Module](
     Returns:
         A tuple of the trained model and the training history.
 
+    Note:
+        The returned history will be `None` if `make_logger=False`.
+
     """
     if init_opt_state is None:
         # Initialize the optimizer and 'tell it' to optimize with respect to
@@ -231,43 +239,45 @@ def fit[T: eqx.Module](
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
 
-    # Initialize logging and default metrics
-    _metrics = []
-    _metrics.append(
-        BatchMetric(
-            "loss",
-            loss,
-            data,
-            batcher,
-            batch_size,
-            batch_axes,
-            verbose=True,
-            key=bkey,
-        )
-    )
-    if validation_data is not None:
+    if make_logger:
+        # Initialize logging and default metrics
+        _metrics = []
         _metrics.append(
             BatchMetric(
-                "validation_loss",
+                "loss",
                 loss,
-                validation_data,
+                data,
                 batcher,
-                4 * batch_size,
+                batch_size,
                 batch_axes,
                 verbose=True,
                 key=bkey,
-            ),
+            )
         )
-    if metrics is not None:
-        _metrics += metrics
-    logger = MetricLogger(log_every, _metrics, verbose)
+        if validation_data is not None:
+            _metrics.append(
+                BatchMetric(
+                    "validation_loss",
+                    loss,
+                    validation_data,
+                    batcher,
+                    4 * batch_size,
+                    batch_axes,
+                    verbose=True,
+                    key=bkey,
+                ),
+            )
+        if metrics is not None:
+            _metrics += metrics
+        logger = MetricLogger(log_every, _metrics, verbose)
 
-    callbacks.append(logger)
+        callbacks.append(logger)
 
     context = run_training_loop(context, callbacks)
 
     model = context.state.model
 
-    history = logger.history if logger is not None else History()
+    if make_logger:
+        return model, logger.history
 
-    return model, history
+    return model, None
