@@ -26,11 +26,11 @@ import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray, PyTree, Scalar
 
-from klax._callbacks import Callback
-from klax._datahandler import BatchGenerator
-from klax._losses import Loss
-from klax._trainstate import TrainingView
-from klax._wrappers import unwrap
+from ._callbacks import Callback
+from ._datahandler import BatchGenerator
+from ._losses import Loss
+from ._trainstate import TrainingView
+from ._wrappers import unwrap
 
 try:
     from tqdm.auto import tqdm

@@ -20,7 +20,7 @@ import jax
 import optax
 from jaxtyping import PyTree, PyTreeDef
 
-from klax._losses import Loss
+from ._losses import Loss
 
 # ====--------------------------------------------------------------------=== #
 # TrainingView classes
