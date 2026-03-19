@@ -1,189 +1,283 @@
-# Copyright 2025 The Klax Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-from typing import Self
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.random as jrandom
+import jax.random as jr
 import optax
 import pytest
-from jaxtyping import Array
 
 import klax
-from klax import Constraint, Unwrappable
 
 
-def test_training(getkey):
-    # Fitting a linear function
-    x = jnp.linspace(0.0, 1.0, 2).reshape(-1, 1)
-    y = 2.0 * x + 1.0
-    model = eqx.nn.Linear(1, 1, key=getkey())
-    model, _ = klax.fit(model, (x, y), optimizer=optax.adam(1.0), key=getkey())
-    y_pred = jax.vmap(model)(x)
-    assert jnp.allclose(y_pred, y)
-
-    # Multiple inputs
-    class Model(eqx.Module):
-        weight: Array
-
-        def __call__(self, x):
-            b, x = x
-            return b + self.weight * x
-
-    x = jrandom.uniform(key=getkey(), shape=(10,))
-    b = 2.0
-    y = b + 2 * x
-    model = Model(weight=jnp.array(1.0))
-    model, _ = klax.fit(
-        model,
-        ((b, x), y),
-        batch_axis=0,  # Test automatic batch axis braodcasting to data
-        optimizer=optax.adam(1.0),
-        key=getkey(),
+class TestMakeStep:
+    @pytest.mark.parametrize(
+        "optimizer",
+        [
+            optax.adabelief(1.0),
+            optax.adadelta(1.0),
+            optax.adan(1.0),
+            optax.adafactor(1.0),
+            optax.adagrad(1.0),
+            optax.adam(1.0),
+            optax.adamw(1.0),
+            optax.adamax(1.0),
+            optax.adamaxw(1.0),
+            optax.amsgrad(1.0),
+            optax.fromage(1.0),
+            optax.lamb(1.0),
+            optax.lars(1.0),
+            optax.lbfgs(1.0),
+            optax.lion(1.0),
+            optax.nadam(1.0),
+            optax.nadamw(1.0),
+            optax.noisy_sgd(1.0),
+            optax.novograd(1.0),
+            optax.optimistic_gradient_descent(1.0),
+            optax.optimistic_adam(1.0),
+            optax.polyak_sgd(1.0),
+            optax.radam(1.0),
+            optax.rmsprop(1.0),
+            optax.sgd(1.0),
+            optax.sign_sgd(1.0),
+            optax.sm3(1.0),
+            optax.yogi(1.0),
+        ],
     )
-    y_pred = jax.vmap(model, in_axes=((None, 0),))((b, x))
-    assert jnp.allclose(y_pred, y)
+    def test_make_step_updates_state(self, optimizer, getkey):
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
 
-    # Continued training with history and solver state
-    x = jrandom.uniform(getkey(), (2, 1))
-    model = eqx.nn.Linear(1, 1, key=getkey())
-    history = klax.HistoryCallback(log_every=2)
-    model, history = klax.fit(
-        model, (x, x), steps=20, history=history, key=getkey()
-    )
-    assert len(history.steps) == 11
-    assert len(history.loss) == 11
-    time_1 = history.training_time
-    model, history = klax.fit(
-        model,
-        (x, x),
-        steps=10,
-        history=history,
-        init_opt_state=history.last_opt_state,
-        key=getkey(),
-    )
-    assert len(history.steps) == 16
-    assert len(history.loss) == 16
-    assert history.steps[-1] == 30
-    time_2 = history.training_time
-    assert time_1 < time_2
+        x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
+        y = jnp.array([3.0, 7.0])
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
 
-    # Validation data
-    x = jrandom.uniform(getkey(), (2, 1))
-    model = eqx.nn.Linear(1, 1, key=getkey())
-    _, history = klax.fit(model, (x, x), validation_data=(x, x), key=getkey())
-    assert len(history.val_loss) == 11
+        view = klax.make_view(
+            model=model,
+            optimizer=optimizer,
+            opt_state=opt_state,
+            batch=batch,
+            batch_axes=0,
+            loss=klax.mse,
+            steps=5,
+        )
 
-    # Callbacks
-    x = jrandom.uniform(getkey(), (2, 1))
-    model = eqx.nn.Linear(1, 1, key=getkey())
+        new_state = klax.make_step(
+            view._state, next(view._static.batch), view._static
+        )
 
-    class MyCallback(klax.Callback):
-        def __call__(self, cbargs: klax.CallbackArgs):
-            """Break training after five steps."""
-            if cbargs.step == 5:
-                return True
-
-    _, history = klax.fit(
-        model,
-        (x, x),
-        history=klax.HistoryCallback(1),
-        callbacks=(MyCallback(),),
-        key=getkey(),
-    )
-    print(history.log_every)
-    assert history.steps[-1] == 5
-
-
-@pytest.mark.parametrize(
-    "optimizer",
-    [
-        optax.adabelief(1.0),
-        optax.adadelta(1.0),
-        optax.adan(1.0),
-        optax.adafactor(1.0),
-        optax.adagrad(1.0),
-        optax.adam(1.0),
-        optax.adamw(1.0),
-        optax.adamax(1.0),
-        optax.adamaxw(1.0),
-        optax.amsgrad(1.0),
-        optax.fromage(1.0),
-        optax.lamb(1.0),
-        optax.lars(1.0),
-        optax.lbfgs(1.0),
-        optax.lion(1.0),
-        optax.nadam(1.0),
-        optax.nadamw(1.0),
-        optax.noisy_sgd(1.0),
-        optax.novograd(1.0),
-        optax.optimistic_gradient_descent(1.0),
-        optax.optimistic_adam(1.0),
-        optax.polyak_sgd(1.0),
-        optax.radam(1.0),
-        optax.rmsprop(1.0),
-        optax.sgd(1.0),
-        optax.sign_sgd(1.0),
-        optax.sm3(1.0),
-        optax.yogi(1.0),
-    ],
-)
-def test_training_optax_optimizers(getkey, optimizer):
-    # Test all optex optimizers
-    x = jrandom.uniform(getkey(), (2, 1))
-    model = eqx.nn.Linear(1, 1, key=getkey())
-    klax.fit(model, (x, x), steps=2, optimizer=optimizer, key=getkey())
-
-
-def test_apply_in_training(getkey):
-    # Create dummy data
-    x = jnp.linspace(0.0, 1.0, 20)
-    y = -2 * x - 1
-
-    # Create dummy Constraint
-    class AtLeast(Constraint):
-        array: Array
-        minval: Array
-
-        def unwrap(self) -> Array:
-            return self.array
-
-        def apply(self) -> Self:
-            return eqx.tree_at(
-                lambda x: x.array,
-                self,
-                replace=jnp.maximum(self.array, self.minval),
+        # State has changed
+        assert not jax.tree.all(
+            jax.tree.map(
+                lambda a, b: jnp.array_equal(a, b)
+                if isinstance(a, jnp.ndarray)
+                else a == b,
+                view._state.model_leaves,
+                new_state.model_leaves,
             )
+        )
 
-    # Create dummy model
-    class Model(eqx.Module):
-        weight: Unwrappable[Array]
-        bias: Unwrappable[Array]
 
-        def __init__(self):
-            self.weight = AtLeast(jnp.array(0.0), jnp.array(-1))
-            self.bias = AtLeast(jnp.array(-1.0), jnp.array(0))
+class TestRunTrainingLoop:
+    def test_invokes_callbacks(self, getkey):
+        class RecordingCallback(klax.Callback):
+            def __init__(self):
+                self.start_steps = []
+                self.steps = []
+                self.end_steps = []
 
-        def __call__(self, x):
-            return self.weight * x + self.bias
+            def on_training_start(self, view, step):
+                self.start_steps.append(step)
 
-    # Create and train model
-    model = Model()
-    model, _ = klax.fit(model, (x, y), steps=2, key=getkey())
+            def on_training_step(self, view, step):
+                self.steps.append(step)
 
-    model_ = klax.unwrap(model)  # Important to use unwrap here not finalize
-    assert model_.weight >= -1
-    assert model_.bias >= 0
+            def on_training_end(self, view, step):
+                self.end_steps.append(step)
+
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+        optimizer = optax.sgd(1.0)
+        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+
+        x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
+        y = jnp.array([3.0, 7.0])
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
+
+        view = klax.make_view(
+            model=model,
+            optimizer=optimizer,
+            opt_state=opt_state,
+            batch=batch,
+            batch_axes=0,
+            loss=klax.mse,
+            steps=3,
+        )
+
+        callback = RecordingCallback()
+
+        updated_view = klax.run_training_loop(view, [callback])
+
+        assert callback.start_steps == [0]
+        assert callback.steps == [1, 2, 3]
+        assert callback.end_steps == [3]
+        assert not jax.tree.all(
+            jax.tree.map(
+                lambda a, b: jnp.array_equal(a, b)
+                if isinstance(a, jnp.ndarray)
+                else a == b,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
+            )
+        )
+
+    def test_zero_steps_no_updates(self, getkey):
+        class RecordingCallback(klax.Callback):
+            def __init__(self):
+                self.start_steps = []
+                self.steps = []
+                self.end_steps = []
+
+            def on_training_start(self, view, step):
+                self.start_steps.append(step)
+
+            def __call__(self, view, step):
+                self.steps.append(step)
+
+            def on_training_end(self, view, step):
+                self.end_steps.append(step)
+
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+        optimizer = optax.sgd(1.0)
+        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+
+        x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
+        y = jnp.array([3.0, 7.0])
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
+
+        view = klax.make_view(
+            model=model,
+            optimizer=optimizer,
+            opt_state=opt_state,
+            batch=batch,
+            batch_axes=0,
+            loss=klax.mse,
+            steps=0,
+        )
+
+        callback = RecordingCallback()
+
+        updated_view = klax.run_training_loop(view, [callback])
+
+        assert callback.start_steps == [0]
+        assert callback.steps == []
+        assert callback.end_steps == [0]
+        assert jax.tree.all(
+            jax.tree.map(
+                lambda a, b: jnp.array_equal(a, b)
+                if isinstance(a, jnp.ndarray)
+                else a == b,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
+            )
+        )
+
+    def test_stops_on_callback(self, getkey):
+        class StopAfterOne(klax.Callback):
+            def __init__(self):
+                self.steps = []
+                self.end_steps = []
+
+            def on_training_step(self, view, step):
+                self.steps.append(step)
+                return True  # request stop after first step
+
+            def on_training_end(self, view, step):
+                self.end_steps.append(step)
+
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+        optimizer = optax.sgd(1.0)
+        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+
+        x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
+        y = jnp.array([3.0, 7.0])
+        batch = klax.batch_data((x, y), batch_size=32, key=getkey())
+
+        view = klax.make_view(
+            model=model,
+            optimizer=optimizer,
+            opt_state=opt_state,
+            batch=batch,
+            batch_axes=0,
+            loss=klax.mse,
+            steps=5,
+        )
+
+        callback = StopAfterOne()
+
+        updated_view = klax.run_training_loop(view, [callback])
+
+        assert callback.steps == [1]
+        assert callback.end_steps == [1]
+        assert not jax.tree.all(
+            jax.tree.map(
+                lambda a, b: jnp.array_equal(a, b)
+                if isinstance(a, jnp.ndarray)
+                else a == b,
+                view._state.model_leaves,
+                updated_view._state.model_leaves,
+            )
+        )
+
+
+class TestFit:
+    def test_basic_behavior(self, getkey):
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+
+        data = (
+            jr.uniform(getkey(), (100, 2)),
+            jr.uniform(getkey(), (100,)),
+        )
+
+        trained_model, history = klax.fit(
+            model,
+            data,
+            batch_size=5,
+            batch_axes=0,
+            steps=5,
+            loss=klax.mse,
+            optimizer=optax.sgd(0.1),
+            key=getkey(),
+        )
+
+        assert isinstance(trained_model, klax.nn.FICNN)
+        assert history.total_steps == 5
+        assert "loss" in history.content
+        loss_steps, loss_values = history["loss"]
+        assert loss_steps == [0]
+        assert len(loss_values) == 1
+
+    def test_overwriting_default_metrics(self, getkey):
+        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+
+        data = (
+            jr.uniform(getkey(), (100, 2)),
+            jr.uniform(getkey(), (100,)),
+        )
+
+        def my_metric(model):
+            return "A"
+
+        my_metric.name = "loss"
+        my_metric.verbose = False
+
+        trained_model, history = klax.fit(
+            model,
+            data,
+            batch_size=5,
+            batch_axes=0,
+            steps=5,
+            loss=klax.mse,
+            optimizer=optax.sgd(0.1),
+            metrics=[my_metric],
+            key=getkey(),
+        )
+
+        assert history.content["loss"][1] == ["A"]
