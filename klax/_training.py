@@ -22,8 +22,6 @@ import jax
 import optax
 from jaxtyping import PRNGKeyArray, PyTree
 
-from klax._losses import Loss
-
 from ._callbacks import Callback
 from ._datahandler import (
     Batcher,

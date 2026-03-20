@@ -20,7 +20,7 @@ import optax
 from jax import numpy as jnp
 from jaxtyping import Array, Int, PyTree, PyTreeDef
 
-from klax._losses import Loss
+from ._losses import Loss
 
 
 # NOTE: Unfortunately step cannot be int, otherwise filter_jit does not trace it
