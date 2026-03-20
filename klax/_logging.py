@@ -15,22 +15,18 @@
 """Utilities for logging during training."""
 
 import pickle
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from functools import update_wrapper
 from pathlib import Path
 from time import time
 from typing import Any, Literal, Protocol, cast
 
 import equinox as eqx
 import jax
-from jaxtyping import PRNGKeyArray, PyTree, Scalar
+from jaxtyping import PRNGKeyArray, PyTree
 
-from ._callbacks import Callback
-from ._datahandler import BatchGenerator
-from ._losses import Loss
-from ._trainstate import TrainingView
-from ._wrappers import unwrap
+from klax._callbacks import Callback
+from klax._datahandler import Batcher
+from klax._trainstate import TrainingContext
 
 try:
     from tqdm.auto import tqdm
@@ -42,15 +38,19 @@ except ImportError:
 
 
 class Metric(Protocol):
-    """A Metric is any object that can be called on a model and returns a value.
+    """A Metric computes values that should be recorded in the training history.
 
-    Furthermore, metrics must have attributes `name: str` and `verbose: bool`.
+    Metrics callables, that take the current [`TrainingContext`][klax.TrainingContext]
+    and return some value to be added to the training history by the
+    [`MetricLogger`][klax.MetricLogger].
+    Additionally Metrics have a `name` and `verbose` property, that determines
+    how they are logged.
     """
 
     name: str
     verbose: bool
 
-    def __call__(self, model: PyTree) -> Any: ...
+    def __call__(self, context: TrainingContext) -> Any: ...
 
 
 def metric[T](
@@ -61,12 +61,13 @@ def metric[T](
     Intended usage:
     ```python
     @metric(name="my_metric", verbose=False)
-    def compute_my_metric(model): ...
+    def compute_my_metric(context): ...
     ```
 
     Args:
         name: Name of the metric.
-        verbose: Verbosity level for the metric. Defaults to False.
+        verbose: Wether to print the Metrics values to the console during training.
+            Defaults to False.
 
     """
 
@@ -80,26 +81,22 @@ def metric[T](
 
 
 class BatchMetric:
-    """Compute a metric value from the model and a random batch of data.
+    """Loss-like function [`Metric`][klax.Metric].
 
-    This is a convenience class that allows you to easily define metrics
-    that depend on data batches, such as the training or validation loss.
-    Internally, it uses its own batch generator to sample batches and
-    unwraps the model before evaluating a provided function with signature
-    ``(model, batch, batch_axes) -> Any``.
+    A `BatchMetric` uses it's own batch generator and data, to turn a
+    [loss][klax.Loss]-like function evaluation into a [`Metric`][klax.Metric].
     """
 
     def __init__[T](
         self,
         name: str,
-        func: Callable[
-            [PyTree[Any], PyTree[Any, "T"], PyTree[int | None, "T ..."]], Any  # type: ignore
-        ],
+        func: Callable[[PyTree, PyTree[Any, "T"], PyTree], Any],
         data: PyTree[Any, "T"],
-        batcher: BatchGenerator,
+        batcher: Batcher,
         batch_size: int,
         batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
         verbose: bool = False,
+        jit_compile: bool = True,
         *,
         key: PRNGKeyArray,
     ):
@@ -108,38 +105,33 @@ class BatchMetric:
         Args:
             name: Name of the metric.
             func: The evaluation function to compute. It should take the model,
-                a batch of data, and the batch axes as input.
+                a batch of data, and the auxiliary runtime state as input.
             data: The dataset to generate batches from.
-            batcher: Batch generator function.
+            batcher: Batch generator factory.
             batch_size: The size of each batch.
             batch_axes: The axes corresponding to the batch dimension in the data.
             verbose: Verbosity level for the metric. Defaults to False.
+            jit_compile: If true, `eqx.filter_jit` is used to jit compile `func`.
             key: PRNG key for random number generation.
 
         """
         self.name = name
         self.verbose = verbose
-        self.batch = batcher(data, batch_size, batch_axes, key=key)
-        self.batch_axes = batch_axes
-        self.func = func
+        self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
+        self.func = eqx.filter_jit(func) if jit_compile else func
 
-    @eqx.filter_jit
-    def evaluate(self, model, batch):
-        model = unwrap(model)
-        return self.func(model, batch, self.batch_axes)
-
-    def __call__(self, model: PyTree) -> Scalar:
+    def __call__(self, context: TrainingContext) -> Any:
         """Compute the metric.
 
         Args:
-            model: Model to evaluate.
+            context: TrainingContext to evaluate in.
 
         Returns:
             The metric value on the sampled batch.
 
         """
-        batch = next(self.batch)
-        return self.evaluate(model, batch)
+        batch = next(self.batch_generator)
+        return self.func(context.state.model, batch, context.state.run_state)
 
 
 type Steps = list[int]
@@ -359,19 +351,20 @@ class MetricLogger(Callback):
         """
         self.metrics[metric.name] = metric
 
-    def on_training_step(self, view: TrainingView, step: int) -> None:
+    def on_training_step(self, context: TrainingContext) -> None:
         """Log metrics at the current training step.
 
         Args:
-            view: The current TrainingView containing state and static info.
-            step: The current training step.
+            context: Current training context.
 
         """
-        if step % self.log_every == 0:
+        if context.state.step % self.log_every == 0:
             message = []
             for metric in self.metrics.values():
-                metric_value = jax.device_get(metric(view.model))
-                self.history.append(step, metric.name, metric_value)
+                metric_value = jax.device_get(metric(context))
+                self.history.append(
+                    context.state.step, metric.name, metric_value
+                )
                 if self.verbose and metric.verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
@@ -383,28 +376,28 @@ class MetricLogger(Callback):
                 postfix = ", ".join(message)
                 if self.verbose > 1:
                     self.tqdm_bar.set_postfix_str(postfix)
-                    if step != 0:
+                    if context.state.step != 0:
                         self.tqdm_bar.update(self.log_every)
                 else:
                     print(
-                        f"Step {step:>{self.steps_str_length}}/{view._static.steps}: "
+                        f"Step {context.state.step:>{self.steps_str_length}}/{context.steps}: "
                         + postfix
                     )
 
-    def on_training_start(self, view: TrainingView, step: int) -> None:
+    def on_training_start(self, context: TrainingContext) -> None:
         self.start_time = time()
-        self.steps_str_length = len(str(view._static.steps))
+        self.steps_str_length = len(str(context.steps))
 
         if self.verbose > 1:
-            self.tqdm_bar = tqdm(total=view._static.steps, dynamic_ncols=True)
+            self.tqdm_bar = tqdm(total=context.steps, dynamic_ncols=True)
 
-        self.on_training_step(view, step)
+        self.on_training_step(context)
 
-    def on_training_end(self, view: TrainingView, step: int) -> None:
+    def on_training_end(self, context: TrainingContext) -> None:
         end_time = time()
         self.history.total_time = end_time - self.start_time
-        self.history.total_steps = step
-        self.history.final_opt_state = view.opt_state
+        self.history.total_steps = context.state.step
+        self.history.final_opt_state = context.state.opt_state
 
         if self.verbose > 1:
             try:

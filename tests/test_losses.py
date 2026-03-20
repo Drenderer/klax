@@ -42,7 +42,7 @@ class TestLossAbstractClass:
         """Test creating a custom Loss subclass."""
 
         class SquaredDifferenceLoss(Loss):
-            def __call__(self, model, batch, batch_axes):
+            def value(self, model, batch, batch_axes):
                 x, y = batch
                 y_pred = jax.vmap(model, in_axes=batch_axes)(x)
                 return jnp.sum(jnp.square(y_pred - y))
@@ -53,7 +53,7 @@ class TestLossAbstractClass:
         y = jnp.array([1.0, 2.0, 3.0])
         batch = (x, y)
 
-        result = loss_fn.value(model, batch, 0)
+        result = loss_fn(model, batch, 0)
         assert isinstance(result, jnp.ndarray)
         assert result.shape == ()
 
@@ -86,7 +86,7 @@ class TestLossAbstractClass:
                 return self.param * x
 
         class SimpleLoss(Loss):
-            def __call__(self, model, batch, batch_axes):
+            def value(self, model, batch, batch_axes):
                 x, y = batch
                 y_pred = jax.vmap(model, in_axes=batch_axes)(x)
                 return jnp.mean(jnp.square(y_pred - y))
@@ -97,14 +97,14 @@ class TestLossAbstractClass:
         y = jnp.array([5.0, 10.0])
         batch = (x, y)
 
-        value = loss_fn.value(model, batch, 0)
+        value = loss_fn(model, batch, 0)
         assert isinstance(value, jnp.ndarray)
 
     def test_value_and_grad_returns_tuple(self):
         """Test that value_and_grad returns (value, grad) tuple."""
 
         class SimpleLoss(Loss):
-            def __call__(self, model, batch, batch_axes):
+            def value(self, model, batch, batch_axes):
                 x, y = batch
                 y_pred = jax.vmap(model, in_axes=batch_axes)(x)
                 return jnp.mean(jnp.square(y_pred - y))
@@ -126,7 +126,7 @@ class TestLossAbstractClass:
         """Test that gradients are computed correctly."""
 
         class SimpleLoss(Loss):
-            def __call__(self, model, batch, batch_axes):
+            def value(self, model, batch, batch_axes):
                 x, y = batch
                 y_pred = jax.vmap(model, in_axes=batch_axes)(x)
                 return jnp.mean(jnp.square(y_pred - y))
@@ -150,7 +150,7 @@ class TestLossAbstractClass:
         """Test partitioned_value method with split model."""
 
         class SimpleLoss(Loss):
-            def __call__(self, model, batch, batch_axes):
+            def value(self, model, batch, batch_axes):
                 x, y = batch
                 y_pred = jax.vmap(model, in_axes=batch_axes)(x)
                 return jnp.mean(jnp.square(y_pred - y))
@@ -167,7 +167,7 @@ class TestLossAbstractClass:
         partitioned_result = loss_fn.partitioned_value(
             params, static, batch, 0
         )
-        full_result = loss_fn.value(model, batch, 0)
+        full_result = loss_fn(model, batch, 0)
 
         assert jnp.allclose(partitioned_result, full_result)
 

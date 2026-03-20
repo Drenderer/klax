@@ -6,7 +6,6 @@ import jax.random as jr
 import pytest
 
 import klax
-from klax import BatchMetric, History, MetricLogger, TrainingView
 
 
 class TestMetricDecorator:
@@ -24,10 +23,10 @@ class TestMetricDecorator:
 
 
 class TestBatchMetric:
-    """Test suite for the BatchMetric class."""
+    """Test suite for the klax.BatchMetric class."""
 
     def test_initialization(self, getkey):
-        """Test BatchMetric initialization with required parameters."""
+        """Test klax.BatchMetric initialization with required parameters."""
         data = (
             jr.uniform(getkey(), (100, 2)),
             jr.uniform(getkey(), (100, 1)),
@@ -35,7 +34,7 @@ class TestBatchMetric:
         batch_size = 32
         batch_axes = 0
 
-        metric = BatchMetric(
+        metric = klax.BatchMetric(
             name="my_metric",
             func=klax.mse,
             data=data,
@@ -43,11 +42,11 @@ class TestBatchMetric:
             batch_size=batch_size,
             batch_axes=batch_axes,
             verbose=False,
+            jit_compile=False,
             key=getkey(),
         )
 
         assert metric.name == "my_metric"
-        assert metric.batch_axes == batch_axes
         assert metric.func == klax.mse
         assert not metric.verbose
 
@@ -60,7 +59,7 @@ class TestBatchMetric:
         batch_size = 32
         batch_axes = 0
 
-        metric = BatchMetric(
+        metric = klax.BatchMetric(
             name="my_metric",
             func=klax.mse,
             data=data,
@@ -71,18 +70,21 @@ class TestBatchMetric:
         )
 
         model = eqx.nn.Linear(2, 1, key=getkey())
-        result = metric(model)
+        context = SimpleNamespace(
+            state=SimpleNamespace(model=model, run_state=None)
+        )
+        result = metric(context)
 
         assert isinstance(result, jnp.ndarray)
         assert result.shape == ()
 
 
 class TestHistory:
-    """Test suite for the History class."""
+    """Test suite for the klax.History class."""
 
     def test_initialization(self):
-        """Test History initialization."""
-        history = History()
+        """Test klax.History initialization."""
+        history = klax.History()
         assert history.content == {}
         assert history.total_time == -1.0
         assert history.total_steps == -1
@@ -90,7 +92,7 @@ class TestHistory:
 
     def test_append_single_metric(self):
         """Test appending a single metric entry."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
 
         assert "loss" in history.content
@@ -99,7 +101,7 @@ class TestHistory:
 
     def test_append_multiple_entries_same_metric(self):
         """Test appending multiple entries to the same metric."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
         history.append(step=10, key="loss", value=0.3)
         history.append(step=20, key="loss", value=0.1)
@@ -110,7 +112,7 @@ class TestHistory:
 
     def test_append_multiple_different_metrics(self):
         """Test appending entries to different metrics."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
         history.append(step=0, key="accuracy", value=0.8)
         history.append(step=10, key="loss", value=0.3)
@@ -123,7 +125,7 @@ class TestHistory:
 
     def test_getitem_existing_metric(self):
         """Test retrieving an existing metric using __getitem__."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
         history.append(step=10, key="loss", value=0.3)
 
@@ -133,7 +135,7 @@ class TestHistory:
 
     def test_keys_returns_all_metric_keys(self):
         """Test that keys() returns all metric keys."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
         history.append(step=0, key="accuracy", value=0.8)
 
@@ -142,7 +144,7 @@ class TestHistory:
 
     def test_getitem_nonexistent_metric_raises_keyerror(self):
         """Test that accessing non-existent metric raises KeyError."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
 
         with pytest.raises(KeyError, match="Metric 'accuracy' not found"):
@@ -150,7 +152,7 @@ class TestHistory:
 
     def test_append_with_various_value_types(self):
         """Test appending metrics with various value types."""
-        history = History()
+        history = klax.History()
 
         # Float value
         history.append(step=0, key="loss", value=0.5)
@@ -170,7 +172,7 @@ class TestHistory:
 
     def test_append_maintains_order(self):
         """Test that append maintains insertion order."""
-        history = History()
+        history = klax.History()
         for i in range(100):
             history.append(step=i, key="loss", value=float(i))
 
@@ -180,7 +182,7 @@ class TestHistory:
 
     def test_content_structure(self):
         """Test the structure of the content dictionary."""
-        history = History()
+        history = klax.History()
         history.append(step=0, key="metric1", value=1.0)
         history.append(step=5, key="metric1", value=2.0)
 
@@ -192,13 +194,17 @@ class TestHistory:
         assert isinstance(metric_data[1], list)
 
     def test_extend(self):
-        """Test extending one History with another."""
-        history1 = History(total_steps=10, total_time=5.0, final_opt_state=1)
+        """Test extending one klax.History with another."""
+        history1 = klax.History(
+            total_steps=10, total_time=5.0, final_opt_state=1
+        )
         history1.append(step=0, key="loss", value=0.5)
         history1.append(step=10, key="loss", value=0.3)
         history1.append(step=10, key="hist1_metric", value=-5)
 
-        history2 = History(total_steps=15, total_time=3.0, final_opt_state=2)
+        history2 = klax.History(
+            total_steps=15, total_time=3.0, final_opt_state=2
+        )
         history2.append(step=0, key="loss", value=0.2)
         history2.append(step=10, key="loss", value=0.1)
         history2.append(step=10, key="hist2_metric", value=5)
@@ -222,7 +228,7 @@ class TestHistory:
         assert history1.final_opt_state == 2
 
     def test_save_and_load_roundtrip(self, tmp_path):
-        history = History()
+        history = klax.History()
         history.append(step=0, key="loss", value=0.5)
         history.append(step=5, key="acc", value=0.8)
         history.total_steps = 5
@@ -232,7 +238,7 @@ class TestHistory:
         path = tmp_path / "nested" / "history.pkl"
         history.save(path)
 
-        loaded = History.load(path)
+        loaded = klax.History.load(path)
 
         assert loaded.content == history.content
         assert loaded.total_steps == history.total_steps
@@ -241,23 +247,27 @@ class TestHistory:
 
 
 class TestMetricLogger:
-    """Tests for the MetricLogger class."""
+    """Tests for the klax.MetricLogger class."""
 
-    def _make_view(
+    def _make_context(
         self,
+        step: int = 0,
         steps: int = 10,
         model: dict | None = None,
-        opt_state: object | None = None,
+        opt_state=None,
     ):
         return SimpleNamespace(
-            model=model if model is not None else {"w": 1.0},
-            _static=SimpleNamespace(steps=steps),
-            opt_state=opt_state if opt_state is not None else {"opt": 1},
+            state=SimpleNamespace(
+                model=model if model is not None else {"w": 1.0},
+                step=jnp.array(step, dtype=int),
+                opt_state=opt_state,
+            ),
+            steps=steps,
         )
 
     def test_add_metric_and_logging_frequency(self):
         my_metric = klax.metric(name="m1")(lambda model: jnp.array(1.0))
-        logger = MetricLogger(
+        logger = klax.MetricLogger(
             log_every=2,
             metrics=[
                 my_metric,
@@ -265,30 +275,32 @@ class TestMetricLogger:
             verbose=0,
         )
 
-        view = self._make_view(steps=10)
+        context = self._make_context(step=1, steps=10)
 
         # Step 1: not divisible by 2 -> no log
-        logger.on_training_step(view, 1)
+        logger.on_training_step(context)
         assert "m1" not in logger.history.content
 
         # Step 2: divisible by 2 -> should log
-        logger.on_training_step(view, 2)
+        context.state.step = 2
+        logger.on_training_step(context)
         assert "m1" in logger.history.content
         assert logger.history.content["m1"][0] == [2]
 
         # Step 4: divisible by 2 -> should log again
-        logger.on_training_step(view, 4)
+        context.state.step = 4
+        logger.on_training_step(context)
         assert logger.history.content["m1"][0] == [2, 4]
 
     def test_verbose_print_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=1)
+        logger = klax.MetricLogger(log_every=1, verbose=1)
         my_metric = klax.metric(name="loss", verbose=True)(
             lambda model: jnp.array(1.23)
         )
         logger.add_metric(my_metric)
 
-        view = self._make_view(steps=10)
-        logger.on_training_step(view, 0)
+        context = self._make_context(steps=10)
+        logger.on_training_step(context)
 
         out = capsys.readouterr().out
         assert "Step 0/10:" in out
@@ -296,15 +308,15 @@ class TestMetricLogger:
         assert "loss: 1.2300e+00" in out
 
     def test_verbose_print_non_scalar_metric(self, capsys):
-        logger = MetricLogger(log_every=1, verbose=1)
+        logger = klax.MetricLogger(log_every=1, verbose=1)
 
         my_metric = klax.metric(name="arr", verbose=True)(
             lambda model: jnp.array([1.0, 2.0])
         )
         logger.add_metric(my_metric)
 
-        view = self._make_view(steps=5)
-        logger.on_training_step(view, 0)
+        context = self._make_context(steps=5)
+        logger.on_training_step(context)
 
         out = capsys.readouterr().out
         assert "Step 0/5:" in out
@@ -312,7 +324,7 @@ class TestMetricLogger:
         assert "arr:" in out
 
     def test_on_training_start_and_end_sets_history(self):
-        logger = MetricLogger(log_every=1, verbose=0)
+        logger = klax.MetricLogger(log_every=1, verbose=0)
 
         my_metric = klax.metric(name="m", verbose=False)(
             lambda model: jnp.array(0.0)
@@ -320,14 +332,15 @@ class TestMetricLogger:
         logger.add_metric(my_metric)
 
         sentinel_opt = {"state": 42}
-        view = self._make_view(steps=7, opt_state=sentinel_opt)
+        context = self._make_context(steps=7, opt_state=sentinel_opt)
 
-        logger.on_training_start(view, 0)
+        logger.on_training_start(context)
         # At start, one log happens at step 0
         assert "m" in logger.history.content
         assert logger.history.content["m"][0] == [0]
 
-        logger.on_training_end(view, 5)
+        context.state.step = 5
+        logger.on_training_end(context)
         assert logger.history.total_steps == 5
         assert isinstance(logger.history.total_time, float)
         assert logger.history.total_time >= 0.0
@@ -339,17 +352,17 @@ class TestMetricLogger:
 
         metric_b = klax.metric(name="loss", verbose=False)(lambda model: "B")
 
-        logger = MetricLogger(
+        logger = klax.MetricLogger(
             log_every=1, metrics=[metric_a, metric_b], verbose=0
         )
         assert len(logger.metrics) == 1
 
         sentinel_opt = {"state": 42}
-        view = self._make_view(steps=7, opt_state=sentinel_opt)
-        logger.on_training_start(view, 0)
+        context = self._make_context(steps=7, opt_state=sentinel_opt)
+        logger.on_training_start(context)
         assert logger.history.content["loss"][1] == ["B"]
 
         logger.add_metric(metric_a)
-        logger.on_training_step(view, 1)
+        logger.on_training_step(context)
 
         assert logger.history.content["loss"][1] == ["B", "A"]

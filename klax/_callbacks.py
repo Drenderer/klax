@@ -15,23 +15,24 @@
 
 from abc import ABC
 
-from ._trainstate import TrainingView
+from ._trainstate import TrainingContext
 
 
 class Callback(ABC):
     """Callback base class.
 
     A callback consists of three methods:
-        - `on_training_start`: Executed once at the start of training.
-        - `on_training_step`: Executed after each step (parameter update)
-            during training.
-        - `on_training_end`: Executed once at the end of training.
 
-    Each method receives the current step and a [`TrainingView`][klax.TrainingView]
-    object that provides read and write access to the current
-    training state (model and optimizer state) as well as read-only
-    access to static training information (loss function, optimizer,
-    batch axes, etc). The `on_training_step` method can optionally
+    - `on_training_start`: Executed once at the start of training.
+    - `on_training_step`: Executed after each step (parameter update)
+            during training.
+    - `on_training_end`: Executed once at the end of training.
+
+    Each method receives the current [`TrainingContext`][klax.TrainingContext],
+    which provides access to the [`TrainingState`][klax.TrainingState] (model,
+    optimizer state, auxiliary runtime state and current step count), as well as the
+    [loss][klax.Loss], optimizer, batch generator and total scheduled step count.
+    The `on_training_step` method can optionally
     return a boolean "stop signal", that - if `True` - will stop the
     training at the current step.
 
@@ -39,14 +40,14 @@ class Callback(ABC):
     create a custom callback.
     """
 
-    def on_training_start(self, view: TrainingView, step: int) -> None:
+    def on_training_start(self, context: TrainingContext) -> None:
         """Execute at the beginning of training, before any parameter updates."""
         pass
 
-    def on_training_step(self, view: TrainingView, step: int) -> bool | None:
+    def on_training_step(self, context: TrainingContext) -> bool | None:
         """Execute after each parameter update during training."""
         pass
 
-    def on_training_end(self, view: TrainingView, step: int) -> None:
+    def on_training_end(self, context: TrainingContext) -> None:
         """Execute at the end of training."""
         pass

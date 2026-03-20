@@ -3,7 +3,6 @@ title: Calibration and Data Handling
 ---
 
 ::: klax.batch_data
-::: klax.batch_data_with_key
 ---
 ::: klax.split_data
 ::: klax.fit
@@ -15,16 +14,9 @@ title: Calibration and Data Handling
 
 ---
 
-::: klax.TrainingView
-    options:
-        members: false
 ::: klax.TrainingState
     options:
         members: false
-::: klax.TrainingStatic
+::: klax.TrainingContext
     options:
-        members: 
-            - assemble_model
-            - disassemble_model
-            - assemble_opt_state
-            - disassemble_opt_state
+        members: false
