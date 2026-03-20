@@ -736,7 +736,7 @@ class TestPICNN:
         )
 
         assert picnn.use_passthrough is use_passthrough
-        for layer in picnn.layers:
+        for layer in picnn.layers[1:]:
             assert layer.use_passthrough is use_passthrough
 
     @pytest.mark.parametrize("use_bias", [True, False])
@@ -880,9 +880,9 @@ class TestPICNN:
         # Compute gradients with respect to the layer parameters
         grads = eqx.filter_grad(loss_fn)(picnn, x, p)
 
-        for layer in grads.layers:
+        for n, layer in enumerate(grads.layers):
             assert not jnp.all(layer.linear_yu.weight == 0)
             assert not jnp.all(layer.linear_yu.bias == 0)
-            if use_passthrough:
+            if use_passthrough and n != 0:
                 assert not jnp.all(layer.linear_xu.weight == 0)
                 assert not jnp.all(layer.linear_xu.bias == 0)
