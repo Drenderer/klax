@@ -331,7 +331,7 @@ class PICNNLayer(eqx.Module, strict=True):
             u_in_size: Size of the arbitrary path input.
             u_out_size: Size of the arbitrary path output.
             x_size: Size of the passthrough path input
-            use_passthrough: If true, the original input `x` is used for the
+            use_passthrough: If true, the original input `x` is used in the
                 calculation of the output `y`.
                 Defaults to True.
             nonnegative_y_weight: If true, applies the [nonnegative][klax.NonNegative]
@@ -625,7 +625,8 @@ class PICNN(eqx.Module, strict=True):
                 for both the convex output `y(x, p)` and the arbitrary output `p(p)`.
                 If only a single integer is provided, it is used for both `y_size and u_size`.
             use_passthrough: use_passthrough: Whether to use passthrough layers.
-                If true, the PICNN's input is passed again to each hidden layer.
+                If true, the PICNN's input is passed again to each hidden layer (Except
+                for the first hidden layer, since it receives the original input anyway).
                 Defaults to True.
             non_decreasing: If true, the output is element-wise non-decreasing
                 in `x`. This is useful if the input `x` is a convex
@@ -698,6 +699,7 @@ class PICNN(eqx.Module, strict=True):
         )
         in_sizes = ((x_size, p_size),) + width_sizes
         out_sizes = width_sizes + ((out_size, None),)
+        use_passthroughs = (False,) + len(width_sizes) * (use_passthrough,)
         use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
         update_u = len(width_sizes) * (True,) + (False,)
         nonnegative_y_weight = (non_decreasing,) + len(width_sizes) * (True,)
@@ -706,9 +708,10 @@ class PICNN(eqx.Module, strict=True):
         )
         keys = jr.split(key, len(in_sizes))
         layers = []
-        for (in_y, in_u), (out_y, out_u), ub, uu, enn, ay, k in zip(
+        for (in_y, in_u), (out_y, out_u), up, ub, uu, enn, ay, k in zip(
             in_sizes,
             out_sizes,
+            use_passthroughs,
             use_biases,
             update_u,
             nonnegative_y_weight,
@@ -722,7 +725,7 @@ class PICNN(eqx.Module, strict=True):
                     x_size=x_size,
                     y_out_size=out_y,
                     u_out_size=out_u,
-                    use_passthrough=use_passthrough,
+                    use_passthrough=up,
                     nonnegative_y_weight=enn,
                     nonnegative_passthrough=non_decreasing,
                     use_bias=ub,
