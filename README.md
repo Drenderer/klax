@@ -11,34 +11,42 @@ Check out the [Documentation](https://drenderer.github.io/klax/) for examples an
 
 ## What is Klax?
 
-Klax provides specialized machine learning architectures, constraints, and training utilities for mechanics and physics applications. Built on top of [JAX](https://docs.jax.dev/en/latest/), [Equinox](https://docs.kidger.site/equinox/), and [Optax](https://optax.readthedocs.io/en/latest/), it offers:
+Klax provides:
 
-- **Special Neural Networks**: Implementations of, e.g.,  Input Convex Neural Networks (ICNNs), matrix-valued neural networks, MLPs with custom initialization, and more.
-- **JAX Compatibility**: Seamless integration with JAX's automatic differentiation and acceleration.
-- **Parameter Constraints**: Differentiable and non-differentiable parameter constraints through [`klax.Unwrappable`](https://drenderer.github.io/klax/api/wrappers/#klax.Unwrappable) and [`klax.Constraint`](https://drenderer.github.io/klax/api/wrappers/#klax.Constraint)
-- **Customizable Training**: Methods and APIs for customized calibrations on arbitrary PyTree data structures through [`klax.fit`](https://drenderer.github.io/klax/api/training/#klax.fit), [`klax.Loss`](https://drenderer.github.io/klax/api/losses/#klax.Loss), and [`klax.Callback`](https://drenderer.github.io/klax/api/callbacks/#klax.Callback).
+- **Specialized machine learning architectures**: [MLPs][klax.nn.MLP] with customizable initialization, [fully][klax.nn.FICNN] and [partially][klax.nn.PICNN] input convex neural networks (ICNNs), matrix-valued neural networks, e.g., [skew symmetric][klax.nn.SkewSymmetricMatrix] matrices, and more.
+- **Parameter constraints**: Differentiable and non-differentiable parameter constraints, e.g., [non-negativity][klax.NonNegative] and [symmetry][klax.Symmetric] constraints.
+- **Highly customizable training and logging utlities**: Methods for [calibrating][klax.fit] abitrary trainable PyTrees with custom [loss functions][klax.Loss], [callbacks][klax.Callback], and [metrics logging][klax.MetricLogger].
+- **Full JAX compatibility**: Seamless integration with [JAX](https://docs.jax.dev/en/latest/)'s automatic differentiation and acceleration
 
-Klax is designed to be minimally intrusive - all models inherit directly from [`equinox.Module`](https://docs.kidger.site/equinox/api/module/module/#equinox.Module) without additional abstraction layers. This ensures full compatibility with the JAX/Equinox ecosystem.
+Klax is build around the highly successfull [JAX](https://docs.jax.dev/en/latest/), [Equinox](https://docs.kidger.site/equinox/), and [Optax](https://optax.readthedocs.io/en/latest/) projects and designed to be minimally intrusive. All models inherit directly from [`equinox.Module`](https://docs.kidger.site/equinox/api/module/module/#equinox.Module) without additional abstraction layers, ensuring full compatibility with the ecosystem.
 
 The constraint system is derived from Paramax's [`paramax.AbstractUnwrappable`](https://danielward27.github.io/paramax/api/wrappers.html#paramax.wrappers.AbstractUnwrappable), extending it to support non-differentiable/zero-gradient parameter constraints such as ReLU-based non-negativity constraints.
 
-The provided calibration utilities ([`klax.fit`](https://drenderer.github.io/klax/api/training/#klax.fit), [`klax.Loss`](https://drenderer.github.io/klax/api/losses/#klax.Loss), [`klax.Callback`](https://drenderer.github.io/klax/api/callbacks/#klax.Callback)) are designed to operate on arbitrarily shaped PyTrees of data, fully utilizing the flexibility of JAX and Equinox. While they cover most common machine learning use cases, as well as our specialized requirements, they remain entirely optional. The core building blocks of Klax work seamlessly in custom training loops.
+The training utilities ([`klax.fit`][], [`klax.Loss`][], [`klax.Callback`][]) are designed to operate on arbitrarily shaped model and data PyTrees, fully utilizing the flexibility of JAX and Equinox. While they cover most common machine learning use cases, as well as our specialized requirements, they remain entirely optional. The meachine learning architectures implemented in Klax work seamlessly in any JAX-compatible training loop.
 
-Currently Klax's training utilities are built around Optax, but different optimization libraries could be supported in the future if desired.
+Currently Klax's training utilities are built around [Optax](https://optax.readthedocs.io/en/latest/), but different optimization libraries could be supported in the future if desired.
 
-If you like using Klax, feel free to leave a GitHub star, and if there is a machine learning architecture that you think should be included in Klax, please consider making a PR.
+## Support us!
+
+If you like using Klax, feel free to leave a GitHub star, and if there is a machine learning architecture or anything else that you think should be included in Klax, please consider opening a PR.
 
 
 ## Installation
 
-Klax requires python 3.12+.
+Klax can be installed via pip using
 
 ```bash
 pip install klax
 ```
 
-**or** get the most recent changes from the main branch via
+If you want to add the latest release to your Python [uv](https://docs.astral.sh/uv/) project run
 
 ```bash
-pip install "klax @ git+https://github.com/Drenderer/klax.git@main"
+uv add klax
+```
+
+or directly install the main branch via
+
+```bash
+uv add "klax @ git+https://github.com/Drenderer/klax.git@main"
 ```
