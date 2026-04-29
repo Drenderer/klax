@@ -30,10 +30,9 @@ from ._linear import InputSplitLinear, Linear
 
 
 class FICNN(eqx.Module, strict=True):
-    """A fully input convex neural network (FICNN) from [Amos et al.](https://arxiv.org/abs/1609.07152).
+    """A fully input convex neural network (FICNN) according to [Amos et al.](https://arxiv.org/abs/1609.07152).
 
-    Each element of the output is a convex function of the input.
-
+    Each element of the output `y` is a convex function of the input `x`.
 
     """
 
@@ -79,14 +78,20 @@ class FICNN(eqx.Module, strict=True):
                 of shape `(in_size,)`.
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_size,)`.
-            width_sizes: The sizes of each hidden layer in a list.
+            width_sizes: The sizes of each hidden layer provided as a list.
             use_passthrough: Whether to use passthrough layers. If true, the
-                input is passed through to each hidden layer. Defaults to True.
-            non_decreasing: If true, the output is element-wise non-decreasing
-                in each input. This is useful if the input `x` is a convex
-                function of some other quantity `z`. If the FICNN `f(x(z))` is
-                non-decreasing then `f` is convex with respect to `z` if `x(z)` is
-                convex. Defaults to False.
+                input is passed through to each hidden layer and the output
+                layer. Defaults to `True`.
+            non_decreasing: If true, all weights in the first layer are
+                constrained using `klax.NonNegative`. Hence, the output is
+                element-wise non-decreasing in each input. This is useful in
+                the following scenario: Consider that you want to model the
+                function `g(z) = FICNN(x(z))` as a chain of the functions
+                `x(z)` and `FICNN(x)` such that `g` is convex w.r.t.
+                the `z`. If `x(z)` is convex, **the FICNN must be
+                non-decreasing** in `x` to ensure convexity of `g(z)`. This
+                option is, for example, used in material modeling applications,
+                where the FICNN is a function of convex invariants, c.f., [Dammaß et al. (2025)](https://doi.org/10.48550/arXiv.2503.20598).
             weight_init: The weight initializer of type `SupportedInitializer`
                 used for *unconstrained weights*.
                 Defaults to he_normal().
@@ -344,8 +349,8 @@ class PICNNLayer(eqx.Module, strict=True):
             nonnegative_passthrough: If true, applies the [nonnegative][klax.NonNegative]
                 weight wrapper to all weights in the passthrough path. This is only
                 necessary if the PICNN should be non-decreasing. However, in that case
-                you should consider to avoid using passthrough layers at all,
-                since their benefit will be largely diminished.
+                you should consider to avoiding passthrough layers, as their benefit
+                will be largely diminished.
                 Defaults to False.
             use_bias: Whether to use a bias in the convex path. All layers in the
                 arbitrary and interconnection paths will use biases regardless of
@@ -548,12 +553,12 @@ class PICNNLayer(eqx.Module, strict=True):
 
 
 class PICNN(eqx.Module, strict=True):
-    """A partially input convex neural network (FICNN) from [Amos et al.](https://arxiv.org/abs/1609.07152).
+    """A partially input convex neural network (FICNN) accordin to [Amos et al.](https://arxiv.org/abs/1609.07152).
 
     A PICNN is a function `(x, p) -> y` where each element
     of the output `y` is a convex function of the input `x`,
     but can have an arbitrary relationship to the input `p`.
-    You can think of the PICNN as a FICNN mapping `x` to `y`, but
+    You can think of the PICNN as an FICNN mapping `x` to `y`, but
     whose weights and biases are functions of the input `p`.
     """
 
@@ -599,15 +604,15 @@ class PICNN(eqx.Module, strict=True):
 
         Warning:
             To ensure convexity, the activation functions need to have certain
-            properties:
+            properties, depending on the `non_decreasing` option:
 
-            | Activation | with `non_decreasing=False` | with `non_decreasing=True` |
+            | Activation | `non_decreasing=False` | `non_decreasing=True` |
             |---|---|---|
-            | `activation_y` | **Convex and non-decreasing** | **Convex and non-decreasing** |
-            | `final_activation_y` | **Convex and non-decreasing** | **Convex and non-decreasing** |
-            | `activation_u` | No constraint | No constraint |
-            | `activation_yu` | **Non-negative** | **Non-negative** |
-            | `activation_xu` | No constraint | **Non-negative** |
+            | `activation_y` | *Convex and non-decreasing* | *Convex and non-decreasing* |
+            | `final_activation_y` | *Convex and non-decreasing* | *Convex and non-decreasing* |
+            | `activation_u` | Arbitrary | Arbitrary |
+            | `activation_yu` | *Non-negative* | *Non-negative* |
+            | `activation_xu` | Arbitrary | *Non-negative* |
 
         Args:
             x_size: Size of the input `x`. Can be `"scalar"`, to indicate a scalar input.
@@ -628,15 +633,20 @@ class PICNN(eqx.Module, strict=True):
                 If true, the PICNN's input is passed again to each hidden layer (Except
                 for the first hidden layer, since it receives the original input anyway).
                 Defaults to True.
-            non_decreasing: If true, the output is element-wise non-decreasing
-                in `x`. This is useful if the input `x` is a convex
-                function of some other quantity `z`. If the PICNN `f(x(z), p)` is
-                non-decreasing then `f` is convex with respect to `z` if `x(z)` is
-                convex.
-                Note that if `use_passthrough=True` and `non_decreasing=True` then
-                `activation_xu` has to be a non-negative function to guarantee convexity
-                with respect to `x`. It is recommended avoid using passthrough
-                layers for non-decreasing PICNNs.
+            non_decreasing: If true, the `PICNN` output is element-wise
+                non-decreasing in the input `x`. This is useful in the
+                following scenario: Consider that you want to model the function
+                `g(z, p) = PICNN(x(z), p)` as a chain of the functions `x(z)` and
+                `PICNN(x, z)` such that `g` is convex w.r.t. `z`. If `x(z)` is
+                convex, **the PICNN must be non-decreasing** in `x` to ensure
+                convexity of `g(z)`. This option is, for example, used in
+                material modeling applications, where the PICNN is a function
+                of convex invariants, c.f., [Dammaß et al. (2025)](https://doi.org/10.48550/arXiv.2503.20598).
+
+                Note: If `use_passthrough=True` and `non_decreasing=True` then
+                `activation_xu` has to be a non-negative function to guarantee
+                convexity with respect to `x`. We recomment avoiding passthrough
+                for non-decreasing PICNNs.
                 Defaults to False.
             weight_init: The weight initializer of type `SupportedInitializer`
                 used for *unconstrained weights*.
