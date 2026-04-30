@@ -316,7 +316,7 @@ class PICNNLayer(eqx.Module, strict=True):
             but has an arbitrary relationship to the input `p` - the
             input `p` modulates the network.
 
-            The input `p` is passed into a MLP, that we call the
+            The input `p` is passed into an MLP, that we call the
             "arbitrary path", since it is the flow of information
             through the network without any constraints. Information
             about the input `x` never enters the "arbitrary path".
