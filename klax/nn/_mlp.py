@@ -38,7 +38,7 @@ class MLP(eqx.Module, strict=True):
 
     This class is modified form [`equinox.nn.MLP`](https://docs.kidger.site/equinox/api/nn/mlp/#equinox.nn.MLP)
     to allow for custom initialization and different node numbers in the hidden
-    layers. Hence, it may also be used for ecoder/decoder tasks.
+    layers.
 
     """
 

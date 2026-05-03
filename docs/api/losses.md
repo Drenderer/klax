@@ -2,6 +2,14 @@
 title: Loss functions
 ---
 
+Loss functions define the objective minimized during training with
+[klax.fit][]. In klax, a loss receives `(model, batch, run_state)` and
+returns a scalar value. Built-in options like [klax.mse][] and [klax.mae][]
+cover common regression tasks, while custom losses can be created either with
+the [loss][klax.loss] decorator or by implementing a custom
+[Loss][klax.Loss] class.
+
+---
 ## Ready to use loss functions
 ::: klax.mse
 ::: klax.mae
