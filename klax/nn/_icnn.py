@@ -29,16 +29,175 @@ from .._wrappers import NonNegative
 from ._linear import InputSplitLinear, Linear
 
 
+class FICNNLayer(eqx.Module, strict=True):
+    """Layer for a fully input convex neural network from [Amos et al.](https://arxiv.org/abs/1609.07152)."""
+
+    linear_y: InputSplitLinear | Linear
+    activation_y: Callable
+    use_bias: bool = eqx.field(static=True)
+    use_passthrough: bool = eqx.field(static=True)
+    nonnegative_y_weight: bool = eqx.field(static=True)
+    nonnegative_passthrough: bool = eqx.field(static=True)
+
+    def __init__(
+        self,
+        y_in_size: int | Literal["scalar"],
+        x_size: int | Literal["scalar"],
+        y_out_size: int | Literal["scalar"],
+        *,
+        use_passthrough: bool = True,
+        nonnegative_y_weight: bool = True,
+        nonnegative_passthrough: bool = False,
+        use_bias: bool = True,
+        activation: Callable = jax.nn.softplus,
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
+        constrained_weight_init: SupportedInitializer | None = hoedt_normal(),
+        constrained_bias_init: SupportedInitializer | None = hoedt_bias(),
+        dtype: type | None = None,
+        key: PRNGKeyArray,
+    ):
+        """Initialize the FICNNLayer.
+
+        Args:
+            y_in_size: Size of the previous layers output.
+            x_size: Size of the FICNN's original input.
+            y_out_size: Size of the layers output.
+            use_passthrough: If true, the FICNN's original input `x` is used in the
+                calculation of the layers output `y`.
+                Defaults to True.
+            nonnegative_y_weight: If true, applies the [nonnegative][klax.NonNegative]
+                weight wrapper to the appropriate weight to ensure convexity of the
+                output `y` with respect to the input `y`. However, note that the first
+                FICNN layer in a FICNN should not enforce this positivity, unless
+                the FICNN output is supposed to be non-decreasing in the convex input
+                as well.
+                Defaults to True.
+            nonnegative_passthrough: If true, applies the [nonnegative][klax.NonNegative]
+                weight wrapper to all weights in the passthrough path. This is only
+                necessary if the FICNN should be non-decreasing. However, in that case
+                you should consider to avoiding passthrough layers, as their benefit
+                will be largely diminished.
+                Defaults to False.
+            use_bias: Whether to use a bias.
+                Defaults to True.
+            activation: Activation applied to the convex path output.
+                Defaults to jax.nn.softplus().
+            weight_init: Default weight initialization. Defaults to he_normal().
+            bias_init: Default bias initialization. Defaults to zeros.
+            constrained_weight_init: The weight initializer used for
+                *nonnegative constrained weights*.
+                If `None` or `nonnegative_y_weight=False`, then `weight_init` is used
+                for constrained weights as well.
+                Defaults to [`klax.hoedt_normal`][].
+            constrained_bias_init: The bias initializer used for biases in layers
+                with *nonnegative constrained weights*.
+                Defaults to hoedt_bias().
+            dtype: The dtype to use for all the weights and biases in this layer.
+                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
+                depending on whether JAX is in 64-bit mode.
+            key: A `jax.random.PRNGKey` used to provide randomness for
+                parameter initialization.
+
+        """
+        dtype = default_floating_dtype() if dtype is None else dtype
+
+        constrained_weight_init = (
+            weight_init
+            if constrained_weight_init is None
+            else constrained_weight_init
+        )
+        constrained_bias_init = (
+            bias_init
+            if constrained_bias_init is None
+            else constrained_bias_init
+        )
+
+        # In case the `activation` is learnt, make a
+        # separate copy of their weights for every neuron.
+        self.activation_y = eqx.filter_vmap(
+            lambda: activation, axis_size=y_out_size
+        )()
+
+        if use_passthrough:
+            _weight_inits = (
+                constrained_weight_init
+                if nonnegative_y_weight
+                else weight_init,
+                constrained_weight_init
+                if nonnegative_passthrough
+                else weight_init,
+            )
+            _weight_wraps = (
+                NonNegative if nonnegative_y_weight else None,
+                NonNegative if nonnegative_passthrough else None,
+            )
+            _bias_init = (
+                constrained_bias_init
+                if nonnegative_y_weight or nonnegative_passthrough
+                else bias_init
+            )
+            self.linear_y = InputSplitLinear(
+                (y_in_size, x_size),
+                y_out_size,
+                weight_inits=_weight_inits,
+                bias_init=_bias_init,
+                use_bias=use_bias,
+                weight_wraps=_weight_wraps,
+                bias_wrap=None,
+                dtype=dtype,
+                key=key,
+            )
+        else:
+            self.linear_y = Linear(
+                y_in_size,
+                y_out_size,
+                weight_init=constrained_weight_init
+                if nonnegative_y_weight
+                else weight_init,
+                bias_init=constrained_bias_init
+                if nonnegative_y_weight
+                else bias_init,
+                use_bias=use_bias,
+                weight_wrap=NonNegative if nonnegative_y_weight else None,
+                bias_wrap=None,
+                dtype=dtype,
+                key=key,
+            )
+
+        self.use_bias = use_bias
+        self.use_passthrough = use_passthrough
+        self.nonnegative_y_weight = nonnegative_y_weight
+        self.nonnegative_passthrough = nonnegative_passthrough
+
+    def __call__(
+        self,
+        y: Float[Array, "... y_in_size"],
+        x: Float[Array, "... x_size"],
+        *,
+        key: PRNGKeyArray | None = None,
+    ) -> tuple[
+        Float[Array, "... y_out_size"],
+        Float[Array, "... x_size"],
+    ]:
+        if self.use_passthrough:
+            y = self.linear_y(y, x, key=key)
+        else:
+            y = self.linear_y(y, key=key)
+
+        y = self.activation_y(y)
+
+        return y, x
+
+
 class FICNN(eqx.Module, strict=True):
-    """A fully input convex neural network (FICNN) according to [Amos et al.](https://arxiv.org/abs/1609.07152).
+    """Fully input convex neural network (FICNN) from [Amos et al.](https://arxiv.org/abs/1609.07152).
 
-    Each element of the output `y` is a convex function of the input `x`.
-
+    A FICNN is a function `x -> y` where each element
+    of the output `y` is a convex function of the input `x`.
     """
 
-    layers: tuple[Linear | InputSplitLinear, ...]
-    activations: tuple[Callable, ...]
-    final_activation: Callable
+    layers: tuple[FICNNLayer]
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
@@ -68,64 +227,104 @@ class FICNN(eqx.Module, strict=True):
     ):
         """Initialize FICNN.
 
+        The FICNN's output `y` will be an element-wise convex function of the
+        input `x`.
+
         Warning:
-            Modifying `activation` or `final_activation` to a concave function
-            or a function that isn't non-decreasing will break the convexity of
-            the FICNN. Use these parameters with care.
+            To ensure convexity, the activation functions `activation` and
+            `final_activation` need to be *convex and non-decreasing*.
 
         Args:
-            in_size: The input size. The input to the module should be a vector
-                of shape `(in_size,)`.
-            out_size: The output size. The output from the module will be a
-                vector of shape `(out_size,)`.
+            in_size: Size of the input `x`. Can be `"scalar"`, to indicate a scalar input.
+                The input to the FICNN should be a vector of shape `(x_size,)` or
+                a scalar with shape `()` if `x_size="scalar"`
+            out_size: Size of the output `y`. Can be `"scalar"`, to indicate a scalar output.
+                The output of the FICNN will be a vector of shape `(out_size,)` or
+                a scalar with shape `()` if `out_size="scalar"`.
             width_sizes: The sizes of each hidden layer provided as a list.
-            use_passthrough: Whether to use passthrough layers. If true, the
-                input is passed through to each hidden layer and the output
-                layer. Defaults to `True`.
-            non_decreasing: If true, all weights in the first layer are
-                constrained using `klax.NonNegative`. Hence, the output is
-                element-wise non-decreasing in each input. This is useful in
+            use_passthrough: Whether to use passthrough layers. If true, each
+                FICNN's hidden layer and the output layer are passed the original
+                input `x` as additional input. Defaults to `True`.
+            non_decreasing: If true, the weights in the first layer and in the passthrough
+                connections are constrained using `klax.NonNegative`. Hence, the output is
+                element-wise convex and *non-decreasing* in each input. This is useful in
                 the following scenario: Consider that you want to model the
                 function `g(z) = FICNN(x(z))` as a chain of the functions
                 `x(z)` and `FICNN(x)` such that `g` is convex w.r.t.
-                the `z`. If `x(z)` is convex, **the FICNN must be
+                `z`. If `x(z)` is convex, **the FICNN must be convex and
                 non-decreasing** in `x` to ensure convexity of `g(z)`. This
                 option is, for example, used in material modeling applications,
-                where the FICNN is a function of convex invariants, c.f., [Dammaß et al. (2025)](https://doi.org/10.48550/arXiv.2503.20598).
+                where the FICNN is a function of convex invariants, c.f.,
+                [Dammaß et al. (2025)](https://doi.org/10.48550/arXiv.2503.20598).
             weight_init: The weight initializer of type `SupportedInitializer`
                 used for *unconstrained weights*.
                 Defaults to he_normal().
-            bias_init: The bias initializer of type `SupportedInitializer` used
-                for the biases of *unconstrained layers*.
+            bias_init: The bias initializer used for the biases of *unconstrained layers*.
                 Defaults to zeros.
-            constrained_weight_init: The weight initializer of type
-                `SupportedInitializer` used for *constrained weights*.
+            constrained_weight_init: The weight initializer used for *constrained weights*.
                 If None, then `weight_init` is used for constrained weights as well.
                 Defaults to [`klax.hoedt_normal`][].
-            constrained_bias_init: The bias initializer of type
-                `SupportedInitializer` used for the biases of *constrained layers*.
-                If None, then `bias_init` is used for the biases in constrained
-                layers as well.
+            constrained_bias_init: The bias initializer used for the biases of
+                *constrained layers*. If None, then `bias_init` is used for the
+                biases in constrained layers as well.
                 Defaults to zeros.
             activation: The activation function of each hidden layer. To ensure
                 convexity this function must be convex and non-decreasing.
                 Defaults to `jax.nn.softplus`.
-            final_activation: The activation function after the output layer.
-                To ensure convexity this function must be convex and
-                non-decreasing. (Defaults to the identity.)
-            use_bias: Whether to add on a bias in the hidden layers. (Defaults
-                to True.)
+            final_activation: The activation function in the last layer.
+                To ensure convexity of the overall FICNN this function must be
+                convex and non-decreasing.
+                Defaults to the identity.
+            use_bias: Whether to add on a bias in the hidden layers.
+                Defaults to True.
             use_final_bias: Whether to add on a bias to the final layer.
                 Defaults to True.
             dtype: The dtype to use for all the weights and biases in this MLP.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialization. (Keyword only argument.)
+                parameter initialization.
 
         """
         dtype = default_floating_dtype() if dtype is None else dtype
+
         width_sizes = tuple(width_sizes)
+        in_sizes = (in_size,) + width_sizes
+        out_sizes = width_sizes + (out_size,)
+        use_passthroughs = (False,) + len(width_sizes) * (use_passthrough,)
+        use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
+        nonnegative_y_weights = (non_decreasing,) + len(width_sizes) * (True,)
+        activations_y = len(width_sizes) * (activation,) + (final_activation,)
+        keys = jr.split(key, len(in_sizes))
+        layers = []
+        for in_y, out_y, up, ub, enn, ay, k in zip(
+            in_sizes,
+            out_sizes,
+            use_passthroughs,
+            use_biases,
+            nonnegative_y_weights,
+            activations_y,
+            keys,
+        ):
+            layers.append(
+                FICNNLayer(
+                    y_in_size=in_y,
+                    x_size=in_size,
+                    y_out_size=out_y,
+                    use_passthrough=up,
+                    nonnegative_y_weight=enn,
+                    nonnegative_passthrough=non_decreasing,
+                    use_bias=ub,
+                    activation=ay,
+                    weight_init=weight_init,
+                    bias_init=bias_init,
+                    constrained_weight_init=constrained_weight_init,
+                    constrained_bias_init=constrained_bias_init,
+                    dtype=dtype,
+                    key=k,
+                )
+            )
+        self.layers = tuple(layers)
 
         self.in_size = in_size
         self.out_size = out_size
@@ -135,131 +334,16 @@ class FICNN(eqx.Module, strict=True):
         self.use_passthrough = use_passthrough
         self.non_decreasing = non_decreasing
 
-        in_sizes = (in_size,) + width_sizes
-        out_sizes = width_sizes + (out_size,)
-        use_biases = len(width_sizes) * (use_bias,) + (use_final_bias,)
-        keys = jr.split(key, len(in_sizes))
+    def __call__(
+        self,
+        x: Float[Array, "... x_size"],
+        *,
+        key: PRNGKeyArray | None = None,
+    ) -> Float[Array, "... out_size"]:
+        y = x
 
-        constrained_weight_init = (
-            weight_init
-            if constrained_weight_init is None
-            else constrained_weight_init
-        )
-        constrained_bias_init = (
-            bias_init
-            if constrained_bias_init is None
-            else constrained_bias_init
-        )
-
-        layers = []
-        for n, (sin, sout, ub, key) in enumerate(
-            zip(in_sizes, out_sizes, use_biases, keys)
-        ):
-            if n == 0:
-                layers.append(
-                    Linear(
-                        sin,
-                        sout,
-                        (
-                            constrained_weight_init
-                            if non_decreasing
-                            else weight_init
-                        ),
-                        bias_init,
-                        ub,
-                        NonNegative if non_decreasing else None,
-                        dtype=dtype,
-                        key=key,
-                    )
-                )
-            else:
-                if use_passthrough:
-                    layers.append(
-                        InputSplitLinear(
-                            (sin, in_size),
-                            sout,
-                            (
-                                constrained_weight_init
-                                if non_decreasing
-                                else (constrained_weight_init, weight_init)
-                            ),
-                            bias_init,
-                            ub,
-                            (
-                                (NonNegative, NonNegative)
-                                if non_decreasing
-                                else (NonNegative, None)
-                            ),
-                            dtype=dtype,
-                            key=key,
-                        )
-                    )
-                else:
-                    layers.append(
-                        Linear(
-                            sin,
-                            sout,
-                            constrained_weight_init,
-                            constrained_bias_init,
-                            ub,
-                            NonNegative,
-                            dtype=dtype,
-                            key=key,
-                        )
-                    )
-
-        self.layers = tuple(layers)
-
-        # In case `activation` or `final_activation` are learnt, then make a
-        # separate copy of their weights for every neuron.
-        activations = []
-        for width in width_sizes:
-            activations.append(
-                eqx.filter_vmap(lambda: activation, axis_size=width)()
-            )
-        self.activations = tuple(activations)
-        if out_size == "scalar":
-            self.final_activation = final_activation
-        else:
-            self.final_activation = eqx.filter_vmap(
-                lambda: final_activation, axis_size=out_size
-            )()
-
-    def __call__(self, x: Array, *, key: PRNGKeyArray | None = None) -> Array:
-        """Forward pass through `FICNN`.
-
-        Args:
-            x: A JAX array with shape `(in_size,)`. (Or shape `()` if
-                `in_size="scalar"`.)
-            key: Ignored; provided for compatibility with the rest of the
-                Equinox API. (Keyword only argument.)
-
-        Returns:
-            A JAX array with shape `(out_size,)`. (Or shape `()` if
-            `out_size="scalar"`.)
-
-        """
-        y = self.layers[0](x)
-
-        for i, (layer, activation) in enumerate(
-            zip(self.layers[1:], self.activations)
-        ):
-            layer_activation = jax.tree.map(
-                lambda y: y[i] if eqx.is_array(y) else y, activation
-            )
-            y = eqx.filter_vmap(lambda a, b: a(b))(layer_activation, y)
-
-            if self.use_passthrough:
-                # Tell type checker that this is an InputSplitLinear
-                layer = cast(InputSplitLinear, layer)
-                y = layer(y, x)
-            else:
-                y = layer(y)
-
-        if self.out_size == "scalar":
-            y = self.final_activation(y)
-        else:
-            y = eqx.filter_vmap(lambda a, b: a(b))(self.final_activation, y)
+        for layer in self.layers:
+            y, _ = layer(y, x, key=key)
 
         return y
 
@@ -374,9 +458,8 @@ class PICNNLayer(eqx.Module, strict=True):
             bias_init: Default bias initialization. Defaults to zeros.
             constrained_weight_init: The weight initializer used for
                 *nonnegative constrained weights*.
-                If None, then `weight_init` is used for constrained weights as well.
-                Note that if `nonnegative_y_weight=True` then this argument is ignored
-                and the default `weight_init` is used instead.
+                If `None` or `nonnegative_y_weight=False`, then `weight_init` is used
+                for constrained weights as well.
                 Defaults to [`klax.hoedt_normal`][].
             constrained_bias_init: The bias initializer used for biases in layers
                 with *nonnegative constrained weights*.
@@ -387,7 +470,7 @@ class PICNNLayer(eqx.Module, strict=True):
             interconnect_bias_init: Bias initializer for weights in the
                 interconnection path from the arbitrary path to the convex path.
                 Defaults to `ones`.
-            dtype: The dtype to use for all the weights and biases in this MLP.
+            dtype: The dtype to use for all the weights and biases in this layer.
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
@@ -546,6 +629,7 @@ class PICNNLayer(eqx.Module, strict=True):
             y = self.activation_y(self.linear_y(w_y, w_x, u))
         else:
             y = self.activation_y(self.linear_y(w_y, u))
+
         if self.update_u:
             u = self.activation_u(self.linear_u(u))
 
@@ -553,7 +637,7 @@ class PICNNLayer(eqx.Module, strict=True):
 
 
 class PICNN(eqx.Module, strict=True):
-    """A partially input convex neural network (FICNN) accordin to [Amos et al.](https://arxiv.org/abs/1609.07152).
+    """Partially input convex neural network (PICNN) from [Amos et al.](https://arxiv.org/abs/1609.07152).
 
     A PICNN is a function `(x, p) -> y` where each element
     of the output `y` is a convex function of the input `x`,
@@ -699,7 +783,7 @@ class PICNN(eqx.Module, strict=True):
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialization. (Keyword only argument.)
+                parameter initialization.
 
         """
         dtype = default_floating_dtype() if dtype is None else dtype
