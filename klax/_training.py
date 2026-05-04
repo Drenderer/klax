@@ -14,7 +14,7 @@
 
 """Implements a basic training loop."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import equinox as eqx
@@ -35,7 +35,6 @@ from ._wrappers import apply
 type Leaf = Any
 
 
-@eqx.filter_jit
 def make_step(
     state_leaves: list[Leaf],
     state_treedef: Any,
@@ -78,6 +77,8 @@ def make_step(
 def run_training_loop(
     context: TrainingContext,
     callbacks: Sequence[Callback],
+    step_function: Callable = make_step,
+    jit_compile: bool = True,
 ) -> TrainingContext:
     state_leaves = context._state_leaves
     state_treedef = context._state_treedef
@@ -85,11 +86,14 @@ def run_training_loop(
     for callback in callbacks:
         callback.on_training_start(context)
 
+    if jit_compile:
+        step_function = eqx.filter_jit(step_function)
+
     for batch in context.batch_generator:
         if context.state.step >= context.steps:
             break
 
-        state_leaves, _ = make_step(
+        state_leaves, _ = step_function(
             state_leaves,
             state_treedef,
             batch,
@@ -129,6 +133,7 @@ def fit[T: eqx.Module](
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
+    jit_compile: bool = True,
     key: PRNGKeyArray,
 ) -> tuple[T, History | None]:
     """Train a model using an optimizer from optax.
@@ -209,6 +214,12 @@ def fit[T: eqx.Module](
             implement early stopping, custom logging and more. The argument
             to the callback function is aCallbackArgs object.
             Defaults to `None`.
+        jit_compile: Wether to compile the function that computes the gradient
+            update step (this includes the loss function). You generally want
+            this to be `True`. However, in cases where the loss function itself
+            is not differentiable (e.g., when computing different parts of the
+            loss on different hardware, such as GPU and CPU) it might be
+            advantageous to have more fine grained control over the compilation.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
 
@@ -274,7 +285,9 @@ def fit[T: eqx.Module](
 
         callbacks.append(logger)
 
-    context = run_training_loop(context, callbacks)
+    context = run_training_loop(
+        context, callbacks, step_function=make_step, jit_compile=jit_compile
+    )
 
     model = context.state.model
 
