@@ -10,36 +10,20 @@ from jax.nn.initializers import variance_scaling
 from jaxtyping import Array
 from matplotlib import pyplot as plt
 
-from klax import HistoryCallback, finalize, fit
+from klax import MetricLogger, finalize, fit
 from klax.nn import MLP as KLAXMLP
 
 
 # Callback for recording predictions during training
-class TrackPredictionHistory(HistoryCallback):
+class TrackPredictionMetric:
     x_eval: Array
-    predictions: list
-    pred_steps: list
-    log_every_pred: int
 
-    def __init__(
-        self,
-        x_eval: Array,
-        log_every: int = 100,
-        log_every_pred: int = 1000,
-        verbose: bool = True,
-    ):
-        super().__init__(log_every=log_every, verbose=verbose)
+    def __init__(self, x_eval: Array):
         self.x_eval = x_eval
-        self.predictions = []
-        self.pred_steps = []
-        self.log_every_pred = log_every_pred
 
-    def __call__(self, cbargs):
-        super().__call__(cbargs)
-        if cbargs.step % self.log_every_pred == 0:
-            model = finalize(cbargs.model)
-            self.predictions.append(jax.vmap(model)(self.x_eval))
-            self.pred_steps.append(cbargs.step)
+    def __call__(self, model):
+        model = finalize(model)
+        return jax.vmap(model)(self.x_eval)
 
 
 # Define a simple dataset
@@ -79,25 +63,30 @@ eqx_mlp = EQXMLP(
 )
 
 # Train the models
+logger = MetricLogger()
+logger.add_metric("predictions", TrackPredictionMetric(x_eval))
 klax_mlp, klax_hist = fit(
     klax_mlp,
     (x, y),
     steps=30_000,
-    history=TrackPredictionHistory(x_eval, log_every_pred=log_every_pred),
+    logger=logger,
     key=train_key,
 )
+
+logger = MetricLogger()
+logger.add_metric("predictions", TrackPredictionMetric(x_eval))
 eqx_mlp, eqx_hist = fit(
     eqx_mlp,
     (x, y),
     steps=30_000,
-    history=TrackPredictionHistory(x_eval, log_every_pred=log_every_pred),
+    logger=logger,
     key=train_key,
 )
 
 # %% Plot histories
 ax = plt.subplot()
-eqx_hist.plot(ax=ax, loss_options=dict(label="eqx MLP", c="blue"))
-klax_hist.plot(ax=ax, loss_options=dict(label="klax MLP", c="orange"))
+eqx_hist.plot("loss", ax=ax, label="eqx MLP", c="blue")
+klax_hist.plot("loss", ax=ax, label="klax MLP", c="orange")
 ax.set(
     yscale="log",
     ylabel="Loss",
@@ -107,10 +96,12 @@ ax.legend()
 plt.show()
 
 # %% Plot history of predictions
-fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(8, 4))
+fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(10, 4))
 
-y_klax = jnp.array(klax_hist.predictions)
-y_eqx = jnp.array(eqx_hist.predictions)
+steps, y_klax = klax_hist["predictions"]
+steps, y_eqx = eqx_hist["predictions"]
+y_klax = jnp.array(y_klax)
+y_eqx = jnp.array(y_eqx)
 colors = plt.cm.jet(jnp.linspace(0, 1, y_klax.shape[0]))
 
 axes[0].scatter(x, y, label="Data", marker="x", c="black")
@@ -130,7 +121,7 @@ for yk, ye, c in zip(y_klax, y_eqx, colors):
     axes[1].plot(x_eval, ye, c=c)
 
 sm = plt.cm.ScalarMappable(
-    cmap=plt.cm.jet, norm=plt.Normalize(vmin=0, vmax=klax_hist.steps[-1])
+    cmap=plt.cm.jet, norm=plt.Normalize(vmin=0, vmax=steps[-1])
 )
 fig.colorbar(sm, ax=axes, orientation="vertical", label="Training Step")
 plt.show()

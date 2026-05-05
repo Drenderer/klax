@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "klax"
-version = "0.1.4"
+version = "0.2.0"
 description = "A lightweight machine learning package for computational mechanics."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -14,11 +14,11 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "equinox>=0.12.2",
-    "jax>=0.6.0",
+    "equinox>=0.11.10",
+    "jax>=0.4.35",
     "optax>=0.2.4",
-    "paramax>=0.0.3",
 ]
+
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Education",
@@ -44,6 +44,9 @@ docs = [
     "mkdocs-ipynb>=0.1.1",
     "mkdocs-material>=9.6.14",
     "mkdocstrings-python>=1.16.12",
+]
+tqdm = [
+    "tqdm>=4.67.1",
 ]
 
 [dependency-groups]
