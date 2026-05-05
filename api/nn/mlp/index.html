@@ -1,0 +1,2937 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The documentation for the Klax Python library.">
+      
+      
+      
+      
+        <link rel="prev" href="../linear/">
+      
+      
+        <link rel="next" href="../matrices/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Multi-layer perceptrons - Klax Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../assets/_hippogriffe.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#klax.nn.MLP" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Klax Documentation" class="md-header__button md-logo" aria-label="Klax Documentation" data-md-component="logo">
+      
+  <img src="../../../assets/logo_minimal.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Klax Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Multi-layer perceptrons
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch theme automatically"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch theme automatically" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-orange" data-md-color-accent="deep-orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-orange" data-md-color-accent="deep-orange"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Drenderer/klax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Drenderer/klax
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Klax Documentation" class="md-nav__button md-logo" aria-label="Klax Documentation" data-md-component="logo">
+      
+  <img src="../../../assets/logo_minimal.png" alt="logo">
+
+    </a>
+    Klax Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Drenderer/klax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Drenderer/klax
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Klax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/isotropic_hyperelasticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Isotropic Hyperelasticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/training_without_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training without Data - PINNs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/sample_weighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample weighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration and Data Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../wrappers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unwrappables and Constraints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../losses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loss functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../serialization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../initialization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter initialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Networks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Neural Networks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-layer perceptrons
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-layer perceptrons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#klax.nn.MLP" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MLP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" MLP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.MLP.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.MLP.__call__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__call__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input-convex-neural-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input Convex Neural Networks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Convex Neural Networks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fully-input-convex-neural-network-ficnn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fully Input Convex Neural Network (FICNN)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fully Input Convex Neural Network (FICNN)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convexity-guarantee" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convexity guarantee
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-non-decreasing-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: non-decreasing output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.FICNN" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FICNN
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" FICNN">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.FICNN.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.FICNN.__call__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__call__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partially-input-convex-neural-network-picnn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partially Input Convex Neural Network (PICNN)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Partially Input Convex Neural Network (PICNN)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-structure_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convexity-guarantee_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convexity guarantee
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-non-decreasing-output_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: non-decreasing output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.PICNN" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;PICNN
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" PICNN">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.PICNN.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#klax.nn.PICNN.__call__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__call__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matrix-valued functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="klax.nn.MLP" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>klax.nn.MLP</code>
+
+
+<a href="#klax.nn.MLP" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Standard Multi-Layer Perceptron; also known as a feed-forward network.</p>
+<p>This class is modified form <a href="https://docs.kidger.site/equinox/api/nn/mlp/#equinox.nn.MLP"><code>equinox.nn.MLP</code></a>
+to allow for custom initialization and different node numbers in the hidden
+layers.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="klax.nn.MLP.__init__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">,</span> <span class="n">width_sizes</span><span class="p">,</span> <span class="n">weight_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">bias_init</span><span class="o">=</span><span class="n">zeros</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">softplus</span><span class="p">,</span> <span class="n">final_activation</span><span class="o">=&lt;</span><span class="k">lambda</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">use_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_final_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">weight_wrap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bias_wrap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span></code>
+
+<a href="#klax.nn.MLP.__init__" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize MLP.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETER</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>in_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The input size. The input to the module should be a vector
+of shape <code>(in_features,)</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>out_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The output size. The output from the module will be a
+vector of shape <code>(out_features,)</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>width_sizes</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The sizes of each hidden layer in a list.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Sequence">Sequence</span>[<span title="int">int</span>]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weight_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The weight initializer of type <code>Initializer</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><a class="autorefs autorefs-internal" title="            klax.Initializer (klax._initializers.Initializer)" href="../../initialization/#klax.Initializer">Initializer</a></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>bias_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The bias initializer of type <code>Initializer</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><a class="autorefs autorefs-internal" title="            klax.Initializer (klax._initializers.Initializer)" href="../../initialization/#klax.Initializer">Initializer</a></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>zeros</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>activation</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The activation function after each hidden layer.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>softplus</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>final_activation</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The activation function after the output layer.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>&lt;lambda&gt;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_bias</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to add on a bias to internal layers.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_final_bias</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to add on a bias to the final layer.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weight_wrap</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>An optional wrapper that is passed to all weights.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="type">type</span>[<a class="autorefs autorefs-internal" title="            klax.Constraint (klax._wrappers.Constraint)" href="../../wrappers/#klax.Constraint">Constraint</a>] | <span title="type">type</span>[<a class="autorefs autorefs-internal" title="            klax.Unwrappable (klax._wrappers.Unwrappable)" href="../../wrappers/#klax.Unwrappable">Unwrappable</a>[<span title="builtins.Array">Array</span>]] | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>bias_wrap</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>An optional wrapper that is passed to all biases.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="type">type</span>[<a class="autorefs autorefs-internal" title="            klax.Constraint (klax._wrappers.Constraint)" href="../../wrappers/#klax.Constraint">Constraint</a>] | <span title="type">type</span>[<a class="autorefs autorefs-internal" title="            klax.Unwrappable (klax._wrappers.Unwrappable)" href="../../wrappers/#klax.Unwrappable">Unwrappable</a>[<span title="builtins.Array">Array</span>]] | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dtype</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The dtype to use for all the weights and biases in this MLP.
+Defaults to either <code>jax.numpy.float32</code> or <code>jax.numpy.float64</code>
+depending on whether JAX is in 64-bit mode.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="type">type</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>A <code>jax.random.PRNGKey</code> used to provide randomness for
+parameter initialisation. (Keyword only argument.)</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.PRNGKeyArray">PRNGKeyArray</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Note</summary>
+  <p>Note that <code>in_size</code> also supports the string <code>"scalar"</code> as a
+special value. In this case the input to the module should be of
+shape <code>()</code>.</p>
+<p>Likewise <code>out_size</code> can also be a string <code>"scalar"</code>, in which case
+the output from the module will have shape <code>()</code>.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="klax.nn.MLP.__call__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#klax.nn.MLP.__call__" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Forward pass through MLP.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETER</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>A JAX array with shape <code>(in_size,)</code>. (Or shape <code>()</code> if
+<code>in_size="scalar"</code>.)</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.Array">Array</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Ignored; provided for compatibility with the rest of the
+Equinox API. (Keyword only argument.)</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.PRNGKeyArray">PRNGKeyArray</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="builtins.Array">Array</span></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>A JAX array with shape <code>(out_size,)</code>. (Or shape <code>()</code> if</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="builtins.Array">Array</span></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p><code>out_size="scalar"</code>.)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+<h1 id="input-convex-neural-networks">Input Convex Neural Networks<a class="headerlink" href="#input-convex-neural-networks" title="Permanent link">¤</a></h1>
+<p>Input Convex Neural Networks (ICNNs) are a family of neural network architectures introduced by
+<a href="https://arxiv.org/abs/1609.07152">Amos et al. (2017)</a> that are designed to produce outputs that
+are provably convex with respect to (some of) their inputs. Klax provides two variants:
+the <strong>Fully Input Convex Neural Network</strong> (<code>FICNN</code>) and the
+<strong>Partially Input Convex Neural Network</strong> (<code>PICNN</code>).</p>
+<h2 id="fully-input-convex-neural-network-ficnn">Fully Input Convex Neural Network (FICNN)<a class="headerlink" href="#fully-input-convex-neural-network-ficnn" title="Permanent link">¤</a></h2>
+<p>An <code>FICNN</code> represents a function <span class="arithmatex">\(f : x \mapsto y\)</span> where every element of the output <span class="arithmatex">\(y\)</span> is a
+convex function of the input <span class="arithmatex">\(x\)</span>.</p>
+<h3 id="layer-structure">Layer structure<a class="headerlink" href="#layer-structure" title="Permanent link">¤</a></h3>
+<p><img alt="FICNN Layer" src="../../../assets/icnn_ficnn_layer.png#only-light" />
+<img alt="FICNN Layer" src="../../../assets/icnn_ficnn_layer_dark.png#only-dark" /></p>
+<p>Each <code>FICNNLayer</code> computes:</p>
+<div class="arithmatex">\[y_{i+1} = \sigma\!\left(U_i y_i + W_i x + b_i\right)\]</div>
+<p>where:</p>
+<ul>
+<li><span class="arithmatex">\(y_i\)</span> is the hidden state from the previous layer (initialised as <span class="arithmatex">\(y^0 = x\)</span>),</li>
+<li><span class="arithmatex">\(x\)</span> is the original network input, passed directly to every layer via the <em>passthrough connection</em>,</li>
+<li><span class="arithmatex">\(U_i\)</span>, <span class="arithmatex">\(W_i\)</span>, <span class="arithmatex">\(_i\)</span> are the weight matrices and bias of layer <span class="arithmatex">\(i\)</span>,</li>
+<li><span class="arithmatex">\(\sigma\)</span> is an activation function that must be <strong>convex and non-decreasing</strong> (default: <code>softplus</code>).</li>
+</ul>
+<h3 id="convexity-guarantee">Convexity guarantee<a class="headerlink" href="#convexity-guarantee" title="Permanent link">¤</a></h3>
+<p>Convexity is maintained by enforcing two constraints:</p>
+<ol>
+<li><strong>Non-negative weights on the convex path.</strong> The weight matrix <span class="arithmatex">\(U_i\)</span> acting on the
+   previous hidden state <span class="arithmatex">\(y_i\)</span> is constrained to be element-wise non-negative (via
+   <a class="autorefs autorefs-internal" title="            klax.NonNegative" href="../../wrappers/#klax.NonNegative"><code>NonNegative</code></a>) for all layers except the first. This ensures that the
+   composition of affine maps and a convex activation remains convex.</li>
+<li><strong>Convex, non-decreasing activation.</strong> The activation <span class="arithmatex">\(\sigma\)</span> applied to each layer's
+   pre-activation must itself be convex and non-decreasing.</li>
+</ol>
+<p>The passthrough weight <span class="arithmatex">\(W_i\)</span> has no sign constraint because <span class="arithmatex">\(x\)</span> enters each layer as a
+fixed affine term, which does not break convexity.</p>
+<h3 id="optional-non-decreasing-output">Optional: non-decreasing output<a class="headerlink" href="#optional-non-decreasing-output" title="Permanent link">¤</a></h3>
+<p>It is possible to additionally constrain <span class="arithmatex">\(U_0\)</span> (the first-layer weight) and all
+passthrough weights <span class="arithmatex">\(W_i\)</span> to be non-negative. This ensures the output is not only convex but
+also element-wise <strong>non-decreasing</strong> in <span class="arithmatex">\(x\)</span>. This is needed, for example, when the FICNN is
+composed with another convex function <span class="arithmatex">\(x(z)\)</span>, and convexity in <span class="arithmatex">\(z\)</span> must be preserved through
+the chain rule.</p>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">¤</a></h3>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="klax.nn.FICNN" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>klax.nn.FICNN</code>
+
+
+<a href="#klax.nn.FICNN" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Fully input convex neural network (FICNN) from <a href="https://arxiv.org/abs/1609.07152">Amos et al.</a>.</p>
+<p>A FICNN is a function <code>x -&gt; y</code> where each element
+of the output <code>y</code> is a convex function of the input <code>x</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="klax.nn.FICNN.__init__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">,</span> <span class="n">width_sizes</span><span class="p">,</span> <span class="n">use_passthrough</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">non_decreasing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">weight_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">bias_init</span><span class="o">=</span><span class="n">zeros</span><span class="p">,</span> <span class="n">constrained_weight_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">constrained_bias_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">softplus</span><span class="p">,</span> <span class="n">final_activation</span><span class="o">=&lt;</span><span class="k">lambda</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">use_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_final_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span></code>
+
+<a href="#klax.nn.FICNN.__init__" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize FICNN.</p>
+<p>The FICNN's output <code>y</code> will be an element-wise convex function of the
+input <code>x</code>.</p>
+
+
+<details class="warning" open>
+  <summary>Warning</summary>
+  <p>To ensure convexity, the activation functions <code>activation</code> and
+<code>final_activation</code> need to be <em>convex and non-decreasing</em>.</p>
+</details>
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETER</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>in_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Size of the input <code>x</code>. Can be <code>"scalar"</code>, to indicate a scalar input.
+The input to the FICNN should be a vector of shape <code>(x_size,)</code> or
+a scalar with shape <code>()</code> if <code>x_size="scalar"</code></p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>out_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Size of the output <code>y</code>. Can be <code>"scalar"</code>, to indicate a scalar output.
+The output of the FICNN will be a vector of shape <code>(out_size,)</code> or
+a scalar with shape <code>()</code> if <code>out_size="scalar"</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>width_sizes</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The sizes of each hidden layer provided as a list.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Sequence">Sequence</span>[<span title="int">int</span>]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_passthrough</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to use passthrough layers. If true, each
+FICNN's hidden layer and the output layer are passed the original
+input <code>x</code> as additional input. Defaults to <code>True</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>non_decreasing</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>If true, the weights in the first layer and in the passthrough
+connections are constrained using <code>klax.NonNegative</code>. Hence, the output is
+element-wise convex and <em>non-decreasing</em> in each input. This is useful in
+the following scenario: Consider that you want to model the
+function <code>g(z) = FICNN(x(z))</code> as a chain of the functions
+<code>x(z)</code> and <code>FICNN(x)</code> such that <code>g</code> is convex w.r.t.
+<code>z</code>. If <code>x(z)</code> is convex, <strong>the FICNN must be convex and
+non-decreasing</strong> in <code>x</code> to ensure convexity of <code>g(z)</code>. This
+option is, for example, used in material modeling applications,
+where the FICNN is a function of convex invariants, c.f.,
+<a href="https://doi.org/10.48550/arXiv.2503.20598">Dammaß et al. (2025)</a>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>False</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weight_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The weight initializer of type <code>SupportedInitializer</code>
+used for <em>unconstrained weights</em>.
+Defaults to he_normal().</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>bias_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The bias initializer used for the biases of <em>unconstrained layers</em>.
+Defaults to zeros.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>zeros</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>constrained_weight_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The weight initializer used for <em>constrained weights</em>.
+If None, then <code>weight_init</code> is used for constrained weights as well.
+Defaults to <a class="autorefs autorefs-internal" title="            klax.hoedt_normal(in_axis=-2, dtype=float64)" href="../../initialization/#klax.hoedt_normal"><code>klax.hoedt_normal</code></a>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>constrained_bias_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The bias initializer used for the biases of
+<em>constrained layers</em>. If None, then <code>bias_init</code> is used for the
+biases in constrained layers as well.
+Defaults to zeros.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>activation</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The activation function of each hidden layer. To ensure
+convexity this function must be convex and non-decreasing.
+Defaults to <code>jax.nn.softplus</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>softplus</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>final_activation</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The activation function in the last layer.
+To ensure convexity of the overall FICNN this function must be
+convex and non-decreasing.
+Defaults to the identity.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>&lt;lambda&gt;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_bias</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to add on a bias in the hidden layers.
+Defaults to True.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_final_bias</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to add on a bias to the final layer.
+Defaults to True.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dtype</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The dtype to use for all the weights and biases in this MLP.
+Defaults to either <code>jax.numpy.float32</code> or <code>jax.numpy.float64</code>
+depending on whether JAX is in 64-bit mode.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="type">type</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>A <code>jax.random.PRNGKey</code> used to provide randomness for
+parameter initialization.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.PRNGKeyArray">PRNGKeyArray</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="klax.nn.FICNN.__call__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#klax.nn.FICNN.__call__" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+<h2 id="partially-input-convex-neural-network-picnn">Partially Input Convex Neural Network (PICNN)<a class="headerlink" href="#partially-input-convex-neural-network-picnn" title="Permanent link">¤</a></h2>
+<p>A <code>PICNN</code> represents a function <span class="arithmatex">\(f : (x, p) \mapsto y\)</span> where every element of the output <span class="arithmatex">\(y\)</span> is
+a convex function of <span class="arithmatex">\(x\)</span>, but can have an <strong>arbitrary</strong> relationship to the conditioning input <span class="arithmatex">\(p\)</span>.
+Intuitively, a PICNN is a FICNN whose weights and biases are themselves functions of <span class="arithmatex">\(p\)</span>.</p>
+<h3 id="layer-structure_1">Layer structure<a class="headerlink" href="#layer-structure_1" title="Permanent link">¤</a></h3>
+<p><img alt="FICNN Layer" src="../../../assets/icnn_picnn_layer.png#only-light" />
+<img alt="FICNN Layer" src="../../../assets/icnn_picnn_layer_dark.png#only-dark" /></p>
+<p>Each <code>PICNNLayer</code> maintains two parallel hidden states:</p>
+<ul>
+<li><strong>Convex path</strong> <span class="arithmatex">\(y_i\)</span>: carries information about <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(p\)</span>; convexity in <span class="arithmatex">\(x\)</span> is enforced here.</li>
+<li><strong>Arbitrary path</strong> <span class="arithmatex">\(u_i\)</span>: an unconstrained MLP processing the input <span class="arithmatex">\(p\)</span> with no convexity constraints applied.</li>
+</ul>
+<p>The two paths interact via <strong>interconnection sublayers</strong> that modulate the weights of the convex
+path using the current state <span class="arithmatex">\(u_i\)</span> of the arbitrary path:</p>
+<div class="arithmatex">\[
+\begin{align}
+    y^{i+1} &amp;= \sigma^y\Bigl(U_i(u_i) y_i \;+W_i(u_i) x \;+b_i(u_i)\Bigr)\\
+    u^{i+1} &amp;= \sigma^u\!\left(W_i^u\, u_i + b_i^u\right)
+\end{align}
+\]</div>
+<p>where:</p>
+<ul>
+<li>the weight <span class="arithmatex">\(U_i(u_i) = \tilde U_i \cdot \texttt{diag}(\sigma^{yu}(W^{yu}u_i+b^{yu}))\)</span> is computed from a constant weight matrix <span class="arithmatex">\(\tilde U_i\)</span>, that is column-wise modulated by <span class="arithmatex">\(u_i\)</span> via a single layer MLP,</li>
+<li>the weight <span class="arithmatex">\(W(u_i) = \tilde W_i \cdot \texttt{diag}(\sigma^{xu}(W^{xu}u_i+b^{xu}))\)</span> is similarly computed from a constant weight matrix <span class="arithmatex">\(\tilde W_i\)</span>, that is column-wise modulated by <span class="arithmatex">\(u_i\)</span> via a single layer MLP (only when <code>use_passthrough=True</code>),</li>
+<li>the bias <span class="arithmatex">\(b(u_i) = W^{bu}u_i+b^{bu}\)</span> is provided through an additional affine projection of <span class="arithmatex">\(u_i\)</span>.</li>
+<li><span class="arithmatex">\(\sigma_{yu}\)</span> must be <strong>non-negative</strong> (default: <code>softplus</code>) to preserve convexity,</li>
+<li><span class="arithmatex">\(\sigma_{xu}\)</span> has no sign constraint by default (identity), but must be non-negative when
+  <code>non_decreasing=True</code>.</li>
+</ul>
+<p>Note that information from <span class="arithmatex">\(x\)</span> <strong>never</strong> enters the arbitrary path <span class="arithmatex">\(u\)</span>, preserving the
+convexity guarantee in <span class="arithmatex">\(x\)</span>.</p>
+<h3 id="convexity-guarantee_1">Convexity guarantee<a class="headerlink" href="#convexity-guarantee_1" title="Permanent link">¤</a></h3>
+<p>The convexity argument mirrors the FICNN:</p>
+<ol>
+<li><strong>Non-negative weights on the convex path.</strong> The weight matrix <span class="arithmatex">\(U_i(u_i)\)</span> acting on the
+   previous hidden state <span class="arithmatex">\(y_i\)</span> is constrained to be element-wise non-negative for all layers except the first. For this, <span class="arithmatex">\(\tilde U_i\)</span> is constrained to be non-negative (via <a class="autorefs autorefs-internal" title="            klax.NonNegative" href="../../wrappers/#klax.NonNegative"><code>NonNegative</code></a>). Additionally, <span class="arithmatex">\(\sigma^{yu}\)</span> <em>must</em> be non-negative (e.g. <code>softplus</code>), ensuring the constraint is maintained regardless of the value of <span class="arithmatex">\(u_i\)</span>. This ensures that the composition of affine maps and a convex activation remains convex.</li>
+<li><strong>Convex, non-decreasing activation.</strong> The activation <span class="arithmatex">\(\sigma_y\)</span> must be convex and non-decreasing.</li>
+</ol>
+<h3 id="optional-non-decreasing-output_1">Optional: non-decreasing output<a class="headerlink" href="#optional-non-decreasing-output_1" title="Permanent link">¤</a></h3>
+<p>Analogously to the FICNN case, it's possible to ensure the output <span class="arithmatex">\(y\)</span> is non-decreasing in <span class="arithmatex">\(x\)</span> by extending the non-negativity constraints to the first-layer weight and to all passthrough weights (setting <code>non_decreasing=True</code>).</p>
+<h3 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">¤</a></h3>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="klax.nn.PICNN" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>klax.nn.PICNN</code>
+
+
+<a href="#klax.nn.PICNN" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Partially input convex neural network (PICNN) from <a href="https://arxiv.org/abs/1609.07152">Amos et al.</a>.</p>
+<p>A PICNN is a function <code>(x, p) -&gt; y</code> where each element
+of the output <code>y</code> is a convex function of the input <code>x</code>,
+but can have an arbitrary relationship to the input <code>p</code>.
+You can think of the PICNN as an FICNN mapping <code>x</code> to <code>y</code>, but
+whose weights and biases are functions of the input <code>p</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="klax.nn.PICNN.__init__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">x_size</span><span class="p">,</span> <span class="n">p_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">,</span> <span class="n">width_sizes</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">use_passthrough</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">non_decreasing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">weight_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">bias_init</span><span class="o">=</span><span class="n">zeros</span><span class="p">,</span> <span class="n">constrained_weight_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">constrained_bias_init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">interconnect_weight_init</span><span class="o">=</span><span class="n">zeros</span><span class="p">,</span> <span class="n">interconnect_bias_init</span><span class="o">=</span><span class="n">ones</span><span class="p">,</span> <span class="n">activation_y</span><span class="o">=</span><span class="n">softplus</span><span class="p">,</span> <span class="n">activation_u</span><span class="o">=</span><span class="n">softplus</span><span class="p">,</span> <span class="n">activation_yu</span><span class="o">=</span><span class="n">softplus</span><span class="p">,</span> <span class="n">activation_xu</span><span class="o">=&lt;</span><span class="k">lambda</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">final_activation_y</span><span class="o">=&lt;</span><span class="k">lambda</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">use_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_final_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span></code>
+
+<a href="#klax.nn.PICNN.__init__" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize PICNN.</p>
+<p>The PICNN's output <code>y</code> will be an element-wise convex function of the
+input <code>x</code>, but can have an arbitrary functional relationship to the input <code>p</code>.</p>
+
+
+<details class="warning" open>
+  <summary>Warning</summary>
+  <p>To ensure convexity, the activation functions need to have certain
+properties, depending on the <code>non_decreasing</code> option:</p>
+<table>
+<thead>
+<tr>
+<th>Activation</th>
+<th><code>non_decreasing=False</code></th>
+<th><code>non_decreasing=True</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>activation_y</code></td>
+<td><em>Convex and non-decreasing</em></td>
+<td><em>Convex and non-decreasing</em></td>
+</tr>
+<tr>
+<td><code>final_activation_y</code></td>
+<td><em>Convex and non-decreasing</em></td>
+<td><em>Convex and non-decreasing</em></td>
+</tr>
+<tr>
+<td><code>activation_u</code></td>
+<td>Arbitrary</td>
+<td>Arbitrary</td>
+</tr>
+<tr>
+<td><code>activation_yu</code></td>
+<td><em>Non-negative</em></td>
+<td><em>Non-negative</em></td>
+</tr>
+<tr>
+<td><code>activation_xu</code></td>
+<td>Arbitrary</td>
+<td><em>Non-negative</em></td>
+</tr>
+</tbody>
+</table>
+</details>
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETER</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Size of the input <code>x</code>. Can be <code>"scalar"</code>, to indicate a scalar input.
+The input to the PICNN should be a vector of shape <code>(x_size,)</code> or
+a scalar with shape <code>()</code> if <code>x_size="scalar"</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Size of the input <code>p</code>. Can be <code>"scalar"</code>, to indicate a scalar input.
+The input to the PICNN should be a vector of shape <code>(p_size,)</code> or
+a scalar with shape <code>()</code> if <code>p_size="scalar"</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>out_size</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Size of the output <code>y</code>. Can be <code>"scalar"</code>, to indicate a scalar output.
+The output of the PICNN will be a vector of shape <code>(out_size,)</code> or
+a scalar with shape <code>()</code> if <code>out_size="scalar"</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="typing.Literal">Literal</span>[&#39;scalar&#39;]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>width_sizes</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>List of the sizes for each hidden layer. Each element of the list
+can be either an integer or a tuple of two integers <code>(y_size, u_size)</code>.
+In the latter case the layers output sizes can be defined individually
+for both the convex output <code>y(x, p)</code> and the arbitrary output <code>p(p)</code>.
+If only a single integer is provided, it is used for both <code>y_size and u_size</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Sequence">Sequence</span>[<span title="int">int</span> | <span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>]]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_passthrough</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>use_passthrough: Whether to use passthrough layers.
+If true, the PICNN's input is passed again to each hidden layer (Except
+for the first hidden layer, since it receives the original input anyway).
+Defaults to True.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>non_decreasing</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>If true, the <code>PICNN</code> output is element-wise
+non-decreasing in the input <code>x</code>. This is useful in the
+following scenario: Consider that you want to model the function
+<code>g(z, p) = PICNN(x(z), p)</code> as a chain of the functions <code>x(z)</code> and
+<code>PICNN(x, z)</code> such that <code>g</code> is convex w.r.t. <code>z</code>. If <code>x(z)</code> is
+convex, <strong>the PICNN must be non-decreasing</strong> in <code>x</code> to ensure
+convexity of <code>g(z)</code>. This option is, for example, used in
+material modeling applications, where the PICNN is a function
+of convex invariants, c.f., <a href="https://doi.org/10.48550/arXiv.2503.20598">Dammaß et al. (2025)</a>.</p>
+<p>Note: If <code>use_passthrough=True</code> and <code>non_decreasing=True</code> then
+<code>activation_xu</code> has to be a non-negative function to guarantee
+convexity with respect to <code>x</code>. We recomment avoiding passthrough
+for non-decreasing PICNNs.
+Defaults to False.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>False</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weight_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The weight initializer of type <code>SupportedInitializer</code>
+used for <em>unconstrained weights</em>.
+Defaults to he_normal().</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>bias_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The bias initializer of type <code>SupportedInitializer</code>
+used for biases in <em>sublayers without weight constraints</em>.
+Defaults to zeros.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>zeros</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>constrained_weight_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The weight initializer of type <code>SupportedInitializer</code>
+used for <em>constrained weights</em>.
+Can be <code>None</code>, in which case <code>weight_init</code> is used.
+Defaults to hoedt_normal().</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>constrained_bias_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The bias initializer of type <code>SupportedInitializer</code>
+used for biases in <em>sublayers with weight constraints</em>.
+Can be <code>None</code>, in which case <code>bias_init</code> is used.
+Defaults to hoedt_bias().</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>init</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>interconnect_weight_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The weight initializer of type <code>SupportedInitializer</code>
+used for weights in <em>interconnection sublayers</em>.
+By initializing these weights to zero, the initial PICNN's
+output will not depend on the input <code>p</code>.
+Defaults to zeros.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>zeros</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>interconnect_bias_init</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The bias initializer of type <code>SupportedInitializer</code>
+used for biases in <em>interconnection sublayers</em>.
+Defaults to ones.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="klax._initializers.SupportedInitializer">SupportedInitializer</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>ones</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>activation_y</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Activation function applied to the convex output
+<code>y</code> in all but the last layer. To ensure convexity, this
+function is required to be <em>convex and non-decreasing</em>.
+Defaults to jax.nn.softplus.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>softplus</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>activation_u</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Activation function applied to the arbitrary output
+<code>u</code>. Defaults to jax.nn.softplus.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>softplus</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>activation_yu</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Activation function applied to the output
+of the sublayer computing the weight modulation in the
+convex path. To ensure convexity, this function is required
+to be <em>non-negative</em>.
+Defaults to jax.nn.softplus.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>softplus</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>activation_xu</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Activation function applied to the output
+of the sublayer computing the weight modulation in the
+passthrough path. To ensure convexity when <code>non_decreasing=True</code>,
+this function is required to be <em>non-negative</em>, otherwise there
+are no constraints.
+Defaults to <code>lambdax: x</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>&lt;lambda&gt;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>final_activation_y</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Activation function applied to the convex output
+<code>y</code> of th last layer. To ensure convexity, this
+function is required to be <em>convex and non-decreasing</em>.
+Defaults to <code>lambdax: x</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="collections.abc.Callable">Callable</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>&lt;lambda&gt;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_bias</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to add on a bias in the hidden layers.
+Defaults to True.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>use_final_bias</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Whether to add on a bias to the final layer.
+Defaults to True.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dtype</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>The dtype to use for all the weights and biases in this MLP.
+Defaults to either <code>jax.numpy.float32</code> or <code>jax.numpy.float64</code>
+depending on whether JAX is in 64-bit mode.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="type">type</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>A <code>jax.random.PRNGKey</code> used to provide randomness for
+parameter initialization.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.PRNGKeyArray">PRNGKeyArray</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="klax.nn.PICNN.__call__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#klax.nn.PICNN.__call__" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Forward pass through the <code>PICNN</code>.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETER</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>A JAX array with shape <code>(x_size,)</code>. (Or shape <code>()</code> if
+<code>x_size="scalar"</code>.) The output will be element-wise
+convex in this input.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.Float">Float</span>[<span title="builtins.Array">Array</span>, &#39;... x_size&#39;]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>A JAX array with shape <code>(p_size,)</code>. (Or shape <code>()</code> if
+<code>x_size="scalar"</code>.) The output can have an arbitrary
+relationship to this input.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.Float">Float</span>[<span title="builtins.Array">Array</span>, &#39;... p_size&#39;]</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Ignored; provided for compatibility with the rest of the
+Equinox API.
+Defaults to None.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>TYPE:</b>
+                      <code><span title="builtins.PRNGKeyArray">PRNGKeyArray</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>DEFAULT:</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="builtins.Float">Float</span>[<span title="builtins.Array">Array</span>, &#39;... out_size&#39;]</code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>A JAX array with shape <code>(out_size,)</code>. (Or shape <code>()</code> if</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="builtins.Float">Float</span>[<span title="builtins.Array">Array</span>, &#39;... out_size&#39;]</code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p><code>out_size="scalar"</code>.)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../linear/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Linear Layers">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Linear Layers
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../matrices/" class="md-footer__link md-footer__link--next" aria-label="Next: Matrix-valued functions">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Matrix-valued functions
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 The Klax Authors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["header.autohide", "navigation.footer", "search.suggest", "search.highlight", "toc.integrate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
