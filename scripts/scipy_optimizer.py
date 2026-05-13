@@ -1,22 +1,13 @@
 # %% Imports
-import itertools
 import time
-from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, Literal
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import numpy as np
 from jax import random as jr
-from jaxtyping import Array, PyTree, PyTreeDef
-from scipy.optimize import OptimizeResult, minimize
 
 import klax
-
-# jax.config.update("jax_enable_x64", True)
 
 # %% Define some evaluation utils
 
@@ -30,7 +21,6 @@ def timer(name=""):
 
 
 # %% Define data
-
 key = jr.key(0)
 x = jnp.linspace(-4, 2, 100)
 y = jnp.sin(x) + 0.01 * jr.normal(key, x.shape)
