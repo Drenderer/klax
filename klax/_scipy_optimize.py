@@ -126,14 +126,14 @@ def scipy_loss_wrapper(loss: Loss, converter: ScipyModelAdapter, data: PyTree):
     """
 
     @jax.jit
-    def _wrapped_loss(x, run_state):
+    def _jitted_wrapped_loss(x, run_state):
         model = converter.unflatten(x)
         value, grad = loss.value_and_grad(model, data, run_state)
         grad = converter.flatten(grad)
         return value, grad
 
     def wrapped_loss(x, run_state):
-        value, grad = _wrapped_loss(x, run_state)
+        value, grad = _jitted_wrapped_loss(x, run_state)
         value = np.array(value, dtype=np.float64)
         grad = np.array(grad, dtype=np.float64)
         return value, grad
