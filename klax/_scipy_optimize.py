@@ -13,7 +13,7 @@ from ._wrappers import Constraint, NonNegative, NonTrainable
 
 
 def _is_static_leaf(element: Any) -> bool:
-    """Return true if the `element` should be treated as static."""
+    """Return true if `element` is considered a static leaf."""
     return isinstance(element, NonTrainable)
 
 
@@ -23,6 +23,11 @@ def _is_static(element: Any) -> bool:
         return True
     else:
         return eqx.is_inexact_array(element)
+
+
+def _is_constraint(element: PyTree) -> bool:
+    """Return True if the `element` is a klax.Constraint."""
+    return isinstance(element, Constraint)
 
 
 def _get_bounds(element: Any) -> list[tuple[np.ndarray, np.ndarray]]:
@@ -36,11 +41,6 @@ def _get_bounds(element: Any) -> list[tuple[np.ndarray, np.ndarray]]:
     raise ValueError(
         f"I don't know how to compute bounds for type {type(element)}"
     )
-
-
-def _is_constraint(element: PyTree) -> bool:
-    """Return True if the `element` is a klax.Constraint."""
-    return isinstance(element, Constraint)
 
 
 class ScipyModelAdapter[T: PyTree]:
@@ -160,14 +160,24 @@ def scipy_fit[T: PyTree](
     tol: float = 1e-12,
     verbose: bool = False,
 ) -> tuple[T, OptimizeResult]:
-    """Fit a model using scipy's minimize.
+    """Fit a model using scipy's [minimize](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html#rdd2e1855725e-12).
 
-    In contrast to the default fit this enables the use of second
-    order optimizers, which can be very beneficial for smaller
+    In contrast to [`fit`][klax.fit] this enables the use of *second
+    order optimizers*, which can be very beneficial for smaller
     models.
 
+    !!! Note
+        This method optimizes the loss function evaluated on the entire dataset. For very
+        large datasets, this may become inefficient.
+
     !!! Warning
-    Most klax functionalities are not compatible with `scipy_fit`.
+        **Compatibility**: Most klax functionalities such as callbacks and metrics are not compatible
+        with `scipy_fit`.
+
+    !!! Warning
+        **Frozen parameters**: To ensure that a parameter is not updated by `scipy_fit`
+        wrap it with [`NonTrainable`][klax.NonTrainable] (see also [`non_trainable`][klax.non_trainable]).
+        Just blocking gradients with `jax.lax.stop_gradient` is potentially not sufficient.
 
     Args:
         model: The model instance, which should be trained. It must be a
@@ -183,21 +193,15 @@ def scipy_fit[T: PyTree](
             method each iteration may use several function evaluations.
         loss: The [loss][klax.Loss] function.
             Defaults to `mse`.
-        optimizer: Type of solver. Available options:
-            - `"Nelder-Mead"`
-            - `"L-BFGS-B"`
-            - `"SLSQP"`
-            - `"Powell"`
-            - `"trust-constr"`
-            - `"COBYLA"`
-            - `"COBYQA"`
+        optimizer: Type of solver. Available options: `"Nelder-Mead"`, `"L-BFGS-B"`,
+            `"SLSQP"`, `"Powell"`, `"trust-constr"`, `"COBYLA"`, `"COBYQA"`
             Defaults to `"SLSQP"`.
         tol: Tolerance for termination.
         verbose: Set to True to print convergence messages.
 
 
     Returns:
-        Fitted model and `scipy.OptimizeResult`.
+        Fitted model and scipy's [`OptimizeResult`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.OptimizeResult.html#scipy.optimize.OptimizeResult).
 
     """
     adapter = ScipyModelAdapter(model)
