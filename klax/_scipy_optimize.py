@@ -1,4 +1,5 @@
 import itertools
+from collections.abc import Sequence
 from typing import Any, Literal
 
 import equinox as eqx
@@ -8,6 +9,7 @@ import numpy as np
 from jaxtyping import Array, PyTree, PyTreeDef
 from scipy.optimize import OptimizeResult, minimize
 
+from ._callbacks import Callback
 from ._losses import Loss, mse
 from ._wrappers import Constraint, NonNegative, NonTrainable
 
@@ -112,6 +114,107 @@ class ScipyModelAdapter[T: PyTree]:
         return eqx.combine(params, self.static)
 
 
+class ScipyTrainingState:
+    _model: PyTree
+    opt_state: OptimizeResult
+    _adapter: ScipyModelAdapter
+    _run_state: PyTree
+    _x: np.ndarray
+    step: int
+
+    def __init__(
+        self, adapter: ScipyModelAdapter, run_state: PyTree, x: np.ndarray
+    ) -> None:
+        self._adapter = adapter
+        self._run_state = run_state
+        self.step = 0
+        self._x = x
+
+    @property
+    def model(self) -> PyTree:
+        return self._adapter.unflatten(self._x)
+
+    @property
+    def run_state(self) -> PyTree:
+        return self._run_state
+
+    def update(self, intermediate_result: OptimizeResult):
+        self.opt_state = intermediate_result
+        self.step += 1
+        self._x = intermediate_result.x
+
+    # @property
+    # def step(self) -> int:
+    #     try:
+    #         return self.opt_state.nit
+    #     except AttributeError:
+    #         raise AttributeError("Attribute step is not available.")
+
+
+class ScipyTrainingContext:
+    state: ScipyTrainingState
+    optimizer: str
+    loss: Loss
+    steps: int
+
+    def __init__(
+        self,
+        adapter: ScipyModelAdapter,
+        run_state: PyTree,
+        optimizer: str,
+        max_steps: int,
+        loss: Loss,
+        x: np.ndarray,
+    ):
+        self.state = ScipyTrainingState(adapter, run_state, x)
+        self.optimizer = optimizer
+        self.steps = max_steps
+        self.loss = loss
+
+    @property
+    def batch_generator(self):
+        raise ValueError("There exists no `batch_generator` for `scipy_fit`.")
+
+    def update_state(self, intermediate_result: OptimizeResult):
+        self.state.update(intermediate_result)
+
+
+class ScipyCallbackAdapter:
+    callbacks: Sequence[Callback]
+    context: ScipyTrainingContext
+
+    def __init__(
+        self,
+        callbacks: Sequence[Callback],
+        adapter: ScipyModelAdapter,
+        run_state: PyTree,
+        optimizer: str,
+        max_steps: int,
+        loss: Loss,
+        x: np.ndarray,
+    ):
+        self.callbacks = callbacks
+        self.context = ScipyTrainingContext(
+            adapter, run_state, optimizer, max_steps, loss, x
+        )
+
+    def on_training_start(self):
+        for callback in self.callbacks:
+            callback.on_training_start(self.context)
+
+    def on_training_step(self, intermediate_result: OptimizeResult):
+        self.context.update_state(intermediate_result)
+        stop = False
+        for callback in self.callbacks:
+            stop |= bool(callback.on_training_step(self.context))
+        if stop:
+            raise StopIteration
+
+    def on_training_end(self):
+        for callback in self.callbacks:
+            callback.on_training_end(self.context)
+
+
 def scipy_loss_wrapper(loss: Loss, converter: ScipyModelAdapter, data: PyTree):
     """Transform a [`Loss`][klax.Loss] into a scipy minimize objective function.
 
@@ -158,6 +261,7 @@ def scipy_fit[T: PyTree](
         "COBYQA",
     ] = "SLSQP",
     tol: float = 1e-12,
+    callbacks: Sequence[Callback] | None = None,
     verbose: bool = False,
 ) -> tuple[T, OptimizeResult]:
     """Fit a model using scipy's [minimize](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html#rdd2e1855725e-12).
@@ -197,6 +301,12 @@ def scipy_fit[T: PyTree](
             `"SLSQP"`, `"Powell"`, `"trust-constr"`, `"COBYLA"`, `"COBYQA"`
             Defaults to `"SLSQP"`.
         tol: Tolerance for termination.
+        callbacks: List of [Callbacks][klax.Callback]. They can be used to
+            implement early stopping, custom logging and more.
+            !!! Warning
+                Not all functionality of [Callbacks][klax.Callback] is available for
+                `scipy_fit`.
+            Defaults to `None`.
         verbose: Set to True to print convergence messages.
 
 
@@ -208,6 +318,13 @@ def scipy_fit[T: PyTree](
     scipy_loss_and_grad = scipy_loss_wrapper(loss, adapter, data)
     x0 = adapter.flatten(model)
 
+    callbacks = [] if callbacks is None else list(callbacks)
+    callback = ScipyCallbackAdapter(
+        callbacks, adapter, run_state, optimizer, max_steps, loss, x0
+    )
+
+    callback.on_training_start()
+
     optimize_result = minimize(
         fun=scipy_loss_and_grad,
         x0=x0,
@@ -217,8 +334,11 @@ def scipy_fit[T: PyTree](
         method=optimizer,
         options={"maxiter": max_steps, "ftol": tol, "disp": verbose},
         bounds=adapter.bounds,
+        callback=callback.on_training_step,
         constraints=(),
     )
-    model = adapter.unflatten(optimize_result.x)
 
+    callback.on_training_end()
+
+    model = adapter.unflatten(optimize_result.x)
     return model, optimize_result
