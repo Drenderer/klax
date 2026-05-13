@@ -147,7 +147,7 @@ def scipy_fit[T: PyTree](
     *,
     run_state: PyTree[Any] = None,
     max_steps: int = 1000,
-    loss: Loss = mse,
+    loss: Loss,
     optimizer: Literal[
         "Nelder-Mead",
         "L-BFGS-B",

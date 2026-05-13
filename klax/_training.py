@@ -119,7 +119,7 @@ def fit[T: eqx.Module](
     run_state: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
-    loss: Loss = mse,
+    loss: Loss,
     optimizer: optax.GradientTransformation
     | optax.GradientTransformationExtraArgs = optax.adam(1e-3),
     init_opt_state: PyTree[Any] = None,
