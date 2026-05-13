@@ -202,8 +202,7 @@ def fit[T: eqx.Module](
             - 2: A progressbar is used and updated every `log_every` steps.
             Defaults to `2`.
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
-            implement early stopping, custom logging and more. The argument
-            to the callback function is aCallbackArgs object.
+            implement early stopping, custom logging and more.
             Defaults to `None`.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
