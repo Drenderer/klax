@@ -31,6 +31,7 @@ from ._losses import Loss as Loss
 from ._losses import loss as loss
 from ._losses import mae as mae
 from ._losses import mse as mse
+from ._scipy_optimize import scipy_fit as scipy_fit
 from ._serialization import (
     text_deserialize_filter_spec as text_deserialize_filter_spec,
 )
