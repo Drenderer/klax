@@ -19,10 +19,10 @@ def _is_static_leaf(element: Any) -> bool:
     return isinstance(element, NonTrainable)
 
 
-def _is_static(element: Any) -> bool:
-    """Return `True` if `element` should be treated as static."""
+def _is_trainable(element: Any) -> bool:
+    """Return `True` if `element` should be treated as trainable."""
     if _is_static_leaf(element):
-        return True
+        return False
     else:
         return eqx.is_inexact_array(element)
 
@@ -62,7 +62,7 @@ class ScipyModelAdapter[T: PyTree]:
 
         """
         params, static = eqx.partition(
-            model, _is_static, is_leaf=_is_static_leaf
+            model, _is_trainable, is_leaf=_is_static_leaf
         )
         leafs, tree_def = jax.tree.flatten(params)
 
@@ -91,7 +91,7 @@ class ScipyModelAdapter[T: PyTree]:
 
         """
         params, _ = eqx.partition(
-            model, eqx.is_inexact_array, is_leaf=_is_static
+            model, _is_trainable, is_leaf=_is_static_leaf
         )
         leafs, _ = jax.tree.flatten(params)
         return jnp.concat(jax.tree.map(lambda x: x.flatten(), leafs))
