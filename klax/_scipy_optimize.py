@@ -10,7 +10,7 @@ from jaxtyping import Array, PyTree, PyTreeDef
 from scipy.optimize import OptimizeResult, minimize
 
 from ._callbacks import Callback
-from ._losses import Loss, mse
+from ._losses import Loss
 from ._wrappers import Constraint, NonNegative, NonTrainable
 
 
@@ -46,7 +46,7 @@ def _get_bounds(element: Any) -> list[tuple[np.ndarray, np.ndarray]]:
 
 
 class ScipyModelAdapter[T: PyTree]:
-    """Adapter to translate an equinox model into the scipy minimize formulation."""
+    """Adapter to translate an equinox model into the format of scipy minimize."""
 
     static: PyTree
     tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
@@ -115,6 +115,8 @@ class ScipyModelAdapter[T: PyTree]:
 
 
 class ScipyTrainingState:
+    """`TrainingState` mock-up class compatible with `scipy_fit`."""
+
     _model: PyTree
     opt_state: OptimizeResult
     _adapter: ScipyModelAdapter
@@ -143,15 +145,10 @@ class ScipyTrainingState:
         self.step += 1
         self._x = intermediate_result.x
 
-    # @property
-    # def step(self) -> int:
-    #     try:
-    #         return self.opt_state.nit
-    #     except AttributeError:
-    #         raise AttributeError("Attribute step is not available.")
-
 
 class ScipyTrainingContext:
+    """`TrainingContext` mock-up class compatible with `scipy_fit`."""
+
     state: ScipyTrainingState
     optimizer: str
     loss: Loss
@@ -180,6 +177,8 @@ class ScipyTrainingContext:
 
 
 class ScipyCallbackAdapter:
+    """Combine multiple callbacks into one, scipy compatible callback."""
+
     callbacks: Sequence[Callback]
     context: ScipyTrainingContext
 
@@ -215,12 +214,12 @@ class ScipyCallbackAdapter:
             callback.on_training_end(self.context)
 
 
-def scipy_loss_wrapper(loss: Loss, converter: ScipyModelAdapter, data: PyTree):
+def scipy_loss_wrapper(loss: Loss, adapter: ScipyModelAdapter, data: PyTree):
     """Transform a [`Loss`][klax.Loss] into a scipy minimize objective function.
 
     Args:
         loss: [`Loss`][klax.Loss] to wrap.
-        converter: ScipyModelAdapter for the model.
+        adapter: ScipyModelAdapter for the model.
         data: Training data.
 
     Returns:
@@ -230,9 +229,9 @@ def scipy_loss_wrapper(loss: Loss, converter: ScipyModelAdapter, data: PyTree):
 
     @jax.jit
     def _jitted_wrapped_loss(x, run_state):
-        model = converter.unflatten(x)
+        model = adapter.unflatten(x)
         value, grad = loss.value_and_grad(model, data, run_state)
-        grad = converter.flatten(grad)
+        grad = adapter.flatten(grad)
         return value, grad
 
     def wrapped_loss(x, run_state):
@@ -270,12 +269,19 @@ def scipy_fit[T: PyTree](
     order optimizers*, which can be very beneficial for smaller
     models.
 
+    Internally, this function translates from the equinox model formulation to a
+    flat vector of trainable variables with assigned min/max bounds. The loss function
+    is then wrapped to accept this vector of design parameters and evaluate the model
+    on the entire dataset. The wrapped loss and bounds are passed to `scipy.optimize.minimize`.
+    Currently, only box constraints in the form of the bounds are supported; (in-)equality
+    constraints are *not* supported.
+
     !!! Note
         This method optimizes the loss function evaluated on the entire dataset. For very
         large datasets, this may become inefficient.
 
     !!! Warning
-        **Compatibility**: Most klax functionalities such as callbacks and metrics are not compatible
+        **Compatibility**: Many klax functionalities are not, or only partially compatible
         with `scipy_fit`.
 
     !!! Warning
