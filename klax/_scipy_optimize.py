@@ -15,7 +15,7 @@ from ._wrappers import Constraint, NonNegative, NonTrainable
 
 
 def _is_static_leaf(element: Any) -> bool:
-    """Return true if `element` is considered a static leaf."""
+    """Return true if `element` should be considered as leaf for finding static parts of a model."""
     return isinstance(element, NonTrainable)
 
 
@@ -23,8 +23,7 @@ def _is_trainable(element: Any) -> bool:
     """Return `True` if `element` should be treated as trainable."""
     if _is_static_leaf(element):
         return False
-    else:
-        return eqx.is_inexact_array(element)
+    return eqx.is_inexact_array(element)
 
 
 def _is_constraint(element: PyTree) -> bool:
