@@ -171,19 +171,18 @@ def fit[T: eqx.Module](
             Defaults to `None`
         steps: Number of gradient updates to apply.
             Defaults to 1000.
-        loss: The loss function with call signature
-            `(model: PyTree, data: PyTree, run_state: PyTree) -> float`.
-            Defaults to `mse`.
+        loss: [`Loss`][klax.Loss] object defining the loss function.
+            Defaults to [`mse`][klax.mse].
         optimizer: The optimizer. Any optax gradient transform to calculate
             the updates for the model.
             Defaults to optax.adam(1e-3).
         init_opt_state: The initial state of the optimizer. If `None`, the
             optimizer is initialized from scratch. By providing a value for
             `init_opt_state`, the user can resume training from a previous
-            state (e.g., obtained from the `HistoryCallback.last_opt_state`).
+            state (e.g., obtained from `history.final_opt_state`).
             Defaults to `None`.
         batcher: The data loader that splits inputs and targets into batches.
-            Defaults to `batch_data`.
+            Defaults to [`batch_data`][klax.batch_data].
         make_logger: Wether to create a [`MetricLogger`][klax.MetricLogger].
             If `False` the arguments `metrics`, `log_every` and `verbose`
             don't have any effect and `fit` will return `None` instead of a
@@ -203,8 +202,7 @@ def fit[T: eqx.Module](
             - 2: A progressbar is used and updated every `log_every` steps.
             Defaults to `2`.
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
-            implement early stopping, custom logging and more. The argument
-            to the callback function is aCallbackArgs object.
+            implement early stopping, custom logging and more.
             Defaults to `None`.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
