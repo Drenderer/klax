@@ -249,15 +249,7 @@ def scipy_fit[T: PyTree](
     run_state: PyTree[Any] = None,
     max_steps: int = 1000,
     loss: Loss,
-    optimizer: Literal[
-        "Nelder-Mead",
-        "L-BFGS-B",
-        "SLSQP",
-        "Powell",
-        "trust-constr",
-        "COBYLA",
-        "COBYQA",
-    ] = "SLSQP",
+    optimizer: Literal["L-BFGS-B", "SLSQP"] = "SLSQP",
     tol: float = 1e-12,
     callbacks: Sequence[Callback] | None = None,
     verbose: bool = False,
@@ -302,8 +294,7 @@ def scipy_fit[T: PyTree](
             method each iteration may use several function evaluations.
         loss: The [loss][klax.Loss] function.
             Defaults to `mse`.
-        optimizer: Type of solver. Available options: `"Nelder-Mead"`, `"L-BFGS-B"`,
-            `"SLSQP"`, `"Powell"`, `"trust-constr"`, `"COBYLA"`, `"COBYQA"`
+        optimizer: Type of solver. Available options: `"L-BFGS-B"` and `"SLSQP"`.
             Defaults to `"SLSQP"`.
         tol: Tolerance for termination.
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
@@ -337,7 +328,7 @@ def scipy_fit[T: PyTree](
         jac=True,
         tol=tol,
         method=optimizer,
-        options={"maxiter": max_steps, "ftol": tol, "disp": verbose},
+        options={"maxiter": max_steps, "disp": verbose},
         bounds=adapter.bounds,
         callback=callback.on_training_step,
         constraints=(),

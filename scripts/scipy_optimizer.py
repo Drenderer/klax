@@ -28,7 +28,7 @@ x = jnp.linspace(-4, 2, 100)
 y = jnp.sin(x) + 0.01 * jr.normal(key, x.shape)
 data = (x, y)
 
-# %% Define a callback
+# %% Optimize using scipy
 
 dataset_loss = klax.BatchMetric(
     "loss",
@@ -36,19 +36,25 @@ dataset_loss = klax.BatchMetric(
     data,
     batcher=klax.batch_data,
     batch_size=100,
+    verbose=True,
     key=jr.key(0),
 )
 
 logger = klax.MetricLogger(
-    log_every=10,
+    log_every=5,
     metrics=[dataset_loss],
 )
 
-# %% Optimize using scipy
+
 model = klax.nn.FICNN("scalar", "scalar", [8, 8], key=key)
-with timer("SLSQP training"):
-    slsqp_model, _ = klax.scipy_fit(
-        model, data, loss=klax.mse, callbacks=[logger], verbose=True
+with timer("SciPy training"):
+    scipy_model, _ = klax.scipy_fit(
+        model,
+        data,
+        loss=klax.mse,
+        optimizer="SLSQP",
+        callbacks=[logger],
+        verbose=False,
     )
 
 logger.history.plot()
@@ -63,15 +69,15 @@ with timer("Adam training"):
 hist.plot()
 plt.show()
 # %% Plot result
-slsqp_model = klax.finalize(slsqp_model)
-slsqp_y_pred = jax.vmap(slsqp_model)(x)
+scipy_model = klax.finalize(scipy_model)
+slsqp_y_pred = jax.vmap(scipy_model)(x)
 
 adam_model = klax.finalize(adam_model)
 adam_y_pred = jax.vmap(adam_model)(x)
 
 fig, ax = plt.subplots()
 ax.scatter(x, y, c="grey", marker="x", label="Data")
-ax.plot(x, slsqp_y_pred, label="SLSQP")
+ax.plot(x, slsqp_y_pred, label="SciPy")
 ax.plot(x, adam_y_pred, label="ADAM")
 ax.set(xlabel="x", ylabel="y", title="FICNN optimizer comparison")
 ax.legend()
