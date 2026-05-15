@@ -117,7 +117,7 @@ class ScipyTrainingState:
     """`TrainingState` mock-up class compatible with `scipy_fit`."""
 
     _model: PyTree
-    opt_state: OptimizeResult
+    opt_state: None
     _adapter: ScipyModelAdapter
     _run_state: PyTree
     _x: np.ndarray
@@ -130,6 +130,7 @@ class ScipyTrainingState:
         self._run_state = run_state
         self.step = 0
         self._x = x
+        self.opt_state = None
 
     @property
     def model(self) -> PyTree:
@@ -139,10 +140,9 @@ class ScipyTrainingState:
     def run_state(self) -> PyTree:
         return self._run_state
 
-    def update(self, intermediate_result: OptimizeResult):
-        self.opt_state = intermediate_result
+    def update(self, xk: np.ndarray):
         self.step += 1
-        self._x = intermediate_result.x
+        self._x = xk
 
 
 class ScipyTrainingContext:
@@ -171,8 +171,8 @@ class ScipyTrainingContext:
     def batch_generator(self):
         raise ValueError("There exists no `batch_generator` for `scipy_fit`.")
 
-    def update_state(self, intermediate_result: OptimizeResult):
-        self.state.update(intermediate_result)
+    def update_state(self, xk: np.ndarray):
+        self.state.update(xk)
 
 
 class ScipyCallbackAdapter:
@@ -200,8 +200,8 @@ class ScipyCallbackAdapter:
         for callback in self.callbacks:
             callback.on_training_start(self.context)
 
-    def on_training_step(self, intermediate_result: OptimizeResult):
-        self.context.update_state(intermediate_result)
+    def on_training_step(self, xk: np.ndarray):
+        self.context.update_state(xk)
         stop = False
         for callback in self.callbacks:
             stop |= bool(callback.on_training_step(self.context))
