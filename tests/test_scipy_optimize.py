@@ -288,7 +288,7 @@ class TestScipyFit:
             (x_data, y_data),
             loss=klax.mse,
             optimizer="SLSQP",
-            max_steps=1,
+            options=dict(maxiter=1),
             callbacks=[callback],
         )
 
@@ -312,7 +312,7 @@ class TestScipyFit:
             (x_data, y_data),
             loss=klax.mse,
             optimizer=optimizer,
-            max_steps=10,
+            options=dict(maxiter=1),
         )
 
     def test_scipy_fit_returns_model_type(self, getkey):
@@ -326,7 +326,7 @@ class TestScipyFit:
             (x_data, y_data),
             loss=klax.mse,
             optimizer="SLSQP",
-            max_steps=50,
+            options=dict(maxiter=1),
         )
 
         # Should have same structure as input model
@@ -356,7 +356,7 @@ class TestScipyFit:
             run_state=run_state,
             loss=StatefulLoss(),
             optimizer="SLSQP",
-            max_steps=1,
+            options=dict(maxiter=1),
         )
 
         assert result is not None

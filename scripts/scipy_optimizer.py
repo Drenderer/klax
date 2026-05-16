@@ -52,9 +52,9 @@ with timer("SciPy training"):
         model,
         data,
         loss=klax.mse,
-        optimizer="SLSQP",
+        optimizer="L-BFGS-B",
+        options=dict(ftol=1e-12, gtol=1e-6),
         callbacks=[logger],
-        verbose=False,
     )
 
 logger.history.plot()

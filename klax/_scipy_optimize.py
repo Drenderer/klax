@@ -246,13 +246,11 @@ def scipy_fit[T: PyTree](
     model: T,
     data: PyTree[Any],
     *,
-    run_state: PyTree[Any] = None,
-    max_steps: int = 1000,
     loss: Loss,
     optimizer: Literal["L-BFGS-B", "SLSQP"] = "SLSQP",
-    tol: float = 1e-12,
+    options: dict | None = None,
+    run_state: PyTree[Any] = None,
     callbacks: Sequence[Callback] | None = None,
-    verbose: bool = False,
 ) -> tuple[T, OptimizeResult]:
     """Fit a model using scipy's [minimize](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html#rdd2e1855725e-12).
 
@@ -287,29 +285,38 @@ def scipy_fit[T: PyTree](
         data: The training data can be any `PyTree` with at least some
             `ArrayLike` leaves. Most likely you'll want `data` to be a
             tuple `(x, y)` with model inputs `x` and model outputs `y`.
-        run_state: Auxiliary runtime state, that is passed to the loss function.
-            Can be updated via callbacks.
-            Defaults to `None`.
-        max_steps: Maximum number of iterations to perform. Depending on the
-            method each iteration may use several function evaluations.
         loss: The [loss][klax.Loss] function.
             Defaults to `mse`.
         optimizer: Type of solver. Available options: `"L-BFGS-B"` and `"SLSQP"`.
             Defaults to `"SLSQP"`.
-        tol: Tolerance for termination.
+        options: Dict of solver specific options passed to `scipy.optimize.minimize`.
+            All solvers accept:
+
+            - `"maxiter"` (int): Maximum number of iterations to perform.
+                Depending on the method each iteration may use several function evaluations.
+                If `options` does not contain `"maxiter"` or `options=None` then
+                klax uses the default `maxiter=1000`.
+            - `"disp"` (bool): Set to True to print convergence messages.
+
+            For the solver-specific options see [SciPy L-BFGS-B](https://docs.scipy.org/doc/scipy/reference/optimize.minimize-lbfgsb.html#optimize-minimize-lbfgsb)
+            and [SciPy SLSQP](https://docs.scipy.org/doc/scipy/reference/optimize.minimize-slsqp.html#optimize-minimize-slsqp).
+        run_state: Auxiliary runtime state, that is passed to the loss function.
+            Can be updated via callbacks.
+            Defaults to `None`.
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
             implement early stopping, custom logging and more.
             !!! Warning
                 Not all functionality of [Callbacks][klax.Callback] is available for
                 `scipy_fit`.
             Defaults to `None`.
-        verbose: Set to True to print convergence messages.
-
 
     Returns:
         Fitted model and scipy's [`OptimizeResult`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.OptimizeResult.html#scipy.optimize.OptimizeResult).
 
     """
+    options = dict() if options is None else options
+    max_steps = options.setdefault("maxiter", 1000)
+
     adapter = ScipyModelAdapter(model)
     scipy_loss_and_grad = scipy_loss_wrapper(loss, adapter, data)
     x0 = adapter.flatten(model)
@@ -326,12 +333,10 @@ def scipy_fit[T: PyTree](
         x0=x0,
         args=run_state,
         jac=True,
-        tol=tol,
         method=optimizer,
-        options={"maxiter": max_steps, "disp": verbose},
+        options=options,
         bounds=adapter.bounds,
         callback=callback.on_training_step,
-        constraints=(),
     )
 
     callback.on_training_end()
