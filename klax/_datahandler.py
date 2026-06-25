@@ -26,20 +26,16 @@ import jax.random as jr
 import numpy as np
 from jaxtyping import PRNGKeyArray, PyTree
 
-try:
-    import xarray as xr
-
-    _HAS_XARRAY = True
-except ImportError:
-    xr = None  # type: ignore[assignment]
-    _HAS_XARRAY = False
+from ._compat import HAS_XARRAY, get_xarray
 
 
 def _is_xarray(x: Any) -> bool:
     """Return True if `x` is an xarray container that klax handles natively."""
-    return _HAS_XARRAY and isinstance(
-        x, (xr.Dataset, xr.DataArray, xr.Variable)
-    )
+    if HAS_XARRAY:
+        xr, _ = get_xarray()
+        return isinstance(x, (xr.Dataset, xr.DataArray, xr.Variable))
+    else:
+        return False
 
 
 def _is_leaf(x: Any) -> bool:
@@ -69,12 +65,12 @@ def _resolve_one(spec: Any, leaf: Any) -> int | str | None:
             raise TypeError(
                 f"batch_axes spec for an xarray leaf must be a `str` dim name, "
                 f"got {type(spec).__name__} ({spec!r}). "
-                f"Available dims: {tuple(leaf.sizes)}"
+                f"Available dims: {leaf.dims}"
             )
-        if spec not in leaf.sizes:
+        if spec not in leaf.dims:
             raise ValueError(
                 f"Dim '{spec}' not present on xarray leaf. "
-                f"Available dims: {tuple(leaf.sizes)}"
+                f"Available dims: {leaf.dims}"
             )
         return spec
     # Non-xarray, non-None leaf.

@@ -3,30 +3,37 @@ import numpy as np
 from jax import numpy as jnp
 from jaxtyping import Array
 
-from klax import NonTrainable, count_parameters
+import klax
+
+# ===---------------------------------------------------------------------=== #
+# klax.count_parameters
+# ===---------------------------------------------------------------------=== #
 
 
 class TestParameterCount:
-    def test_pytree_with_jax_leaves(self):
+    @staticmethod
+    def test_pytree_with_jax_leaves():
         tree = (jnp.ones((3, 3)), jnp.zeros((2, 3)))
-        assert count_parameters(tree) == 15
+        assert klax.count_parameters(tree) == 15
 
-    def test_pytree_with_numpy_leaves(self):
+    @staticmethod
+    def test_pytree_with_numpy_leaves():
         tree = (np.ones((3, 3)), np.zeros((2, 3)))
-        assert count_parameters(tree) == 15
+        assert klax.count_parameters(tree) == 15
 
-    def test_on_equinox_module(self):
+    @staticmethod
+    def test_on_equinox_module():
         class DummyModel(eqx.Module):
             no_parameter: int
             weight: tuple[Array, Array]
-            non_trainable: NonTrainable
+            non_trainable: klax.NonTrainable
 
             def __init__(
                 self,
             ):
                 self.no_parameter = 1
                 self.weight = (jnp.ones((3, 3)), jnp.zeros((3, 3)))
-                self.non_trainable = NonTrainable(jnp.ones((2, 2)))
+                self.non_trainable = klax.NonTrainable(jnp.ones((2, 2)))
 
         dummy_model = DummyModel()
-        assert count_parameters(dummy_model) == 18
+        assert klax.count_parameters(dummy_model) == 18

@@ -7,6 +7,10 @@ import pytest
 
 import klax
 
+# ===---------------------------------------------------------------------=== #
+# klax.make_step
+# ===---------------------------------------------------------------------=== #
+
 
 class TestMakeStep:
     @pytest.mark.parametrize(
@@ -42,7 +46,8 @@ class TestMakeStep:
             optax.yogi(1.0),
         ],
     )
-    def test_make_step_updates_state(self, optimizer, getkey):
+    @staticmethod
+    def test_make_step_updates_state(optimizer, getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
 
@@ -77,8 +82,14 @@ class TestMakeStep:
         )
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.run_training_loop
+# ===---------------------------------------------------------------------=== #
+
+
 class TestRunTrainingLoop:
-    def test_invokes_callbacks(self, getkey):
+    @staticmethod
+    def test_invokes_callbacks(getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -129,7 +140,8 @@ class TestRunTrainingLoop:
             )
         )
 
-    def test_zero_steps_no_updates(self, getkey):
+    @staticmethod
+    def test_zero_steps_no_updates(getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -165,7 +177,7 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        updated_view = klax.run_training_loop(context, [callback])
+        _ = klax.run_training_loop(context, [callback])
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -180,7 +192,8 @@ class TestRunTrainingLoop:
             )
         )
 
-    def test_stops_on_callback(self, getkey):
+    @staticmethod
+    def test_stops_on_callback(getkey):
         class StopAfterOne(klax.Callback):
             def __init__(self):
                 self.steps = []
@@ -228,8 +241,14 @@ class TestRunTrainingLoop:
         )
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.fit
+# ===---------------------------------------------------------------------=== #
+
+
 class TestFit:
-    def test_default_behavior(self, getkey):
+    @staticmethod
+    def test_fit(getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
         data = (
@@ -255,7 +274,8 @@ class TestFit:
         assert loss_steps == [0]
         assert len(loss_values) == 1
 
-    def test_default_behavior_with_xarray(self, getkey):
+    @staticmethod
+    def test_fit_with_xarray(getkey):
         xr = pytest.importorskip(
             "xarray", reason="xarray dependency is not installed"
         )
@@ -280,7 +300,6 @@ class TestFit:
             },
             coords={"batch": jnp.arange(100), "i": jnp.arange(2)},
         )
-        print(data)
 
         trained_model, history = klax.fit(
             model,
@@ -300,7 +319,8 @@ class TestFit:
         assert loss_steps == [0]
         assert len(loss_values) == 1
 
-    def test_overwriting_default_metrics(self, getkey):
+    @staticmethod
+    def test_overwriting_default_metrics(getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
         data = (
@@ -314,7 +334,7 @@ class TestFit:
         my_metric.name = "loss"
         my_metric.verbose = False
 
-        trained_model, history = klax.fit(
+        _, history = klax.fit(
             model,
             data,
             batch_size=5,

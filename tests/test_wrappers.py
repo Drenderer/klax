@@ -35,7 +35,7 @@ from klax import (
 )
 
 
-def test_nested_unwrap():
+def test_unwrap():
     param = Parameterize(
         jnp.square,
         Parameterize(jnp.square, Parameterize(jnp.square, 2)),
@@ -82,7 +82,6 @@ def test_non_negative(getkey):
 
 
 def test_symmetric(getkey):
-    # Constraint
     parameter = jr.normal(getkey(), (3, 10, 3, 3))
     symmetric = Symmetric(parameter)
     _symmetric = unwrap(symmetric)
@@ -93,7 +92,6 @@ def test_symmetric(getkey):
 
 
 def test_skewsymmetric(getkey):
-    # Constraint
     parameter = jr.normal(getkey(), (3, 10, 3, 3))
     symmetric = SkewSymmetric(parameter)
     _symmetric = unwrap(symmetric)
