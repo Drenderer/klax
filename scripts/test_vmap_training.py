@@ -43,12 +43,15 @@ models, history = klax.fit(
     models,
     data,
     loss=loss,
+    steps=10_000,
     batch_size=32,
     vmap_ensemble=True,
-    make_logger=False,
-    jit_compile=False,
+    make_logger=True,
+    jit_compile=True,
     key=jr.key(0),
 )
+
+history.plot()
 
 
 # %%
