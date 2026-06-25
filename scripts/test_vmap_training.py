@@ -28,11 +28,30 @@ y = jnp.sin(x)
 
 data = (x, y)
 
+# %% Debug
+optimizer = optax.adam(1e-3)
+opt_state = jax.vmap(optimizer.init)(eqx.filter(models, eqx.is_inexact_array))
+context = klax.TrainingContext(
+    models, optimizer, opt_state, klax.batch_data, None, klax.mse, 10000
+)
+
 # %% Define a custom training loop
 
 loss = klax.mse
 
+models, history = klax.fit(
+    models,
+    data,
+    loss=loss,
+    batch_size=32,
+    vmap_ensemble=True,
+    make_logger=False,
+    jit_compile=False,
+    key=jr.key(0),
+)
 
+
+# %%
 @eqx.filter_jit
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None))
 def make_step(state_leaves, state_treedef, batch, static):
