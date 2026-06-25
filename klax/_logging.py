@@ -31,10 +31,10 @@ from klax._trainstate import TrainingContext
 try:
     from tqdm.auto import tqdm
 
-    _TQDM_AVAILABLE = True
+    _HAS_TQDM = True
 except ImportError:
-    tqdm = None
-    _TQDM_AVAILABLE = False
+    tqdm = None  # type: ignore[assignment]
+    _HAS_TQDM = False
 
 
 class Metric(Protocol):
@@ -94,7 +94,7 @@ class BatchMetric:
         data: PyTree[Any, "T"],
         batcher: Batcher,
         batch_size: int,
-        batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
+        batch_axes: PyTree[int | str | None, "T ..."] = 0,  # type: ignore
         verbose: bool = False,
         jit_compile: bool = True,
         *,
@@ -119,6 +119,7 @@ class BatchMetric:
         self.verbose = verbose
         self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
         self.func = eqx.filter_jit(func) if jit_compile else func
+        # self.func = jax.jit(func) if jit_compile else func
 
     def __call__(self, context: TrainingContext) -> Any:
         """Compute the metric.
@@ -333,9 +334,10 @@ class MetricLogger(Callback):
         self.log_every = log_every
         self.history = History() if history is None else history
         self.verbose = verbose
-        if (verbose == 2) and not _TQDM_AVAILABLE:
+        if (verbose == 2) and not _HAS_TQDM:
             print(
-                "Warning: tqdm for progress bar not installed. Changing verbosity level to 1."
+                "Warning: tqdm for progress bar not installed. "
+                "Changing verbosity level to 1."
             )
             self.verbose = 1
 

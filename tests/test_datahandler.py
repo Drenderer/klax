@@ -107,3 +107,145 @@ class TestSplitData:
         data = np.arange(10)
         with pytest.raises(ValueError):
             klax.split_data(data, (-1.0,), key=getkey())
+
+
+xr = pytest.importorskip("xarray")
+
+
+class TestBatchDataXArray:
+    def _dataset(self, key, n_batch=100, n_features=4):
+        import jax.numpy as jnp
+
+        return xr.Dataset(
+            {
+                "y": (
+                    ("batch", "i"),
+                    jrandom.uniform(key, (n_batch, n_features)),
+                ),
+                "label": (("batch",), ["text"] * n_batch),
+            },
+            coords={"batch": jnp.arange(n_batch), "i": jnp.arange(n_features)},
+        )
+
+    def test_dataset_with_str_axis(self, getkey):
+        data = self._dataset(getkey())
+        generator = klax.batch_data(
+            data, batch_size=10, batch_axes="batch", key=getkey()
+        )
+        batch = next(generator)
+        assert isinstance(batch, xr.Dataset)
+        assert batch.sizes["batch"] == 10
+        assert batch.sizes["i"] == 4
+        assert "batch" in batch.coords and "i" in batch.coords
+        assert batch.coords["i"].size == 4
+
+    def test_dataarray_with_str_axis(self, getkey):
+        ds = self._dataset(getkey())
+        data = ds["y"]
+        generator = klax.batch_data(
+            data, batch_size=8, batch_axes="batch", key=getkey()
+        )
+        batch = next(generator)
+        assert isinstance(batch, xr.DataArray)
+        assert batch.sizes["batch"] == 8
+        assert batch.sizes["i"] == 4
+
+    def test_mixed_pytree(self, getkey):
+        ds = self._dataset(getkey())
+        arr = jrandom.uniform(getkey(), (100, 3))
+        data = {"x": arr, "y": ds}
+        batch_axes = {"x": 0, "y": "batch"}
+        generator = klax.batch_data(
+            data, batch_size=10, batch_axes=batch_axes, key=getkey()
+        )
+        batch = next(generator)
+        assert batch["x"].shape[0] == 10
+        assert batch["y"].sizes["batch"] == 10
+
+    def test_int_spec_on_xarray_raises(self, getkey):
+        data = self._dataset(getkey())
+        gen = klax.batch_data(data, batch_size=10, key=getkey())
+        with pytest.raises(TypeError, match="must be a `str` dim name"):
+            next(gen)
+
+    def test_str_spec_on_array_raises(self, getkey):
+        data = jrandom.uniform(getkey(), (10, 4))
+        gen = klax.batch_data(
+            data, batch_size=4, batch_axes="batch", key=getkey()
+        )
+        with pytest.raises(TypeError, match="only valid for xarray leaves"):
+            next(gen)
+
+    def test_unknown_dim_raises(self, getkey):
+        data = self._dataset(getkey())
+        gen = klax.batch_data(
+            data, batch_size=10, batch_axes="missing", key=getkey()
+        )
+        with pytest.raises(ValueError, match="not present on xarray leaf"):
+            next(gen)
+
+    def test_none_passthrough_for_xarray(self, getkey):
+        ds = self._dataset(getkey())
+        arr = jrandom.uniform(getkey(), (100, 3))
+        data = {"x": arr, "y": ds}
+        batch_axes = {"x": 0, "y": None}
+        generator = klax.batch_data(
+            data, batch_size=10, batch_axes=batch_axes, key=getkey()
+        )
+        batch = next(generator)
+        assert batch["x"].shape[0] == 10
+        # y was not batched: same sizes as the original dataset
+        assert batch["y"].sizes["batch"] == 100
+
+    def test_convert_to_numpy_skips_xarray(self, getkey):
+        ds = self._dataset(getkey())
+        generator = klax.batch_data(
+            ds,
+            batch_size=10,
+            batch_axes="batch",
+            convert_to_numpy=True,
+            key=getkey(),
+        )
+        batch = next(generator)
+        assert isinstance(batch, xr.Dataset)
+
+
+class TestSplitDataXArray:
+    def _dataset(self, key, n_batch=20, n_features=2):
+        import jax.numpy as jnp
+
+        return xr.Dataset(
+            {
+                "y": (
+                    ("batch", "i"),
+                    jrandom.uniform(key, (n_batch, n_features)),
+                ),
+                "label": (("batch",), ["text"] * n_batch),
+            },
+            coords={"batch": jnp.arange(n_batch), "i": jnp.arange(n_features)},
+        )
+
+    def test_split_dataset(self, getkey):
+        n_batch = 20
+        data = self._dataset(getkey(), n_batch=n_batch)
+        s1, s2 = klax.split_data(
+            data, (3, 1), batch_axes="batch", key=getkey()
+        )
+        assert isinstance(s1, xr.Dataset) and isinstance(s2, xr.Dataset)
+        assert s1.sizes["batch"] + s2.sizes["batch"] == n_batch
+        assert s1.sizes["batch"] == 15 and s2.sizes["batch"] == 5
+        assert s1.sizes["i"] == 2 and s2.sizes["i"] == 2
+
+    def test_split_mixed(self, getkey):
+        n_batch = 20
+        ds = self._dataset(getkey(), n_batch=n_batch)
+        arr = jrandom.uniform(getkey(), (n_batch, 5))
+        data = {"x": arr, "y": ds}
+        batch_axes = {"x": 0, "y": "batch"}
+        s1, s2 = klax.split_data(
+            data, (1, 1), batch_axes=batch_axes, key=getkey()
+        )
+        assert s1["x"].shape[0] == n_batch // 2
+        assert s2["x"].shape[0] == n_batch // 2
+        assert s1["y"].sizes["batch"] == n_batch // 2
+        assert s2["y"].sizes["batch"] == n_batch // 2
