@@ -113,7 +113,6 @@ class BatchMetric:
         self.verbose = verbose
         self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
         self.func = eqx.filter_jit(func) if jit_compile else func
-        # self.func = jax.jit(func) if jit_compile else func
 
     def __call__(self, context: TrainingContext) -> Any:
         """Compute the metric.
