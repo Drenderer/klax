@@ -217,9 +217,9 @@ def fit[T: eqx.Module](
             loss on different hardware, such as GPU and CPU) it might be
             advantageous to have more fine grained control over the compilation.
         vmap_ensemble: If true, the step function and optimizer state
-            initialization are vmapped across the leading axis of the
-            [`TrainingState`][klax.TrainingState], i.e., model, optimizer state
-            and run state.
+            initialization are vmapped across the leading axis of the arrays in
+            the [`TrainingState`][klax.TrainingState], i.e., model, optimizer
+            state and run state.
             This is useful to train multiple instances of the same model
             (ensemble) in a single call to `fit`.
 
