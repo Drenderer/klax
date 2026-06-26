@@ -54,21 +54,16 @@ class TestMakeStep:
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
 
-        state = klax.TrainingState(
-            model, opt_state, run_state=None, step=jnp.array(0.0)
-        )
+        state = klax.TrainingState(model, opt_state, run_state=None)
         state_leaves, state_treedef = jax.tree.flatten(state)
 
-        new_state_leaves, new_state_treedef = klax.make_step(
+        new_state_leaves = klax.make_step(
             state_leaves,
             state_treedef,
             batch=(x, y),
             loss=klax.mse,
             optimizer=optimizer,
         )
-
-        # State structure has not changed
-        assert new_state_treedef == state_treedef
 
         # State has changed
         assert not jax.tree.all(
@@ -125,7 +120,9 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        context = klax.run_training_loop(context, [callback])
+        context = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -177,7 +174,9 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        _ = klax.run_training_loop(context, [callback])
+        updated_view = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -226,7 +225,9 @@ class TestRunTrainingLoop:
 
         callback = StopAfterOne()
 
-        context = klax.run_training_loop(context, [callback])
+        context = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]

@@ -282,9 +282,9 @@ def build_ctx():
         return SimpleNamespace(
             state=SimpleNamespace(
                 model=model if model is not None else {"w": 1.0},
-                step=jnp.array(step, dtype=int),
                 opt_state=opt_state,
             ),
+            step=step,
             steps=steps,
         )
 
