@@ -156,14 +156,13 @@ def fit[T: eqx.Module](
             arrays in `data` are batch dimensions. xarray leaves require
             an explicit `str` dim name.)
 
-            Example: For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
-            where `x` has  shape `(100, 32)`, `y1` has shape `(100,)`
-            and `y2` has shape `(10, 100)`, the appropriate `batch_axes`
-            would be `batch_axes = (0, (0, 1, None))` indicating that
-            the batch axis for `x` is the first axis (0), for `y1` also
-            the first axis (0), for `y2` the second axis (1) and for the
-            string there is no batch axis (`None`).
-            Defaults to `0`.
+            !!!Example
+                For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
+                where `x` has  shape `(32, 100)`, `y1` has shape `(100,)`
+                and `y2` has shape `(100, 10)`, an appropriate `batch_axes`
+                would be `batch_axes = (1, 0, None)` indicating that
+                the batch axis for `x` is the second axis, for `y1` and `y2`
+                the first axis and that there is no batch axis for the string.
         run_state: Auxiliary runtime state, that is passed to the loss function.
             Can be updated via callbacks.
             Defaults to `None`.
@@ -217,27 +216,33 @@ def fit[T: eqx.Module](
             is not jit-able (e.g., when computing different parts of the
             loss on different hardware, such as GPU and CPU) it might be
             advantageous to have more fine grained control over the compilation.
-        vmap_ensemble: If true, this vmaps the step function and optimizer state
-            initialization across the leading axis of the [`TrainingState`][klax.TrainingState]
-            , i.e., model, optimizer state and run state.
+        vmap_ensemble: If true, the step function and optimizer state
+            initialization are vmapped across the leading axis of the
+            [`TrainingState`][klax.TrainingState], i.e., model, optimizer state
+            and run state.
             This is useful to train multiple instances of the same model
             (ensemble) in a single call to `fit`.
 
-            Example: ```python
-                @eqx.filter_vmap
-                def make_mlp_ensemble(key):
-                    return klax.nn.MLP("scalar", "scalar", [16, 16], key=key)
+            !!!Note
+                The batcher is **not** vmapped, meaning that all models in the
+                ensemble will receive identical batches of data.
 
-                mlp_ensemble = make_ensemble(jr.split(key, 10))
+            !!!Example
+                ```python
+                    @eqx.filter_vmap
+                    def make_mlp_ensemble(key):
+                        return klax.nn.MLP("scalar", "scalar", [16, 16], key=key)
 
-                mlp_ensemble, history = klax.fit(mlp_ensemble, ..., vmap_ensemble=True, ...)
+                    mlp_ensemble = make_ensemble(jr.split(key, 10))
 
-                @eqx.filter_vmap(in_axes=(eqx.if_array(0), None))
-                def evaluate_ensemble(ensemble, x):
-                    return ensemble(x)
+                    mlp_ensemble, history = klax.fit(mlp_ensemble, ..., vmap_ensemble=True, ...)
 
-                evaluate_ensemble(mlp_ensemble, jax.random.normal(key, (2,)))
-            ```
+                    @eqx.filter_vmap(in_axes=(eqx.if_array(0), None))
+                    def evaluate_ensemble(ensemble, x):
+                        return ensemble(x)
+
+                    evaluate_ensemble(mlp_ensemble, jax.random.normal(key, (2,)))
+                ```
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
 
