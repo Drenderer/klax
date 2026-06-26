@@ -43,7 +43,7 @@ def make_step(
     batch: PyTree,
     loss: Loss,
     optimizer: optax.GradientTransformationExtraArgs,
-) -> tuple[list[Leaf], Any]:
+) -> list[Leaf]:
     state = jax.tree.unflatten(state_treedef, state_leaves)
 
     model_params, model_static = eqx.partition(state.model, param_spec)
@@ -67,11 +67,10 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    step = state.step + 1
+    state = TrainingState(model, opt_state, state.run_state)
+    state_leaves, _ = jax.tree.flatten(state)
 
-    state = TrainingState(model, opt_state, state.run_state, step)
-
-    return jax.tree.flatten(state)
+    return state_leaves
 
 
 def run_training_loop(
@@ -86,17 +85,18 @@ def run_training_loop(
         callback.on_training_start(context)
 
     for batch in context.batch_generator:
-        if context.state.step >= context.steps:
+        if context.step >= context.steps:
             break
 
-        state_leaves, _ = step_function(
+        state_leaves = step_function(
             state_leaves,
             state_treedef,
             batch,
             context.loss,
             context.optimizer,
         )
-        context.update_state(state_leaves)
+        step = context.step + 1
+        context.update(state_leaves, step)
 
         stop = False
         for callback in callbacks:
@@ -218,7 +218,8 @@ def fit[T: eqx.Module](
             loss on different hardware, such as GPU and CPU) it might be
             advantageous to have more fine grained control over the compilation.
         vmap_ensemble: If true, this vmaps the step function and optimizer state
-            initialization across the leading axis of the model parameters.
+            initialization across the leading axis of the [`TrainingState`][klax.TrainingState]
+            , i.e., model, optimizer state and run state.
             This is useful to train multiple instances of the same model
             (ensemble) in a single call to `fit`.
 
@@ -247,6 +248,15 @@ def fit[T: eqx.Module](
         The returned history will be `None` if `make_logger=False`.
 
     """
+    # Transform the step function
+    step_function = make_step
+    if vmap_ensemble:
+        step_function = eqx.filter_vmap(
+            step_function, in_axes=(eqx.if_array(0), None, None, None, None)
+        )
+    if jit_compile:
+        step_function = eqx.filter_jit(step_function)
+
     if init_opt_state is None:
         # Initialize the optimizer and 'tell it' to optimize with respect to
         # all inexact arrays in the model. This is done by passing the model to
@@ -267,33 +277,6 @@ def fit[T: eqx.Module](
     context = TrainingContext(
         model, optimizer, opt_state, batch_generator, run_state, loss, steps
     )
-
-    # Transform the step function
-    step_function = make_step
-    if vmap_ensemble:
-        state_in_axes = TrainingState(
-            model=jax.tree.map(
-                lambda l: 0 if eqx.is_array(l) else "sentinel", model
-            ),
-            opt_state=jax.tree.map(
-                lambda l: 0 if eqx.is_array(l) else "sentinel", opt_state
-            ),
-            run_state=jax.tree.map(
-                lambda l: 0 if eqx.is_array(l) else "sentinel", run_state
-            ),
-            step="sentinel",
-        )
-        state_leaves_in_axes, _ = jax.tree.flatten(state_in_axes)
-        state_leaves_in_axes = jax.tree.map(
-            lambda l: None if l == "sentinel" else l, state_leaves_in_axes
-        )
-        step_function = eqx.filter_vmap(
-            step_function,
-            in_axes=(state_leaves_in_axes, None, None, None, None),
-            out_axes=(state_leaves_in_axes, None),
-        )
-    if jit_compile:
-        step_function = eqx.filter_jit(step_function)
 
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)

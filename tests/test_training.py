@@ -97,13 +97,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.state.step)
+                self.start_steps.append(context.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -149,13 +149,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.state.step)
+                self.start_steps.append(context.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -200,11 +200,11 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
                 return True  # request stop after first step
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)

@@ -39,6 +39,17 @@ context = klax.TrainingContext(
 
 loss = klax.mse
 
+
+@eqx.filter_vmap
+def get_bias(model):
+    return model.layers[0].bias
+
+
+@klax.metric(name="first_bias")
+def my_metric(context):
+    return get_bias(context.state.model)
+
+
 models, history = klax.fit(
     models,
     data,
@@ -48,10 +59,11 @@ models, history = klax.fit(
     vmap_ensemble=True,
     make_logger=True,
     jit_compile=True,
+    metrics=[my_metric],
     key=jr.key(0),
 )
 
-history.plot()
+history.plot("loss")
 
 
 # %%

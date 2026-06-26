@@ -347,14 +347,12 @@ class MetricLogger(Callback):
             context: Current training context.
 
         """
-        if context.state.step % self.log_every == 0:
+        if context.step % self.log_every == 0:
             message = []
             for metric in self.metrics.values():
                 metric_value = jax.device_get(metric(context))
-                self.history.append(
-                    context.state.step, metric.name, metric_value
-                )
-                if self._verbose and metric.verbose:
+                self.history.append(context.step, metric.name, metric_value)
+                if self.verbose and metric.verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
                     except TypeError:
@@ -365,11 +363,11 @@ class MetricLogger(Callback):
                 postfix = ", ".join(message)
                 if self._verbose > 1:
                     self.tqdm_bar.set_postfix_str(postfix)
-                    if context.state.step != 0:
+                    if context.step != 0:
                         self.tqdm_bar.update(self.log_every)
                 else:
                     print(
-                        f"Step {context.state.step:>{self.steps_str_length}}/{context.steps}: "
+                        f"Step {context.step:>{self.steps_str_length}}/{context.steps}: "
                         + postfix
                     )
 
@@ -386,7 +384,7 @@ class MetricLogger(Callback):
     def on_training_end(self, context: TrainingContext) -> None:
         end_time = time()
         self.history.total_time = end_time - self.start_time
-        self.history.total_steps = context.state.step
+        self.history.total_steps = context.step
         self.history.final_opt_state = context.state.opt_state
 
         if self._verbose > 1:

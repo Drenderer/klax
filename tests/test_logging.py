@@ -308,13 +308,13 @@ class TestMetricLogger:
         assert "m1" not in logger.history.content
 
         # Step 2: divisible by 2 -> should log
-        context.state.step = 2
+        context.step = 2
         logger.on_training_step(context)
         assert "m1" in logger.history.content
         assert logger.history.content["m1"][0] == [2]
 
         # Step 4: divisible by 2 -> should log again
-        context.state.step = 4
+        context.step = 4
         logger.on_training_step(context)
         assert logger.history.content["m1"][0] == [2, 4]
 
@@ -368,7 +368,7 @@ class TestMetricLogger:
         assert "m" in logger.history.content
         assert logger.history.content["m"][0] == [0]
 
-        context.state.step = 5
+        context.step = 5
         logger.on_training_end(context)
         assert logger.history.total_steps == 5
         assert isinstance(logger.history.total_time, float)
