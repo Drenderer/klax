@@ -163,18 +163,6 @@ class TestBatchData:
         # Test not equal, i.e., the dataset was sorted
         assert not (data[:32] == next(generator)).all()
 
-        generator = klax.batch_data(
-            data, batch_size=32, batch_axes="batch", key=getkey()
-        )
-        with pytest.raises(
-            TypeError,
-            match=(
-                f"String dim names are only valid for xarray leaves; "
-                f"got 'batch' on a leaf of type ArrayImpl"
-            ),
-        ):
-            next(generator)
-
     @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
     def test_with_xarray_data_array(getkey):
@@ -195,24 +183,38 @@ class TestBatchData:
         assert (data[:32] == batch).all()
         assert not (data.batch[:32].data == batch.batch.data).all()
 
-        # Test TypeError if the no 'str' type 'batch_axes' is assigned.
-        with pytest.raises(
-            TypeError,
-            match=re.escape(
-                "batch_axes spec for an xarray leaf must be a `str` dim name, "
-                "got int (0). "
-                "Available dims: ('batch',)"
-            ),
-        ):
-            generator = klax.batch_data(data, batch_size=32, key=getkey())
-            next(generator)
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
+    @staticmethod
+    def test_with_xarray_leaf_inside_pytree(getkey):
+        xr, _ = get_xarray()
+        arr = jrandom.uniform(getkey(), (64,))
+        da = xr.DataArray(
+            jrandom.uniform(getkey(), (64,)),
+            coords={"batch": jnp.arange(64)},
+            dims="batch",
+        )
+        data = {"arr": arr, "da": da}
+        batch_axes = {"arr": 0, "da": "batch"}
+        generator = klax.batch_data(
+            data, batch_size=8, batch_axes=batch_axes, key=getkey()
+        )
+        batch = next(generator)
+        assert set(batch.keys()) == {"arr", "da"}
+        assert batch["arr"].shape == (8,)
+        # The xarray leaf survived as a DataArray (i.e., `_is_leaf` stopped
+        # the tree-walker from flattening it) and was sliced via `.isel`.
+        assert isinstance(batch["da"], xr.DataArray)
+        assert batch["da"].sizes["batch"] == 8
 
     @staticmethod
     def test_with_nested_pytree(getkey):
         x = jrandom.uniform(getkey(), (10,))
         data = [x, (x, {"a": x, "b": x})]
-        generator = klax.batch_data(data, batch_size=32, key=getkey())
-        assert jax.tree.structure(next(generator)) == jax.tree.structure(data)
+        generator = klax.batch_data(data, batch_size=4, key=getkey())
+        batch = next(generator)
+        assert jax.tree.structure(batch) == jax.tree.structure(data)
+        for leaf in jax.tree.leaves(batch):
+            assert leaf.shape == (4,)
 
     @staticmethod
     def test_batch_size(getkey):
@@ -251,15 +253,65 @@ class TestBatchData:
         assert next(generator) == data
 
     @staticmethod
-    def test_different_batch_sizes(getkey):
-        x = jrandom.uniform(getkey(), (10,))
-        y = jrandom.uniform(getkey(), (5,))
-        data = (x, y)
-        generator = klax.batch_data(data, batch_size=32, key=getkey())
-        with pytest.raises(
-            ValueError, match="All batched arrays must have equal batch sizes."
-        ):
-            next(generator)
+    def test_without_replacement_within_epoch(getkey):
+        data = np.arange(10)
+        generator = klax.batch_data(data, batch_size=5, key=getkey())
+        b1 = np.asarray(next(generator))
+        b2 = np.asarray(next(generator))
+        # Two batches in one epoch partition the dataset.
+        assert set(b1.tolist()).isdisjoint(b2.tolist())
+        assert set(b1.tolist()) | set(b2.tolist()) == set(data.tolist())
+
+    @staticmethod
+    def test_reshuffle_between_epochs(getkey):
+        data = np.arange(20)
+        generator = klax.batch_data(data, batch_size=20, key=getkey())
+        epoch1 = np.asarray(next(generator))
+        epoch2 = np.asarray(next(generator))
+        assert set(epoch1.tolist()) == set(data.tolist())
+        assert set(epoch2.tolist()) == set(data.tolist())
+        # A fresh permutation is drawn for each epoch.
+        assert not np.array_equal(epoch1, epoch2)
+
+    @staticmethod
+    def test_convert_to_numpy_default_returns_numpy(getkey):
+        data = jrandom.uniform(getkey(), (8,))
+        generator = klax.batch_data(data, batch_size=4, key=getkey())
+        assert isinstance(next(generator), np.ndarray)
+
+    @staticmethod
+    def test_convert_to_numpy_false_keeps_jax(getkey):
+        data = jrandom.uniform(getkey(), (8,))
+        generator = klax.batch_data(
+            data, batch_size=4, convert_to_numpy=False, key=getkey()
+        )
+        batch = next(generator)
+        assert isinstance(batch, jax.Array)
+        assert not isinstance(batch, np.ndarray)
+
+    @staticmethod
+    def test_non_default_positional_axis_numpy(getkey):
+        data = jrandom.uniform(getkey(), (3, 10, 2))
+        generator = klax.batch_data(
+            data, batch_size=4, batch_axes=1, key=getkey()
+        )
+        batch = next(generator)
+        assert isinstance(batch, np.ndarray)
+        assert batch.shape == (3, 4, 2)
+
+    @staticmethod
+    def test_non_default_positional_axis_jax(getkey):
+        data = jrandom.uniform(getkey(), (3, 10, 2))
+        generator = klax.batch_data(
+            data,
+            batch_size=4,
+            batch_axes=1,
+            convert_to_numpy=False,
+            key=getkey(),
+        )
+        batch = next(generator)
+        assert isinstance(batch, jax.Array)
+        assert batch.shape == (3, 4, 2)
 
 
 # ===---------------------------------------------------------------------=== #
@@ -267,7 +319,6 @@ class TestBatchData:
 # ===---------------------------------------------------------------------=== #
 
 
-# TODO: Add tests with xarray data
 class TestSplitData:
     @staticmethod
     def test_split_data(getkey):
@@ -297,7 +348,65 @@ class TestSplitData:
         assert np.array_equal(data, np.sort(s))
 
     @staticmethod
-    def test_with_zero_proportion(getkey):
+    def test_with_negative_proportion(getkey):
         data = np.arange(10)
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match="Proportions must be non-negative"
+        ):
             klax.split_data(data, (-1.0,), key=getkey())
+
+    @staticmethod
+    def test_with_none_batch_axes_per_leaf(getkey):
+        x = jrandom.uniform(getkey(), (10,))
+        constant = jrandom.uniform(getkey(), (3,))
+        data = (x, constant)
+        s1, s2 = klax.split_data(
+            data, (1, 1), batch_axes=(0, None), key=getkey()
+        )
+        # The non-batched leaf is replicated verbatim into every subset.
+        assert eqx.tree_equal(s1[1], constant)
+        assert eqx.tree_equal(s2[1], constant)
+        assert s1[0].shape == (5,)
+        assert s2[0].shape == (5,)
+
+    @staticmethod
+    def test_empty_subset_warning(getkey):
+        data = np.arange(10)
+        with pytest.warns(UserWarning, match="empty subsets"):
+            klax.split_data(data, (1, 0), key=getkey())
+
+    @staticmethod
+    def test_invalid_proportion_dim(getkey):
+        data = np.arange(10)
+        with pytest.raises(
+            ValueError, match="Proportions must be a 1D Sequence"
+        ):
+            klax.split_data(data, [[1, 1], [1, 1]], key=getkey())
+
+    @staticmethod
+    def test_partition_property(getkey):
+        data = np.arange(100)
+        subsets = klax.split_data(data, (1, 2, 3), key=getkey())
+        union = np.concatenate([np.asarray(s) for s in subsets])
+        # Split is a partition: every original index appears in exactly one subset.
+        assert len(union) == len(data)
+        assert set(union.tolist()) == set(data.tolist())
+
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
+    @staticmethod
+    def test_with_xarray_data_array(getkey):
+        xr, _ = get_xarray()
+        data = xr.DataArray(
+            jrandom.uniform(getkey(), (64,)),
+            coords={"batch": jnp.arange(64)},
+            dims="batch",
+        )
+        s1, s2 = klax.split_data(
+            data, (3, 1), batch_axes="batch", key=getkey()
+        )
+        assert s1.sizes["batch"] == 48
+        assert s2.sizes["batch"] == 16
+        s1_idx = set(np.asarray(s1.batch).tolist())
+        s2_idx = set(np.asarray(s2.batch).tolist())
+        assert s1_idx.isdisjoint(s2_idx)
+        assert s1_idx | s2_idx == set(range(64))
