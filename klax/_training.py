@@ -115,7 +115,7 @@ def fit[T: eqx.Module](
     data: PyTree[Any],
     *,
     batch_size: int = 32,
-    batch_axes: PyTree[int | None] = 0,
+    batch_axes: PyTree[int | str | None] = 0,
     run_state: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
@@ -145,11 +145,14 @@ def fit[T: eqx.Module](
             tuple `(x, y)` with model inputs `x` and model outputs `y`.
         batch_size: The number of examples in a batch.
         batch_axes: A `PyTree` denoting, which axis is the batch axis for
-            arrays in `data`. `batch_axes` must be a prefix of `data`. By
-            specifying `batch_axes` as a `PyTree` it is possible to specify
-            different batch axes for different leaves of `data`. (Defaults to
-            `0`, meaning the first axes of arrays in `data` are batch
-            dimensions.)
+            arrays in `data`. Each leaf is one of `int` (positional axis on
+            an array leaf), `str` (dim name on an `xarray` leaf), or `None`
+            (the corresponding subtree is not batched). `batch_axes` must
+            be a prefix of `data`. By specifying `batch_axes` as a `PyTree`
+            it is possible to specify different batch axes for different
+            leaves of `data`. (Defaults to `0`, meaning the first axes of
+            arrays in `data` are batch dimensions. xarray leaves require
+            an explicit `str` dim name.)
 
             Example: For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
             where `x` has  shape `(100, 32)`, `y1` has shape `(100,)`

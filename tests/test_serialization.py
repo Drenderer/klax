@@ -16,11 +16,13 @@
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 import klax
 
 
-def _get_pytress():
+@pytest.fixture
+def pytrees():
     fun = lambda x: x
     obj = object()
 
@@ -45,8 +47,8 @@ def _get_pytress():
     return tree, like
 
 
-def test_text_serialize_filter_spec(tmp_path):
-    tree, like = _get_pytress()
+def test_text_serialize_filter_spec(tmp_path, pytrees):
+    tree, like = pytrees
     file_path = tmp_path / "model.eqx"
 
     eqx.tree_serialise_leaves(
@@ -56,8 +58,4 @@ def test_text_serialize_filter_spec(tmp_path):
     tree_loaded = eqx.tree_deserialise_leaves(
         file_path, like, filter_spec=klax.text_deserialize_filter_spec
     )
-
-    print(tree_loaded)
-    print(tree)
-
     assert eqx.tree_equal(tree_loaded, tree)

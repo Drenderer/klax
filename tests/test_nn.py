@@ -18,21 +18,55 @@ import jax.numpy as jnp
 import jax.random as jrandom
 import pytest
 from jax.nn.initializers import he_normal, uniform
+from jaxtyping import Array
 
 import klax
 from klax.nn import (
     FICNN,
     MLP,
+    PICNN,
     ConstantMatrix,
     ConstantSkewSymmetricMatrix,
     ConstantSPDMatrix,
+    FICNNLayer,
     InputSplitLinear,
     Linear,
     Matrix,
+    PICNNLayer,
     SkewSymmetricMatrix,
     SPDMatrix,
 )
-from klax.nn._icnn import PICNN, FICNNLayer, PICNNLayer
+
+
+@pytest.fixture
+def allow_rank_promotion():
+    """Disable the jax_numpy_rank_promotion for the current test."""
+    old = jax.config.jax_numpy_rank_promotion
+    jax.config.update("jax_numpy_rank_promotion", "allow")
+    try:
+        yield
+    finally:
+        jax.config.update("jax_numpy_rank_promotion", old)
+
+
+@pytest.fixture
+def getzerowrap():
+    import klax
+
+    class ZeroWrapper(klax.Unwrappable[Array]):
+        """A dummy wrapper that sets all parameters to zero."""
+
+        parameter: Array
+
+        def unwrap(self) -> Array:
+            return jnp.zeros_like(self.parameter)
+
+    return ZeroWrapper
+
+
+# ===---------------------------------------------------------------------=== #
+# klax.nn.Linear
+# ===---------------------------------------------------------------------=== #
 
 
 def test_linear(getkey, getzerowrap):
@@ -100,7 +134,12 @@ def test_linear(getkey, getzerowrap):
     assert linear(x).dtype == jnp.complex64
 
 
-def test_is_linear(getkey):
+# ===---------------------------------------------------------------------=== #
+# klax.nn.InputSplitLinear
+# ===---------------------------------------------------------------------=== #
+
+
+def test_input_split_linear(getkey):
     # Zero input length
     is_linear = InputSplitLinear((0,), 4, uniform(), key=getkey())
     x = jrandom.normal(getkey(), (0,))
@@ -159,6 +198,11 @@ def test_is_linear(getkey):
         y = jrandom.normal(getkey(), (2,), dtype=dtype)
         z = jrandom.normal(getkey(), (3,), dtype=dtype)
         assert is_linear(y, z).dtype == dtype
+
+
+# ===---------------------------------------------------------------------=== #
+# klax.nn.MLP
+# ===---------------------------------------------------------------------=== #
 
 
 def test_mlp(getkey):
@@ -231,6 +275,13 @@ def test_mlp(getkey):
     assert [mlp.layers[i].out_features for i in range(0, 3)] == [4, 8, 3]
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.nn.Matrix; klax.nn.ConstantMatrix; klax.nn.SkeSymmetricMatrix;
+# klax.nn.ConstantSkewSymmetricMatrix; klax.nn.SPDMatrix;
+# klax.nn.ConstantSPDMatrix
+# ===---------------------------------------------------------------------=== #
+
+
 def test_matrices(getkey):
     x = jrandom.normal(getkey(), (4,))
 
@@ -286,10 +337,14 @@ def test_matrices(getkey):
     assert jnp.all(jnp.linalg.eigvalsh(output) > 0.0)
 
 
-class TestFICNNLayer:
-    """Test suite for the FICNNLayer implementation."""
+# ===---------------------------------------------------------------------=== #
+# klax.nn.FICNNLayer
+# ===---------------------------------------------------------------------=== #
 
-    def test_basic_shapes(self, getkey):
+
+class TestFICNNLayer:
+    @staticmethod
+    def test_basic_shapes(getkey):
         """Test that the layer outputs the correct shapes."""
         layer = FICNNLayer(
             y_in_size=3,
@@ -313,9 +368,8 @@ class TestFICNNLayer:
             pytest.param(True, klax.NonNegative, id="with_wrapper"),
         ],
     )
-    def test_nonnegative_y_weight(
-        self, nonnegative_y_weight, expected_type, getkey
-    ):
+    @staticmethod
+    def test_nonnegative_y_weight(nonnegative_y_weight, expected_type, getkey):
         layer = FICNNLayer(
             y_in_size=3,
             x_size=4,
@@ -327,7 +381,8 @@ class TestFICNNLayer:
 
         assert isinstance(layer.linear_y.weights[0], expected_type)
 
-    def test_use_passthrough_true(self, getkey):
+    @staticmethod
+    def test_use_passthrough_true(getkey):
         """Test that use_passthrough=True creates an `InputSplitLinear` layer."""
         layer = FICNNLayer(
             y_in_size=3,
@@ -341,7 +396,8 @@ class TestFICNNLayer:
         assert isinstance(layer.linear_y, InputSplitLinear)
         assert len(layer.linear_y.weights) == 2
 
-    def test_use_passthrough_false(self, getkey):
+    @staticmethod
+    def test_use_passthrough_false(getkey):
         """Test that use_passthrough=False does create a `Linear` layer."""
         layer = FICNNLayer(
             y_in_size=3,
@@ -354,7 +410,8 @@ class TestFICNNLayer:
         # linear_y should be Linear with only 1 input
         assert isinstance(layer.linear_y, Linear)
 
-    def test_use_bias_true(self, getkey):
+    @staticmethod
+    def test_use_bias_true(getkey):
         """Test that use_bias=True adds bias to linear_y."""
         layer = FICNNLayer(
             y_in_size=3,
@@ -368,7 +425,8 @@ class TestFICNNLayer:
         assert layer.linear_y.use_bias is True
         assert layer.linear_y.bias is not None
 
-    def test_use_bias_false(self, getkey):
+    @staticmethod
+    def test_use_bias_false(getkey):
         """Test that use_bias=False removes bias from linear_y."""
         layer = FICNNLayer(
             y_in_size=3,
@@ -382,7 +440,8 @@ class TestFICNNLayer:
         assert layer.linear_y.use_bias is False
         assert layer.linear_y.bias is None
 
-    def test_batched_call_single_batch(self, getkey, allow_rank_promotion):
+    @staticmethod
+    def test_batched_call_single_batch(getkey, allow_rank_promotion):
         """Test that the layer supports batched calls (single batch dim)."""
         layer = klax.finalize(
             FICNNLayer(
@@ -401,9 +460,8 @@ class TestFICNNLayer:
         assert y_out.shape == (batch_size, 5)
         assert x_out.shape == (batch_size, 4)
 
-    def test_batched_call_multiple_batch_dims(
-        self, getkey, allow_rank_promotion
-    ):
+    @staticmethod
+    def test_batched_call_multiple_batch_dims(getkey, allow_rank_promotion):
         """Test that the layer supports multiple batch dimensions."""
         layer = klax.finalize(
             FICNNLayer(
@@ -422,7 +480,8 @@ class TestFICNNLayer:
         assert y_out.shape == batch_shape + (5,)
         assert x_out.shape == batch_shape + (4,)
 
-    def test_custom_activations(self, getkey):
+    @staticmethod
+    def test_custom_activations(getkey):
         """Test that custom activation functions work correctly."""
         layer = klax.finalize(
             FICNNLayer(
@@ -443,7 +502,8 @@ class TestFICNNLayer:
         assert x_out.shape == (4,)
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
-    def test_dtype_preservation(self, dtype, getkey):
+    @staticmethod
+    def test_dtype_preservation(dtype, getkey):
         """Test that the layer preserves the specified dtype."""
         layer = klax.finalize(
             FICNNLayer(
@@ -462,7 +522,8 @@ class TestFICNNLayer:
         assert y_out.dtype == dtype
         assert x_out.dtype == dtype
 
-    def test_x_passthrough_unchanged(self, getkey):
+    @staticmethod
+    def test_x_passthrough_unchanged(getkey):
         """Test that x is passed through unchanged."""
         layer = klax.finalize(
             FICNNLayer(
@@ -476,13 +537,12 @@ class TestFICNNLayer:
         y = jrandom.normal(getkey(), (3,))
         x = jrandom.normal(getkey(), (4,))
 
-        y_out, x_out = layer(y, x)
+        _, x_out = layer(y, x)
         # x should be returned unchanged
         assert jnp.allclose(x_out, x)
 
-    def test_trainable_activation_functions(
-        self, getkey, allow_rank_promotion
-    ):
+    @staticmethod
+    def test_trainable_activation_functions(getkey, allow_rank_promotion):
         """Test that each neuron's activation receives independent parameter updates.
 
         This test verifies that when using learnable activation functions with vmapped
@@ -531,6 +591,11 @@ class TestFICNNLayer:
         assert grads.activation_y.bias.shape == (5,)
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.nn.FICNN
+# ===---------------------------------------------------------------------=== #
+
+
 class TestFICNN:
     """Test suite for the FICNN implementation.
 
@@ -538,7 +603,8 @@ class TestFICNN:
     FICNNLayer tests, such as stacking multiple layers and composition.
     """
 
-    def test_scalar_sizes(self, getkey):
+    @staticmethod
+    def test_scalar_sizes(getkey):
         """Test FICNN with scalar input/output sizes."""
         ficnn = klax.finalize(
             FICNN(
@@ -562,7 +628,8 @@ class TestFICNN:
             [],
         ],
     )
-    def test_different_width_sizes(self, width_sizes, getkey):
+    @staticmethod
+    def test_different_width_sizes(width_sizes, getkey):
         """Test FICNN with various width size configurations."""
         ficnn = klax.finalize(
             FICNN(
@@ -580,7 +647,8 @@ class TestFICNN:
         assert jnp.isfinite(y).all()
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
-    def test_dtype_preservation(self, dtype, getkey):
+    @staticmethod
+    def test_dtype_preservation(dtype, getkey):
         """Test that FICNN preserves specified dtype across layers."""
         ficnn = klax.finalize(
             FICNN(
@@ -597,7 +665,8 @@ class TestFICNN:
         y = ficnn(x)
         assert y.dtype == dtype
 
-    def test_batched_inputs(self, getkey, allow_rank_promotion):
+    @staticmethod
+    def test_batched_inputs(getkey, allow_rank_promotion):
         """Test that FICNN handles batched inputs correctly."""
         ficnn = klax.finalize(
             FICNN(
@@ -615,7 +684,8 @@ class TestFICNN:
         assert y.shape == (batch_size, 2)
 
     @pytest.mark.parametrize("use_passthrough", [True, False])
-    def test_use_passthrough(self, use_passthrough, getkey):
+    @staticmethod
+    def test_use_passthrough(use_passthrough, getkey):
         """Test FICNN with and without use_passthrough."""
         ficnn = FICNN(
             in_size=3,
@@ -631,7 +701,8 @@ class TestFICNN:
 
     @pytest.mark.parametrize("use_bias", [True, False])
     @pytest.mark.parametrize("use_final_bias", [True, False])
-    def test_use_bias_configurations(self, use_bias, use_final_bias, getkey):
+    @staticmethod
+    def test_use_bias_configurations(use_bias, use_final_bias, getkey):
         """Test FICNN with different bias configurations."""
         ficnn = FICNN(
             in_size=3,
@@ -648,7 +719,8 @@ class TestFICNN:
         assert ficnn.layers[-1].use_bias is use_final_bias
 
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    def test_non_decreasing_property(self, non_decreasing, getkey):
+    @staticmethod
+    def test_non_decreasing_property(non_decreasing, getkey):
         """Test that non_decreasing is applied properly."""
         ficnn = FICNN(
             in_size=2,
@@ -666,7 +738,8 @@ class TestFICNN:
         for layer in ficnn.layers:
             assert layer.nonnegative_passthrough is non_decreasing
 
-    def test_custom_activations(self, getkey):
+    @staticmethod
+    def test_custom_activations(getkey):
         """Test with custom activation functions."""
         ficnn = klax.finalize(
             FICNN(
@@ -685,7 +758,8 @@ class TestFICNN:
         assert y.shape == (2,)
         assert jnp.isfinite(y).all()
 
-    def test_layer_count(self, getkey):
+    @staticmethod
+    def test_layer_count(getkey):
         """Test that FICNN creates correct number of layers."""
         width_sizes = [4, 6, 8]
         ficnn = FICNN(
@@ -699,7 +773,8 @@ class TestFICNN:
 
     @pytest.mark.parametrize("use_passthrough", [True, False])
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    def test_convexity(self, use_passthrough, non_decreasing, getkey):
+    @staticmethod
+    def test_convexity(use_passthrough, non_decreasing, getkey):
         x = jrandom.normal(getkey(), (10, 5))
         ficnn = klax.finalize(
             FICNN(
@@ -723,10 +798,16 @@ class TestFICNN:
         assert jnp.all(jnp.linalg.eigvals(hessian_fun(x)) > -1e-6)
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.nn.PICNNLayer
+# ===---------------------------------------------------------------------=== #
+
+
 class TestPICNNLayer:
     """Test suite for the PICNNLayer implementation."""
 
-    def test_basic_shapes(self, getkey):
+    @staticmethod
+    def test_basic_shapes(getkey):
         """Test that the layer outputs the correct shapes."""
         layer = PICNNLayer(
             y_in_size=3,
@@ -754,9 +835,8 @@ class TestPICNNLayer:
             pytest.param(True, klax.NonNegative, id="with_wrapper"),
         ],
     )
-    def test_nonnegative_y_weight(
-        self, nonnegative_y_weight, expected_type, getkey
-    ):
+    @staticmethod
+    def test_nonnegative_y_weight(nonnegative_y_weight, expected_type, getkey):
         layer = PICNNLayer(
             y_in_size=3,
             u_in_size=2,
@@ -770,7 +850,8 @@ class TestPICNNLayer:
 
         assert isinstance(layer.linear_y.weights[0], expected_type)
 
-    def test_use_passthrough_true(self, getkey):
+    @staticmethod
+    def test_use_passthrough_true(getkey):
         """Test that use_passthrough=True creates linear_xu layer."""
         layer = PICNNLayer(
             y_in_size=3,
@@ -790,7 +871,8 @@ class TestPICNNLayer:
         assert isinstance(layer.linear_y, InputSplitLinear)
         assert len(layer.linear_y.weights) == 3
 
-    def test_use_passthrough_false(self, getkey):
+    @staticmethod
+    def test_use_passthrough_false(getkey):
         """Test that use_passthrough=False does not create linear_xu."""
         layer = PICNNLayer(
             y_in_size=3,
@@ -809,7 +891,8 @@ class TestPICNNLayer:
         assert isinstance(layer.linear_y, InputSplitLinear)
         assert len(layer.linear_y.weights) == 2
 
-    def test_use_bias_true(self, getkey):
+    @staticmethod
+    def test_use_bias_true(getkey):
         """Test that use_bias=True adds bias to linear_y."""
         layer = PICNNLayer(
             y_in_size=3,
@@ -825,7 +908,8 @@ class TestPICNNLayer:
         assert layer.linear_y.use_bias is True
         assert layer.linear_y.bias is not None
 
-    def test_use_bias_false(self, getkey):
+    @staticmethod
+    def test_use_bias_false(getkey):
         """Test that use_bias=False removes bias from linear_y."""
         layer = PICNNLayer(
             y_in_size=3,
@@ -841,7 +925,8 @@ class TestPICNNLayer:
         assert layer.linear_y.use_bias is False
         assert layer.linear_y.bias is None
 
-    def test_batched_call_single_batch(self, getkey, allow_rank_promotion):
+    @staticmethod
+    def test_batched_call_single_batch(getkey, allow_rank_promotion):
         """Test that the layer supports batched calls (single batch dim)."""
         layer = klax.finalize(
             PICNNLayer(
@@ -864,9 +949,8 @@ class TestPICNNLayer:
         assert u_out.shape == (batch_size, 6)
         assert x_out.shape == (batch_size, 4)
 
-    def test_batched_call_multiple_batch_dims(
-        self, getkey, allow_rank_promotion
-    ):
+    @staticmethod
+    def test_batched_call_multiple_batch_dims(getkey, allow_rank_promotion):
         """Test that the layer supports multiple batch dimensions."""
         layer = klax.finalize(
             PICNNLayer(
@@ -889,7 +973,8 @@ class TestPICNNLayer:
         assert u_out.shape == batch_shape + (6,)
         assert x_out.shape == batch_shape + (4,)
 
-    def test_custom_activations(self, getkey):
+    @staticmethod
+    def test_custom_activations(getkey):
         """Test that custom activation functions work correctly."""
         layer = klax.finalize(
             PICNNLayer(
@@ -917,7 +1002,8 @@ class TestPICNNLayer:
         assert x_out.shape == (4,)
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
-    def test_dtype_preservation(self, dtype, getkey):
+    @staticmethod
+    def test_dtype_preservation(dtype, getkey):
         """Test that the layer preserves the specified dtype."""
         layer = klax.finalize(
             PICNNLayer(
@@ -940,7 +1026,8 @@ class TestPICNNLayer:
         assert u_out.dtype == dtype
         assert x_out.dtype == dtype
 
-    def test_x_passthrough_unchanged(self, getkey):
+    @staticmethod
+    def test_x_passthrough_unchanged(getkey):
         """Test that x is passed through unchanged."""
         layer = klax.finalize(
             PICNNLayer(
@@ -957,11 +1044,12 @@ class TestPICNNLayer:
         u = jrandom.normal(getkey(), (2,))
         x = jrandom.normal(getkey(), (4,))
 
-        y_out, u_out, x_out = layer(y, u, x)
+        _, _, x_out = layer(y, u, x)
         # x should be returned unchanged
         assert jnp.allclose(x_out, x)
 
-    def test_interconnect_initialization(self, getkey):
+    @staticmethod
+    def test_interconnect_initialization(getkey):
         """Test custom interconnect weight and bias initialization."""
         layer = PICNNLayer(
             y_in_size=3,
@@ -979,9 +1067,8 @@ class TestPICNNLayer:
         if layer.use_passthrough:
             assert layer.linear_xu is not None
 
-    def test_trainable_activation_functions(
-        self, getkey, allow_rank_promotion
-    ):
+    @staticmethod
+    def test_trainable_activation_functions(getkey, allow_rank_promotion):
         """Test that each neuron's activation receives independent parameter updates.
 
         This test verifies that when using learnable activation functions with vmapped
@@ -1019,7 +1106,7 @@ class TestPICNNLayer:
         # Create a simple loss function that is sensitive to individual neuron outputs
         def loss_fn(layer, y, u, x):
             layer = klax.unwrap(layer)
-            y_out, u_out, x_out = layer(y, u, x)
+            y_out, _, _ = layer(y, u, x)
             targets = jnp.array([1.0, -1.0, 0.5, -0.5, 2.0])
             return jnp.mean((y_out - targets) ** 2)
 
@@ -1039,6 +1126,11 @@ class TestPICNNLayer:
         assert grads.activation_xu.bias.shape == (4,)
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.nn.PICNN
+# ===---------------------------------------------------------------------=== #
+
+
 class TestPICNN:
     """Test suite for the PICNN implementation.
 
@@ -1046,7 +1138,8 @@ class TestPICNN:
     PICNNLayer tests, such as stacking multiple layers and composition.
     """
 
-    def test_scalar_sizes(self, getkey):
+    @staticmethod
+    def test_scalar_sizes(getkey):
         """Test PICNN with scalar input/output sizes."""
         picnn = klax.finalize(
             PICNN(
@@ -1073,7 +1166,8 @@ class TestPICNN:
             [(3, 4), (5, 6), (7, 8), (9, 10)],
         ],
     )
-    def test_different_width_sizes(self, width_sizes, getkey):
+    @staticmethod
+    def test_different_width_sizes(width_sizes, getkey):
         """Test PICNN with various width size configurations."""
         picnn = klax.finalize(
             PICNN(
@@ -1093,7 +1187,8 @@ class TestPICNN:
         assert jnp.isfinite(y).all()
 
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
-    def test_dtype_preservation(self, dtype, getkey):
+    @staticmethod
+    def test_dtype_preservation(dtype, getkey):
         """Test that PICNN preserves specified dtype across layers."""
         picnn = klax.finalize(
             PICNN(
@@ -1112,7 +1207,8 @@ class TestPICNN:
         y = picnn(x, p)
         assert y.dtype == dtype
 
-    def test_batched_inputs(self, getkey, allow_rank_promotion):
+    @staticmethod
+    def test_batched_inputs(getkey, allow_rank_promotion):
         """Test that PICNN handles batched inputs correctly."""
         picnn = klax.finalize(
             PICNN(
@@ -1132,7 +1228,8 @@ class TestPICNN:
         assert y.shape == (batch_size, 2)
 
     @pytest.mark.parametrize("use_passthrough", [True, False])
-    def test_use_passthrough(self, use_passthrough, getkey):
+    @staticmethod
+    def test_use_passthrough(use_passthrough, getkey):
         """Test PICNN with and without use_passthrough."""
         picnn = PICNN(
             x_size=3,
@@ -1149,7 +1246,8 @@ class TestPICNN:
 
     @pytest.mark.parametrize("use_bias", [True, False])
     @pytest.mark.parametrize("use_final_bias", [True, False])
-    def test_use_bias_configurations(self, use_bias, use_final_bias, getkey):
+    @staticmethod
+    def test_use_bias_configurations(use_bias, use_final_bias, getkey):
         """Test PICNN with different bias configurations."""
         picnn = PICNN(
             x_size=3,
@@ -1167,7 +1265,8 @@ class TestPICNN:
         assert picnn.layers[-1].use_bias is use_final_bias
 
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    def test_non_decreasing_property(self, non_decreasing, getkey):
+    @staticmethod
+    def test_non_decreasing_property(non_decreasing, getkey):
         """Test PICNN with non_decreasing=True."""
         picnn = PICNN(
             x_size=2,
@@ -1186,7 +1285,8 @@ class TestPICNN:
         for layer in picnn.layers:
             assert layer.nonnegative_passthrough is non_decreasing
 
-    def test_custom_activations(self, getkey):
+    @staticmethod
+    def test_custom_activations(getkey):
         """Test PICNN with custom activation functions."""
         picnn = klax.finalize(
             PICNN(
@@ -1210,7 +1310,8 @@ class TestPICNN:
         assert y.shape == (2,)
         assert jnp.isfinite(y).all()
 
-    def test_layer_count(self, getkey):
+    @staticmethod
+    def test_layer_count(getkey):
         """Test that PICNN creates correct number of layers."""
         width_sizes = [(4, 5), (6, 7), (8, 9)]
         picnn = PICNN(
@@ -1225,7 +1326,8 @@ class TestPICNN:
 
     @pytest.mark.parametrize("use_passthrough", [True, False])
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    def test_convexity(self, use_passthrough, non_decreasing, getkey):
+    @staticmethod
+    def test_convexity(use_passthrough, non_decreasing, getkey):
         x = jrandom.normal(getkey(), (10, 5))
         p = jrandom.normal(getkey(), (10, 2))
         picnn = klax.finalize(
@@ -1254,7 +1356,8 @@ class TestPICNN:
 
     @pytest.mark.parametrize("use_passthrough", [True, False])
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    def test_initial_gradients(self, use_passthrough, non_decreasing, getkey):
+    @staticmethod
+    def test_initial_gradients(use_passthrough, non_decreasing, getkey):
         x = jrandom.normal(getkey(), (10, 5))
         p = jrandom.normal(getkey(), (10, 2))
 

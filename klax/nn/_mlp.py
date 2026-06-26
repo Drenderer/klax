@@ -27,7 +27,7 @@ import jax.random as jrandom
 from jax.nn.initializers import he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
-from .._initializers import Initializer
+from .._initializers import SupportedInitializer
 from .._misc import default_floating_dtype
 from .._wrappers import Constraint, Unwrappable
 from ._linear import Linear
@@ -56,8 +56,8 @@ class MLP(eqx.Module, strict=True):
         in_size: int | Literal["scalar"],
         out_size: int | Literal["scalar"],
         width_sizes: Sequence[int],
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -76,8 +76,8 @@ class MLP(eqx.Module, strict=True):
             out_size: The output size. The output from the module will be a
                 vector of shape `(out_features,)`.
             width_sizes: The sizes of each hidden layer in a list.
-            weight_init: The weight initializer of type `Initializer`.
-            bias_init: The bias initializer of type `Initializer`.
+            weight_init: The weight initializer of type `SupportedInitializer`.
+            bias_init: The bias initializer of type `SupportedInitializer`.
             activation: The activation function after each hidden layer.
             final_activation: The activation function after the output layer.
             use_bias: Whether to add on a bias to internal layers.
