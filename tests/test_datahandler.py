@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -77,10 +79,10 @@ class TestBatchData:
         # Test TypeError if the no 'str' type 'batch_axes' is assigned.
         with pytest.raises(
             TypeError,
-            match=(
-                f"batch_axes spec for an xarray leaf must be a `str` dim name, "
-                f"got int (0). "
-                f"Available dims: ('batch',)"
+            match=re.escape(
+                "batch_axes spec for an xarray leaf must be a `str` dim name, "
+                "got int (0). "
+                "Available dims: ('batch',)"
             ),
         ):
             generator = klax.batch_data(data, batch_size=32, key=getkey())
