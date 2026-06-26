@@ -18,21 +18,51 @@ import jax.numpy as jnp
 import jax.random as jrandom
 import pytest
 from jax.nn.initializers import he_normal, uniform
+from jaxtyping import Array
 
 import klax
 from klax.nn import (
     FICNN,
     MLP,
+    PICNN,
     ConstantMatrix,
     ConstantSkewSymmetricMatrix,
     ConstantSPDMatrix,
+    FICNNLayer,
     InputSplitLinear,
     Linear,
     Matrix,
+    PICNNLayer,
     SkewSymmetricMatrix,
     SPDMatrix,
 )
-from klax.nn._icnn import PICNN, FICNNLayer, PICNNLayer
+
+
+@pytest.fixture
+def allow_rank_promotion():
+    """Disable the jax_numpy_rank_promotion for the current test."""
+    old = jax.config.jax_numpy_rank_promotion
+    jax.config.update("jax_numpy_rank_promotion", "allow")
+    try:
+        yield
+    finally:
+        jax.config.update("jax_numpy_rank_promotion", old)
+
+
+@pytest.fixture
+def getzerowrap():
+    import klax
+
+    class ZeroWrapper(klax.Unwrappable[Array]):
+        """A dummy wrapper that sets all parameters to zero."""
+
+        parameter: Array
+
+        def unwrap(self) -> Array:
+            return jnp.zeros_like(self.parameter)
+
+    return ZeroWrapper
+
 
 # ===---------------------------------------------------------------------=== #
 # klax.nn.Linear
