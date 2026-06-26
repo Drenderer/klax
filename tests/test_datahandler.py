@@ -23,11 +23,130 @@ import pytest
 
 import klax
 from klax._compat import HAS_XARRAY, get_xarray
+from klax._datahandler import broadcast_and_get_size
 
 # ===---------------------------------------------------------------------=== #
 # klax.broadcast_and_get_size
 # ===---------------------------------------------------------------------=== #
-# TODO: test this function separately from the following ones
+
+
+class TestBroadcastAndGetSize:
+    @staticmethod
+    def test_single_array_default_axis(getkey):
+        data = jrandom.uniform(getkey(), (64, 3))
+        axes, size = broadcast_and_get_size(data, 0)
+        assert axes == 0
+        assert size == 64
+
+    @staticmethod
+    def test_prefix_broadcast_over_nested_pytree(getkey):
+        x = jrandom.uniform(getkey(), (10, 2))
+        data = (x, {"a": x, "b": x})
+        axes, size = broadcast_and_get_size(data, 0)
+        assert axes == (0, {"a": 0, "b": 0})
+        assert size == 10
+
+    @staticmethod
+    def test_non_array_leaf_with_int_spec_becomes_none(getkey):
+        x = jrandom.uniform(getkey(), (8,))
+        data = (x, 1.0, "meta")
+        axes, size = broadcast_and_get_size(data, 0)
+        assert axes == (0, None, None)
+        assert size == 8
+
+    @staticmethod
+    def test_none_spec_skips_leaf(getkey):
+        x = jrandom.uniform(getkey(), (4,))
+        y = jrandom.uniform(getkey(), (10,))
+        data = (x, y)
+        axes, size = broadcast_and_get_size(data, (None, 0))
+        assert axes == (None, 0)
+        assert size == 10
+
+    @staticmethod
+    def test_all_none_yields_singleton_size():
+        axes, size = broadcast_and_get_size((1.0, "foo"), None)
+        assert axes == (None, None)
+        assert size == 1
+
+    @staticmethod
+    def test_non_default_positional_axis(getkey):
+        x = jrandom.uniform(getkey(), (3, 10, 2))
+        axes, size = broadcast_and_get_size(x, 1)
+        assert axes == 1
+        assert size == 10
+
+    @staticmethod
+    def test_mismatched_batch_sizes_raises(getkey):
+        data = (
+            jrandom.uniform(getkey(), (10,)),
+            jrandom.uniform(getkey(), (5,)),
+        )
+        with pytest.raises(
+            ValueError,
+            match="All batched arrays must have equal batch sizes.",
+        ):
+            broadcast_and_get_size(data, 0)
+
+    @staticmethod
+    def test_str_spec_on_non_xarray_leaf_raises(getkey):
+        data = jrandom.uniform(getkey(), (8,))
+        with pytest.raises(
+            TypeError,
+            match="String dim names are only valid for xarray leaves",
+        ):
+            broadcast_and_get_size(data, "batch")
+
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
+    @staticmethod
+    def test_xarray_leaf_with_str_spec(getkey):
+        xr, _ = get_xarray()
+        data = xr.DataArray(
+            jrandom.uniform(getkey(), (64,)),
+            coords={"batch": jnp.arange(64)},
+            dims="batch",
+        )
+        axes, size = broadcast_and_get_size(data, "batch")
+        assert axes == "batch"
+        assert size == 64
+
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
+    @staticmethod
+    def test_xarray_leaf_with_int_spec_raises(getkey):
+        xr, _ = get_xarray()
+        data = xr.DataArray(
+            jrandom.uniform(getkey(), (64,)),
+            coords={"batch": jnp.arange(64)},
+            dims="batch",
+        )
+        with pytest.raises(
+            TypeError,
+            match=re.escape(
+                "batch_axes spec for an xarray leaf must be a `str` dim name, "
+                "got int (0). "
+                "Available dims: ('batch',)"
+            ),
+        ):
+            broadcast_and_get_size(data, 0)
+
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
+    @staticmethod
+    def test_xarray_leaf_with_unknown_dim_raises(getkey):
+        xr, _ = get_xarray()
+        data = xr.DataArray(
+            jrandom.uniform(getkey(), (64,)),
+            coords={"batch": jnp.arange(64)},
+            dims="batch",
+        )
+        with pytest.raises(
+            ValueError,
+            match=re.escape(
+                "Dim 'nope' not present on xarray leaf. "
+                "Available dims: ('batch',)"
+            ),
+        ):
+            broadcast_and_get_size(data, "nope")
+
 
 # ===---------------------------------------------------------------------=== #
 # klax.batch_data
