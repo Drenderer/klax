@@ -348,3 +348,28 @@ class TestFit:
         )
 
         assert history.content["loss"][1] == ["A"]
+
+    def test_vmap_training(self, getkey):
+        # Create ensemble of models
+        keys = jr.split(getkey(), 3)
+
+        @eqx.filter_vmap
+        def make_ensemble(key):
+            return klax.nn.FICNN("scalar", "scalar", [4, 4], key=key)
+
+        model_ensemble = make_ensemble(keys)
+
+        # Create simple data
+        x = jr.uniform(getkey(), (20,))
+        y = jr.uniform(getkey(), (20,))
+
+        trained_ensemble, history = klax.fit(
+            model_ensemble,
+            (x, y),
+            batch_size=5,
+            steps=4,
+            loss=klax.mse,
+            optimizer=optax.sgd(0.1),
+            vmap_ensemble=True,
+            key=getkey(),
+        )
