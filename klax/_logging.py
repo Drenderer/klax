@@ -15,6 +15,7 @@
 """Utilities for logging during training."""
 
 import pickle
+import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from time import time
@@ -24,17 +25,10 @@ import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray, PyTree
 
-from klax._callbacks import Callback
-from klax._datahandler import Batcher
-from klax._trainstate import TrainingContext
-
-try:
-    from tqdm.auto import tqdm
-
-    _TQDM_AVAILABLE = True
-except ImportError:
-    tqdm = None
-    _TQDM_AVAILABLE = False
+from ._callbacks import Callback
+from ._compat import HAS_TQDM, get_plot, get_tqdm
+from ._datahandler import Batcher
+from ._trainstate import TrainingContext
 
 
 class Metric(Protocol):
@@ -94,7 +88,7 @@ class BatchMetric:
         data: PyTree[Any, "T"],
         batcher: Batcher,
         batch_size: int,
-        batch_axes: PyTree[int | None, "T ..."] = 0,  # type: ignore
+        batch_axes: PyTree[int | str | None, "T ..."] = 0,
         verbose: bool = False,
         jit_compile: bool = True,
         *,
@@ -250,14 +244,7 @@ class History:
             ImportError: If matplotlib is not installed.
 
         """
-        try:
-            import matplotlib.pyplot as plt
-        except ImportError as e:
-            raise ImportError(
-                "Failed to import matplotlib. Install it with: "
-                "pip install klax[plotting]. "
-                f"Original error: {str(e)}"
-            )
+        plt = get_plot()
 
         if ax is None:
             _, ax = plt.subplots()
@@ -303,7 +290,7 @@ class MetricLogger(Callback):
     log_every: int
     metrics: dict[str, Metric]
     steps_str_length: int = 0
-    verbose: Literal[0, 1, 2]
+    _verbose: Literal[0, 1, 2]
     start_time: float = 0.0
     progress_bar: bool
     tqdm_bar: Any = None
@@ -332,12 +319,14 @@ class MetricLogger(Callback):
         self.metrics = {} if metrics is None else {m.name: m for m in metrics}
         self.log_every = log_every
         self.history = History() if history is None else history
-        self.verbose = verbose
-        if (verbose == 2) and not _TQDM_AVAILABLE:
-            print(
-                "Warning: tqdm for progress bar not installed. Changing verbosity level to 1."
+        self._verbose = verbose
+        if (verbose == 2) and not HAS_TQDM:
+            warnings.warn(
+                "tqdm for progress bar not installed. "
+                "Falling back to verbosity level 1.",
+                category=ImportWarning,
             )
-            self.verbose = 1
+            self._verbose = 1
 
     def add_metric(self, metric: Metric) -> None:
         """Add a metric to be logged during training.
@@ -365,16 +354,16 @@ class MetricLogger(Callback):
                 self.history.append(
                     context.state.step, metric.name, metric_value
                 )
-                if self.verbose and metric.verbose:
+                if self._verbose and metric.verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
                     except TypeError:
                         formatted_value = str(metric_value)
                     message.append(f"{metric.name}: {formatted_value}")
 
-            if self.verbose:
+            if self._verbose:
                 postfix = ", ".join(message)
-                if self.verbose > 1:
+                if self._verbose > 1:
                     self.tqdm_bar.set_postfix_str(postfix)
                     if context.state.step != 0:
                         self.tqdm_bar.update(self.log_every)
@@ -388,7 +377,8 @@ class MetricLogger(Callback):
         self.start_time = time()
         self.steps_str_length = len(str(context.steps))
 
-        if self.verbose > 1:
+        if self._verbose > 1:
+            tqdm = get_tqdm()
             self.tqdm_bar = tqdm(total=context.steps, dynamic_ncols=True)
 
         self.on_training_step(context)
@@ -399,8 +389,9 @@ class MetricLogger(Callback):
         self.history.total_steps = context.state.step
         self.history.final_opt_state = context.state.opt_state
 
-        if self.verbose > 1:
+        if self._verbose > 1:
             try:
                 self.tqdm_bar.close()
-            except Exception as e:
+            # TODO: Done make this a blanket exception
+            except Exception:
                 pass
