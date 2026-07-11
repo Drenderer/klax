@@ -361,6 +361,7 @@ class TestFICNNLayer:
         assert y_out.shape == (5,)
         assert x_out.shape == (4,)
 
+    @staticmethod
     @pytest.mark.parametrize(
         "nonnegative_y_weight, expected_type",
         [
@@ -368,7 +369,6 @@ class TestFICNNLayer:
             pytest.param(True, klax.NonNegative, id="with_wrapper"),
         ],
     )
-    @staticmethod
     def test_nonnegative_y_weight(nonnegative_y_weight, expected_type, getkey):
         layer = FICNNLayer(
             y_in_size=3,
@@ -501,8 +501,8 @@ class TestFICNNLayer:
         assert y_out.shape == (5,)
         assert x_out.shape == (4,)
 
-    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     @staticmethod
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     def test_dtype_preservation(dtype, getkey):
         """Test that the layer preserves the specified dtype."""
         layer = klax.finalize(
@@ -620,6 +620,7 @@ class TestFICNN:
         y = ficnn(x)
         assert y.shape == ()
 
+    @staticmethod
     @pytest.mark.parametrize(
         "width_sizes",
         [
@@ -628,7 +629,6 @@ class TestFICNN:
             [],
         ],
     )
-    @staticmethod
     def test_different_width_sizes(width_sizes, getkey):
         """Test FICNN with various width size configurations."""
         ficnn = klax.finalize(
@@ -646,8 +646,8 @@ class TestFICNN:
         assert y.shape == (1,)
         assert jnp.isfinite(y).all()
 
-    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     @staticmethod
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     def test_dtype_preservation(dtype, getkey):
         """Test that FICNN preserves specified dtype across layers."""
         ficnn = klax.finalize(
@@ -683,8 +683,8 @@ class TestFICNN:
         y = ficnn(x)
         assert y.shape == (batch_size, 2)
 
-    @pytest.mark.parametrize("use_passthrough", [True, False])
     @staticmethod
+    @pytest.mark.parametrize("use_passthrough", [True, False])
     def test_use_passthrough(use_passthrough, getkey):
         """Test FICNN with and without use_passthrough."""
         ficnn = FICNN(
@@ -699,9 +699,9 @@ class TestFICNN:
         for layer in ficnn.layers[1:]:
             assert layer.use_passthrough is use_passthrough
 
+    @staticmethod
     @pytest.mark.parametrize("use_bias", [True, False])
     @pytest.mark.parametrize("use_final_bias", [True, False])
-    @staticmethod
     def test_use_bias_configurations(use_bias, use_final_bias, getkey):
         """Test FICNN with different bias configurations."""
         ficnn = FICNN(
@@ -718,8 +718,8 @@ class TestFICNN:
             assert layer.use_bias is use_bias
         assert ficnn.layers[-1].use_bias is use_final_bias
 
-    @pytest.mark.parametrize("non_decreasing", [True, False])
     @staticmethod
+    @pytest.mark.parametrize("non_decreasing", [True, False])
     def test_non_decreasing_property(non_decreasing, getkey):
         """Test that non_decreasing is applied properly."""
         ficnn = FICNN(
@@ -771,9 +771,9 @@ class TestFICNN:
 
         assert len(ficnn.layers) == len(width_sizes) + 1
 
+    @staticmethod
     @pytest.mark.parametrize("use_passthrough", [True, False])
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    @staticmethod
     def test_convexity(use_passthrough, non_decreasing, getkey):
         x = jrandom.normal(getkey(), (10, 5))
         ficnn = klax.finalize(
@@ -828,6 +828,7 @@ class TestPICNNLayer:
         assert u_out.shape == (6,)
         assert x_out.shape == (4,)
 
+    @staticmethod
     @pytest.mark.parametrize(
         "nonnegative_y_weight, expected_type",
         [
@@ -835,7 +836,6 @@ class TestPICNNLayer:
             pytest.param(True, klax.NonNegative, id="with_wrapper"),
         ],
     )
-    @staticmethod
     def test_nonnegative_y_weight(nonnegative_y_weight, expected_type, getkey):
         layer = PICNNLayer(
             y_in_size=3,
@@ -1001,8 +1001,8 @@ class TestPICNNLayer:
         assert u_out.shape == (6,)
         assert x_out.shape == (4,)
 
-    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     @staticmethod
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     def test_dtype_preservation(dtype, getkey):
         """Test that the layer preserves the specified dtype."""
         layer = klax.finalize(
@@ -1157,6 +1157,7 @@ class TestPICNN:
         y = picnn(x, p)
         assert y.shape == ()
 
+    @staticmethod
     @pytest.mark.parametrize(
         "width_sizes",
         [
@@ -1166,7 +1167,6 @@ class TestPICNN:
             [(3, 4), (5, 6), (7, 8), (9, 10)],
         ],
     )
-    @staticmethod
     def test_different_width_sizes(width_sizes, getkey):
         """Test PICNN with various width size configurations."""
         picnn = klax.finalize(
@@ -1186,8 +1186,8 @@ class TestPICNN:
         assert y.shape == (1,)
         assert jnp.isfinite(y).all()
 
-    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     @staticmethod
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
     def test_dtype_preservation(dtype, getkey):
         """Test that PICNN preserves specified dtype across layers."""
         picnn = klax.finalize(
@@ -1227,8 +1227,8 @@ class TestPICNN:
         y = picnn(x, p)
         assert y.shape == (batch_size, 2)
 
-    @pytest.mark.parametrize("use_passthrough", [True, False])
     @staticmethod
+    @pytest.mark.parametrize("use_passthrough", [True, False])
     def test_use_passthrough(use_passthrough, getkey):
         """Test PICNN with and without use_passthrough."""
         picnn = PICNN(
@@ -1244,9 +1244,9 @@ class TestPICNN:
         for layer in picnn.layers[1:]:
             assert layer.use_passthrough is use_passthrough
 
+    @staticmethod
     @pytest.mark.parametrize("use_bias", [True, False])
     @pytest.mark.parametrize("use_final_bias", [True, False])
-    @staticmethod
     def test_use_bias_configurations(use_bias, use_final_bias, getkey):
         """Test PICNN with different bias configurations."""
         picnn = PICNN(
@@ -1264,8 +1264,8 @@ class TestPICNN:
             assert layer.use_bias is use_bias
         assert picnn.layers[-1].use_bias is use_final_bias
 
-    @pytest.mark.parametrize("non_decreasing", [True, False])
     @staticmethod
+    @pytest.mark.parametrize("non_decreasing", [True, False])
     def test_non_decreasing_property(non_decreasing, getkey):
         """Test PICNN with non_decreasing=True."""
         picnn = PICNN(
@@ -1324,9 +1324,9 @@ class TestPICNN:
 
         assert len(picnn.layers) == len(width_sizes) + 1
 
+    @staticmethod
     @pytest.mark.parametrize("use_passthrough", [True, False])
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    @staticmethod
     def test_convexity(use_passthrough, non_decreasing, getkey):
         x = jrandom.normal(getkey(), (10, 5))
         p = jrandom.normal(getkey(), (10, 2))
@@ -1354,9 +1354,9 @@ class TestPICNN:
         hessian_fun = jax.vmap(jax.hessian(picnn))
         assert jnp.all(jnp.linalg.eigvals(hessian_fun(x, p)) > -1e-6)
 
+    @staticmethod
     @pytest.mark.parametrize("use_passthrough", [True, False])
     @pytest.mark.parametrize("non_decreasing", [True, False])
-    @staticmethod
     def test_initial_gradients(use_passthrough, non_decreasing, getkey):
         x = jrandom.normal(getkey(), (10, 5))
         p = jrandom.normal(getkey(), (10, 2))
