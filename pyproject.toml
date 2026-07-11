@@ -53,6 +53,7 @@ tqdm = [
 dev = [
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
+    "pytest-benchmark>=5.2.3",
     "ruff>=0.11.10",
     "ty>=0.0.53",
 ]
@@ -67,6 +68,9 @@ packages = ["klax"]
 [tool.pytest.ini_options]
 addopts = "-p no:faulthandler"
 testpaths = ["tests"]
+markers = [
+    "benchmark: marks tests as performance benchmarks (deselect with '-m \"not benchmark\"')",
+]
 
 [tool.ruff]
 line-length = 79

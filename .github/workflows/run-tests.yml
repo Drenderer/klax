@@ -29,9 +29,9 @@ jobs:
           uv run pre-commit install
           uv run pre-commit run --all-files
 
-      - name: Test with pytest
+      - name: Test with pytest (excluding benchmarks)
         run: |
-          uv run --frozen pytest
+          uv run --frozen pytest -m "not benchmark"
 
       - name: Try building the docs
         run: |
