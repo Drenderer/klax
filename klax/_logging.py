@@ -352,7 +352,7 @@ class MetricLogger(Callback):
             for metric in self.metrics.values():
                 metric_value = jax.device_get(metric(context))
                 self.history.append(context.step, metric.name, metric_value)
-                if self.verbose and metric.verbose:
+                if self._verbose and metric.verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
                     except TypeError:
