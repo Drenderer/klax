@@ -11,7 +11,8 @@ bar). This is the default mechanism used by [klax.fit][] when `make_logger=True`
 
 ::: klax.Metric
     options:
-        members: false
+        members:
+            - __call__
 
 ::: klax.metric
 
