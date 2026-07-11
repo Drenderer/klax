@@ -13,6 +13,7 @@ import klax
 
 
 class TestMakeStep:
+    @staticmethod
     @pytest.mark.parametrize(
         "optimizer",
         [
@@ -33,7 +34,7 @@ class TestMakeStep:
             optax.lion(1.0),
             optax.nadam(1.0),
             optax.nadamw(1.0),
-            optax.noisy_sgd(1.0),
+            optax.noisy_sgd(1.0, key=jr.key(0)),
             optax.novograd(1.0),
             optax.optimistic_gradient_descent(1.0),
             optax.optimistic_adam(1.0),
@@ -46,7 +47,6 @@ class TestMakeStep:
             optax.yogi(1.0),
         ],
     )
-    @staticmethod
     def test_make_step_updates_state(optimizer, getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
