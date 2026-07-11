@@ -48,4 +48,4 @@ from klax import canonicalize_initializer, hoedt_bias, hoedt_normal
 def test_canonicalize_initializer(getkey, init):
     """Test all klax and jax initializers."""
     init = canonicalize_initializer(init)
-    init(getkey(), (2, 1, 3), 2)
+    init(getkey(), (2, 1, 3), 2, dtype=jax.numpy.float32)
