@@ -34,7 +34,7 @@ class TestMakeStep:
             optax.lion(1.0),
             optax.nadam(1.0),
             optax.nadamw(1.0),
-            optax.noisy_sgd(1.0),
+            optax.noisy_sgd(1.0, key=jr.key(0)),
             optax.novograd(1.0),
             optax.optimistic_gradient_descent(1.0),
             optax.optimistic_adam(1.0),
