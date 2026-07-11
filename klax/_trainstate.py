@@ -36,13 +36,11 @@ class TrainingState:
     * `opt_state`: The state of the `optax` optimizer.
     * `run_state`: The user-defined state of the training run, which is
         passed to the loss function and may be modified via callbacks.
-    * `step`: The current optimization step count of the training.
     """
 
     model: PyTree
     opt_state: PyTree
     run_state: PyTree
-    step: Int[Array, ""]
 
 
 class TrainingContext:
@@ -50,13 +48,14 @@ class TrainingContext:
 
     This includes:
 
-    * `state`: The [`TrainingState`][klax.TrainingState]
-    * `optimizer`: The optax optimizer
-    * `loss`: The [Loss][klax.Loss] function
+    * `state`: The [`TrainingState`][klax.TrainingState].
+    * `optimizer`: The optax optimizer.
+    * `loss`: The [Loss][klax.Loss] function.
     * `batch_generator`: The generator object responsible for creating data
-        batches
+        batches.
+    * `step`: The number of currently completed training steps.
     * `steps`: The total number of scheduled optimization steps for the
-        training run
+        training run.
     """
 
     _state: TrainingState | None
@@ -65,6 +64,7 @@ class TrainingContext:
     optimizer: optax.GradientTransformationExtraArgs
     loss: Loss
     batch_generator: Generator[PyTree, None, None]
+    step: int
     steps: int
 
     def __init__(
@@ -83,15 +83,14 @@ class TrainingContext:
             if not isinstance(optimizer, optax.GradientTransformationExtraArgs)
             else optimizer
         )
-        state = TrainingState(
-            model, opt_state, run_state, jnp.array(0, dtype=jnp.int32)
-        )
+        state = TrainingState(model, opt_state, run_state)
 
         self._state = state
         self._state_leaves, self._state_treedef = jax.tree.flatten(state)
         self.optimizer = optimizer
         self.loss = loss
         self.batch_generator = batch_generator
+        self.step = 0
         self.steps = steps
 
     @property
@@ -109,6 +108,7 @@ class TrainingContext:
         self._state = value
         self._state_leaves, _ = jax.tree.flatten(value)
 
-    def update_state(self, leaves):
+    def update(self, state_leaves, step):
         self._state = None
-        self._state_leaves = leaves
+        self._state_leaves = state_leaves
+        self.step = step
