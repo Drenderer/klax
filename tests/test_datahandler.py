@@ -97,8 +97,8 @@ class TestBroadcastAndGetSize:
         ):
             broadcast_and_get_size(data, "batch")
 
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     def test_xarray_leaf_with_str_spec(getkey):
         xr, _ = get_xarray()
         data = xr.DataArray(
@@ -110,8 +110,8 @@ class TestBroadcastAndGetSize:
         assert axes == "batch"
         assert size == 64
 
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     def test_xarray_leaf_with_int_spec_raises(getkey):
         xr, _ = get_xarray()
         data = xr.DataArray(
@@ -129,8 +129,8 @@ class TestBroadcastAndGetSize:
         ):
             broadcast_and_get_size(data, 0)
 
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     def test_xarray_leaf_with_unknown_dim_raises(getkey):
         xr, _ = get_xarray()
         data = xr.DataArray(
@@ -163,8 +163,8 @@ class TestBatchData:
         # Test not equal, i.e., the dataset was sorted
         assert not (data[:32] == next(generator)).all()
 
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     def test_with_xarray_data_array(getkey):
         xr, _ = get_xarray()
         data = xr.DataArray(
@@ -183,8 +183,8 @@ class TestBatchData:
         assert (data[:32] == batch).all()
         assert not (data.batch[:32].data == batch.batch.data).all()
 
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     def test_with_xarray_leaf_inside_pytree(getkey):
         xr, _ = get_xarray()
         arr = jrandom.uniform(getkey(), (64,))
@@ -392,8 +392,8 @@ class TestSplitData:
         assert len(union) == len(data)
         assert set(union.tolist()) == set(data.tolist())
 
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     @staticmethod
+    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
     def test_with_xarray_data_array(getkey):
         xr, _ = get_xarray()
         data = xr.DataArray(

@@ -13,6 +13,7 @@ import klax
 
 
 class TestMakeStep:
+    @staticmethod
     @pytest.mark.parametrize(
         "optimizer",
         [
@@ -33,7 +34,7 @@ class TestMakeStep:
             optax.lion(1.0),
             optax.nadam(1.0),
             optax.nadamw(1.0),
-            optax.noisy_sgd(1.0),
+            optax.noisy_sgd(1.0, key=jr.key(0)),
             optax.novograd(1.0),
             optax.optimistic_gradient_descent(1.0),
             optax.optimistic_adam(1.0),
@@ -46,7 +47,6 @@ class TestMakeStep:
             optax.yogi(1.0),
         ],
     )
-    @staticmethod
     def test_make_step_updates_state(optimizer, getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
@@ -54,21 +54,16 @@ class TestMakeStep:
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
 
-        state = klax.TrainingState(
-            model, opt_state, run_state=None, step=jnp.array(0.0)
-        )
+        state = klax.TrainingState(model, opt_state, run_state=None)
         state_leaves, state_treedef = jax.tree.flatten(state)
 
-        new_state_leaves, new_state_treedef = klax.make_step(
+        new_state_leaves = klax.make_step(
             state_leaves,
             state_treedef,
             batch=(x, y),
             loss=klax.mse,
             optimizer=optimizer,
         )
-
-        # State structure has not changed
-        assert new_state_treedef == state_treedef
 
         # State has changed
         assert not jax.tree.all(
@@ -97,13 +92,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.state.step)
+                self.start_steps.append(context.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -125,7 +120,9 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        context = klax.run_training_loop(context, [callback])
+        context = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
@@ -149,13 +146,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.state.step)
+                self.start_steps.append(context.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -177,7 +174,9 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        _ = klax.run_training_loop(context, [callback])
+        updated_view = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.start_steps == [0]
         assert callback.steps == []
@@ -200,11 +199,11 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
                 return True  # request stop after first step
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -226,7 +225,9 @@ class TestRunTrainingLoop:
 
         callback = StopAfterOne()
 
-        context = klax.run_training_loop(context, [callback])
+        context = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
@@ -347,3 +348,28 @@ class TestFit:
         )
 
         assert history.content["loss"][1] == ["A"]
+
+    def test_vmap_training(self, getkey):
+        # Create ensemble of models
+        keys = jr.split(getkey(), 3)
+
+        @eqx.filter_vmap
+        def make_ensemble(key):
+            return klax.nn.FICNN("scalar", "scalar", [4, 4], key=key)
+
+        model_ensemble = make_ensemble(keys)
+
+        # Create simple data
+        x = jr.uniform(getkey(), (20,))
+        y = jr.uniform(getkey(), (20,))
+
+        trained_ensemble, history = klax.fit(
+            model_ensemble,
+            (x, y),
+            batch_size=5,
+            steps=4,
+            loss=klax.mse,
+            optimizer=optax.sgd(0.1),
+            vmap_ensemble=True,
+            key=getkey(),
+        )

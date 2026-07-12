@@ -99,6 +99,7 @@ nav:
   - Klax: index.md
   - Examples:
       - examples/isotropic_hyperelasticity.ipynb
+      - examples/ensemble_training.ipynb
       - examples/training_without_data.ipynb
       - examples/sample_weighting.ipynb
   - API Reference:

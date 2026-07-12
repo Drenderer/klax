@@ -22,7 +22,7 @@ def get_bias(context):
 
 class ResetBias(klax.Callback):
     def on_training_step(self, context):
-        if context.state.step % 1000 == 0:
+        if context.step % 1000 == 0:
             context.state.model = eqx.tree_at(
                 lambda m: m.layers[0].bias,
                 context.state.model,

@@ -14,7 +14,7 @@
 
 """Implements a basic training loop."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import equinox as eqx
@@ -34,20 +34,19 @@ from ._wrappers import apply
 
 type Leaf = Any
 
+param_spec = eqx.is_inexact_array
 
-@eqx.filter_jit
+
 def make_step(
     state_leaves: list[Leaf],
     state_treedef: Any,
     batch: PyTree,
     loss: Loss,
     optimizer: optax.GradientTransformationExtraArgs,
-) -> tuple[list[Leaf], Any]:
+) -> list[Leaf]:
     state = jax.tree.unflatten(state_treedef, state_leaves)
 
-    model_params, model_static = eqx.partition(
-        state.model, eqx.is_inexact_array
-    )
+    model_params, model_static = eqx.partition(state.model, param_spec)
     value, grad = loss.value_and_grad(state.model, batch, state.run_state)
     updates, opt_state = optimizer.update(
         grad,
@@ -68,16 +67,16 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    step = state.step + 1
+    state = TrainingState(model, opt_state, state.run_state)
+    state_leaves, _ = jax.tree.flatten(state)
 
-    state = TrainingState(model, opt_state, state.run_state, step)
-
-    return jax.tree.flatten(state)
+    return state_leaves
 
 
 def run_training_loop(
     context: TrainingContext,
     callbacks: Sequence[Callback],
+    step_function: Callable,
 ) -> TrainingContext:
     state_leaves = context._state_leaves
     state_treedef = context._state_treedef
@@ -86,17 +85,18 @@ def run_training_loop(
         callback.on_training_start(context)
 
     for batch in context.batch_generator:
-        if context.state.step >= context.steps:
+        if context.step >= context.steps:
             break
 
-        state_leaves, _ = make_step(
+        state_leaves = step_function(
             state_leaves,
             state_treedef,
             batch,
             context.loss,
             context.optimizer,
         )
-        context.update_state(state_leaves)
+        step = context.step + 1
+        context.update(state_leaves, step)
 
         stop = False
         for callback in callbacks:
@@ -129,6 +129,8 @@ def fit[T: eqx.Module](
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
+    jit_compile: bool = True,
+    vmap_ensemble: bool = False,
     key: PRNGKeyArray,
 ) -> tuple[T, History | None]:
     """Train a model using an optimizer from optax.
@@ -154,14 +156,13 @@ def fit[T: eqx.Module](
             arrays in `data` are batch dimensions. xarray leaves require
             an explicit `str` dim name.)
 
-            Example: For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
-            where `x` has  shape `(100, 32)`, `y1` has shape `(100,)`
-            and `y2` has shape `(10, 100)`, the appropriate `batch_axes`
-            would be `batch_axes = (0, (0, 1, None))` indicating that
-            the batch axis for `x` is the first axis (0), for `y1` also
-            the first axis (0), for `y2` the second axis (1) and for the
-            string there is no batch axis (`None`).
-            Defaults to `0`.
+            !!!Example
+                For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
+                where `x` has  shape `(32, 100)`, `y1` has shape `(100,)`
+                and `y2` has shape `(100, 10)`, an appropriate `batch_axes`
+                would be `batch_axes = (1, 0, None)` indicating that
+                the batch axis for `x` is the second axis, for `y1` and `y2`
+                the first axis and that there is no batch axis for the string.
         run_state: Auxiliary runtime state, that is passed to the loss function.
             Can be updated via callbacks.
             Defaults to `None`.
@@ -209,6 +210,39 @@ def fit[T: eqx.Module](
             implement early stopping, custom logging and more. The argument
             to the callback function is aCallbackArgs object.
             Defaults to `None`.
+        jit_compile: Wether to compile the function that computes the gradient
+            update step (this includes the loss function). You generally want
+            this to be `True`. However, in cases where the loss function itself
+            is not jit-able (e.g., when computing different parts of the
+            loss on different hardware, such as GPU and CPU) it might be
+            advantageous to have more fine grained control over the compilation.
+        vmap_ensemble: If true, the step function and optimizer state
+            initialization are vmapped across the leading axis of the arrays in
+            the [`TrainingState`][klax.TrainingState], i.e., model, optimizer
+            state and run state.
+            This is useful to train multiple instances of the same model
+            (ensemble) in a single call to `fit`.
+
+            !!!Note
+                The batcher is **not** vmapped, meaning that all models in the
+                ensemble will receive identical batches of data.
+
+            !!!Example
+                ```python
+                    @eqx.filter_vmap
+                    def make_mlp_ensemble(key):
+                        return klax.nn.MLP("scalar", "scalar", [16, 16], key=key)
+
+                    mlp_ensemble = make_ensemble(jr.split(key, 10))
+
+                    mlp_ensemble, history = klax.fit(mlp_ensemble, ..., vmap_ensemble=True, ...)
+
+                    @eqx.filter_vmap(in_axes=(eqx.if_array(0), None))
+                    def evaluate_ensemble(ensemble, x):
+                        return ensemble(x)
+
+                    evaluate_ensemble(mlp_ensemble, jax.random.normal(key, (2,)))
+                ```
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation.
 
@@ -219,11 +253,23 @@ def fit[T: eqx.Module](
         The returned history will be `None` if `make_logger=False`.
 
     """
+    # Transform the step function
+    step_function = make_step
+    if vmap_ensemble:
+        step_function = eqx.filter_vmap(
+            step_function, in_axes=(eqx.if_array(0), None, None, None, None)
+        )
+    if jit_compile:
+        step_function = eqx.filter_jit(step_function)
+
     if init_opt_state is None:
         # Initialize the optimizer and 'tell it' to optimize with respect to
         # all inexact arrays in the model. This is done by passing the model to
         # the optimizer.
-        opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+        if vmap_ensemble:
+            opt_state = jax.vmap(optimizer.init)(eqx.filter(model, param_spec))
+        else:
+            opt_state = optimizer.init(eqx.filter(model, param_spec))
     else:
         opt_state = init_opt_state
 
@@ -242,11 +288,16 @@ def fit[T: eqx.Module](
 
     if make_logger:
         # Initialize logging and default metrics
+        metric_func = (
+            eqx.filter_vmap(loss, in_axes=(eqx.if_array(0), None, None))
+            if vmap_ensemble
+            else loss
+        )
         _metrics = []
         _metrics.append(
             BatchMetric(
                 "loss",
-                loss,
+                metric_func,
                 data,
                 batcher,
                 batch_size,
@@ -259,7 +310,7 @@ def fit[T: eqx.Module](
             _metrics.append(
                 BatchMetric(
                     "validation_loss",
-                    loss,
+                    metric_func,
                     validation_data,
                     batcher,
                     4 * batch_size,
@@ -274,7 +325,9 @@ def fit[T: eqx.Module](
 
         callbacks.append(logger)
 
-    context = run_training_loop(context, callbacks)
+    context = run_training_loop(
+        context, callbacks, step_function=step_function
+    )
 
     model = context.state.model
 
