@@ -39,6 +39,10 @@ Issues = "https://github.com/Drenderer/klax/issues"
 [project.optional-dependencies]
 plot = ["matplotlib>=3.10.3"]
 docs = [
+    # Pin griffe to 1.x: griffe 2.x renamed the `on_package_loaded` extension
+    # hook to `on_package` and removed the old name, which silently disables
+    # hippogriffe's [source] links and base-class rendering.
+    "griffe<2",
     "hippogriffe>=0.2.2",
     "mkdocs>=1.6.1",
     "mkdocs-ipynb>=0.1.1",
