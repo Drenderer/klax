@@ -45,7 +45,14 @@ def _get_bounds(element: Any) -> list[tuple[np.ndarray, np.ndarray]]:
 
 
 class ScipyModelAdapter[T: PyTree]:
-    """Adapter to translate an equinox model into the format of scipy minimize."""
+    """Adapter to translate an equinox model into the format of scipy minimize.
+
+    The adapter provides functionality to convert an equinox model into a single
+    vector of trainable parameters and back.
+    Additionally, the bounds (allowed range) for each element in the vector are
+    computed and stored by the adapter. This is then used to inform scipy of
+    potential (non-negativity) constraints.
+    """
 
     static: PyTree
     tree_def: PyTreeDef  # pyright: ignore[reportInvalidTypeForm]
@@ -259,24 +266,27 @@ def scipy_fit[T: PyTree](
     models.
 
     Internally, this function translates from the equinox model formulation to a
-    flat vector of trainable variables with assigned min/max bounds. The loss function
-    is then wrapped to accept this vector of design parameters and evaluate the model
-    on the entire dataset. The wrapped loss and bounds are passed to `scipy.optimize.minimize`.
-    Currently, only box constraints in the form of the bounds are supported; (in-)equality
-    constraints are *not* supported.
+    flat vector of trainable variables with assigned min/max bounds. The loss
+    function is then wrapped to accept this vector of design parameters and
+    evaluate the model on the entire dataset. The wrapped loss and bounds are
+    passed to `scipy.optimize.minimize`.
+    Currently, only box constraints in the form of the bounds are supported;
+    (in-)equality constraints are *not* supported.
 
     !!! Note
-        This method optimizes the loss function evaluated on the entire dataset. For very
-        large datasets, this may become inefficient.
+        This method optimizes the loss function evaluated on the entire dataset.
+        For very large datasets, this may become inefficient.
 
     !!! Warning
-        **Compatibility**: Many klax functionalities are not, or only partially compatible
-        with `scipy_fit`.
+        **Compatibility**: Many klax functionalities are not, or only partially
+        compatible with `scipy_fit`.
 
     !!! Warning
-        **Frozen parameters**: To ensure that a parameter is not updated by `scipy_fit`
-        wrap it with [`NonTrainable`][klax.NonTrainable] (see also [`non_trainable`][klax.non_trainable]).
-        Just blocking gradients with `jax.lax.stop_gradient` is potentially not sufficient.
+        **Frozen parameters**: To ensure that a parameter is not updated by
+        `scipy_fit` wrap it with [`NonTrainable`][klax.NonTrainable]
+        (see also [`non_trainable`][klax.non_trainable]).
+        Just blocking gradients with `jax.lax.stop_gradient` is potentially not
+        sufficient.
 
     Args:
         model: The model instance, which should be trained. It must be a
@@ -287,13 +297,16 @@ def scipy_fit[T: PyTree](
             tuple `(x, y)` with model inputs `x` and model outputs `y`.
         loss: The [loss][klax.Loss] function.
             Defaults to `mse`.
-        optimizer: Type of solver. Available options: `"L-BFGS-B"` and `"SLSQP"`.
+        optimizer: Type of solver. Available options: `"L-BFGS-B"` and
+            `"SLSQP"`.
             Defaults to `"SLSQP"`.
-        options: Dict of solver specific options passed to `scipy.optimize.minimize`.
+        options: Dict of solver specific options passed to
+            `scipy.optimize.minimize`.
             All solvers accept:
 
             - `"maxiter"` (int): Maximum number of iterations to perform.
-                Depending on the method each iteration may use several function evaluations.
+                Depending on the method each iteration may use several function
+                evaluations.
                 If `options` does not contain `"maxiter"` or `options=None` then
                 klax uses the default `maxiter=1000`.
             - `"disp"` (bool): Set to True to print convergence messages.
@@ -306,8 +319,8 @@ def scipy_fit[T: PyTree](
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
             implement early stopping, custom logging and more.
             !!! Warning
-                Not all functionality of [Callbacks][klax.Callback] is available for
-                `scipy_fit`.
+                Not all functionality of [Callbacks][klax.Callback] is available
+                for `scipy_fit`.
             Defaults to `None`.
 
     Returns:
