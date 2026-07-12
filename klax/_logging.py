@@ -32,13 +32,13 @@ from ._trainstate import TrainingContext
 
 
 class Metric(Protocol):
-    """A Metric computes values that should be recorded in the training history.
+    """A metric computing values that can be recorded in the training history.
 
-    Metrics callables, that take the current [`TrainingContext`][klax.TrainingContext]
-    and return some value to be added to the training history by the
-    [`MetricLogger`][klax.MetricLogger].
-    Additionally Metrics have a `name` and `verbose` property, that determines
-    how they are logged.
+    Metrics are callables, that take the current
+    [`TrainingContext`][klax.TrainingContext] and return an arbitrary value to
+    be added to the training history by the
+    [`MetricLogger`][klax.MetricLogger]. Additionally, metrics have a `name`
+    and `verbose` property, that determines how they are logged.
     """
 
     name: str
