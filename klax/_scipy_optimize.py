@@ -128,14 +128,12 @@ class ScipyTrainingState:
     _adapter: ScipyModelAdapter
     _run_state: PyTree
     _x: np.ndarray
-    step: int
 
     def __init__(
         self, adapter: ScipyModelAdapter, run_state: PyTree, x: np.ndarray
     ) -> None:
         self._adapter = adapter
         self._run_state = run_state
-        self.step = 0
         self._x = x
         self.opt_state = None
 
@@ -148,7 +146,6 @@ class ScipyTrainingState:
         return self._run_state
 
     def update(self, xk: np.ndarray):
-        self.step += 1
         self._x = xk
 
 
@@ -158,6 +155,7 @@ class ScipyTrainingContext:
     state: ScipyTrainingState
     optimizer: str
     loss: Loss
+    step: int
     steps: int
 
     def __init__(
@@ -171,15 +169,17 @@ class ScipyTrainingContext:
     ):
         self.state = ScipyTrainingState(adapter, run_state, x)
         self.optimizer = optimizer
-        self.steps = max_steps
         self.loss = loss
+        self.step = 0
+        self.steps = max_steps
 
     @property
     def batch_generator(self):
         raise ValueError("There exists no `batch_generator` for `scipy_fit`.")
 
-    def update_state(self, xk: np.ndarray):
+    def update(self, xk: np.ndarray):
         self.state.update(xk)
+        self.step += 1
 
 
 class ScipyCallbackAdapter:
@@ -208,7 +208,7 @@ class ScipyCallbackAdapter:
             callback.on_training_start(self.context)
 
     def on_training_step(self, xk: np.ndarray):
-        self.context.update_state(xk)
+        self.context.update(xk)
         stop = False
         for callback in self.callbacks:
             stop |= bool(callback.on_training_step(self.context))

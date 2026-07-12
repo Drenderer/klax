@@ -19,6 +19,7 @@ import jax.random as jr
 import numpy as np
 import pytest
 from jax.nn.initializers import uniform
+from scipy.optimize import OptimizeResult
 
 import klax
 from klax._scipy_optimize import (
@@ -114,24 +115,6 @@ class TestScipyTrainingState:
 
         assert eqx.tree_equal(model, reconstructed)
 
-    def test_state_step_increment(self, getkey):
-        """Test that step counter increments."""
-        model = klax.nn.Linear(2, 2, uniform(), key=getkey())
-        adapter = ScipyModelAdapter(model)
-        x = adapter.flatten(model)
-
-        state = ScipyTrainingState(adapter, run_state=None, x=x)
-        assert state.step == 0
-
-        # Simulate update with a modified x
-        new_x = x + 0.1
-        from scipy.optimize import OptimizeResult
-
-        result = OptimizeResult(x=new_x, fun=1.0)
-        state.update(result)
-
-        assert state.step == 1
-
 
 class TestScipyTrainingContext:
     """Test the ScipyTrainingContext class."""
@@ -148,6 +131,19 @@ class TestScipyTrainingContext:
 
         with pytest.raises(ValueError, match="batch_generator"):
             _ = context.batch_generator
+
+    def test_update_context_increments_step(self, getkey):
+        model = klax.nn.Linear(2, 2, uniform(), key=getkey())
+        adapter = ScipyModelAdapter(model)
+        x = adapter.flatten(model)
+
+        context = ScipyTrainingContext(
+            adapter, None, "SLSQP", 100, klax.mse, x
+        )
+
+        assert context.step == 0
+        context.update(x)
+        assert context.step == 1
 
 
 class TestScipyCallbackAdapter:
@@ -191,7 +187,6 @@ class TestScipyCallbackAdapter:
         assert callback.started
 
         # Simulate training step
-        from scipy.optimize import OptimizeResult
 
         result = OptimizeResult(x=x + 0.1, fun=0.5)
         callback_adapter.on_training_step(result)
@@ -230,13 +225,11 @@ class TestScipyCallbackAdapter:
 
         callback_adapter.on_training_start()
 
-        from scipy.optimize import OptimizeResult
-
         result = OptimizeResult(x=x + 0.1, fun=0.5)
 
         # First step should not stop
         callback_adapter.on_training_step(result)
-        assert callback_adapter.context.state.step == 1
+        assert callback_adapter.context.step == 1
 
         # Second step should raise StopIteration
         with pytest.raises(StopIteration):
