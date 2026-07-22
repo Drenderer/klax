@@ -9,9 +9,9 @@ import numpy as np
 from jaxtyping import Array, PyTree, PyTreeDef
 from scipy.optimize import OptimizeResult, minimize
 
-from ._callbacks import Callback
-from ._losses import Loss
-from ._wrappers import Constraint, NonNegative, NonTrainable
+from .._callbacks import Callback
+from .._losses import Loss
+from .._wrappers import Constraint, NonNegative, NonTrainable
 
 
 def _is_static_leaf(element: Any) -> bool:

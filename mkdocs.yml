@@ -111,8 +111,9 @@ nav:
       - api/serialization.md
       - api/tools.md
       - api/initialization.md
-      - api/scipyopt.md
       - Neural Networks:
           - api/nn/linear.md
           - api/nn/mlp.md
           - api/nn/matrices.md
+      - Experimental Features:
+          - api/experimental/scipyopt.md

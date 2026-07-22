@@ -22,7 +22,7 @@ from jax.nn.initializers import uniform
 from scipy.optimize import OptimizeResult
 
 import klax
-from klax._scipy_optimize import (
+from klax.experimental._scipy_optimize import (
     ScipyCallbackAdapter,
     ScipyModelAdapter,
     ScipyTrainingContext,
