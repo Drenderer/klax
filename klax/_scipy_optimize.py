@@ -103,7 +103,7 @@ class ScipyModelAdapter[T: PyTree]:
         return jnp.concat(jax.tree.map(lambda x: x.flatten(), leafs))
 
     def unflatten(self, x: Array) -> T:
-        """Unflatten a flat array of paramters into the original model.
+        """Unflatten a flat array of parameters into the original model.
 
         Args:
             x: Flat array of model parameters.
