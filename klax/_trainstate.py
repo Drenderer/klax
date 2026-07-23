@@ -114,7 +114,9 @@ class TrainingState:
             "TrainingState is immutable; use .replace(run_state=...) instead."
         )
 
-    def replace(self, *, model=None, opt_state=None, run_state=None):
+    def replace(
+        self, *, model=None, opt_state=None, run_state=None
+    ) -> "TrainingState":
         current = self._get()
         return TrainingState(
             model if model is not None else current.model,
