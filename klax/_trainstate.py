@@ -12,35 +12,132 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple
 from collections.abc import Generator
-from dataclasses import dataclass
 
 import jax
 import optax
-from jax import numpy as jnp
-from jaxtyping import Array, Int, PyTree, PyTreeDef
+from jaxtyping import PyTree
 
 from ._losses import Loss
 
+_TrainingState = namedtuple(
+    "_TrainingState", ["model", "opt_state", "run_state"]
+)
 
-# NOTE: Unfortunately step cannot be int, otherwise filter_jit does not trace it
-@jax.tree_util.register_dataclass
-@dataclass
+
 class TrainingState:
-    """Dataclass of things that are expected to change during training.
+    """PyTree of the training state, i.e., model, optimizer state and run state.
 
-    This consists of:
+    This PyTree largely behaves like a named tuple with attributes `model`,
+    `opt_state` and `run_state`.
+    Internally, however, it implements the unflattening trick, mentioned by
+    Patrick Kidger [here](https://docs.kidger.site/equinox/tricks/#low-overhead-training-loops).
+    This means that instead of storing the PyTree of the named tuple internally,
+    the flattened version is stored. Only when a specific attribute, e.g.,
+    `state.model` is used, the flattened internal representation is unflattened.
+    This yields slight performance benefits in tight training loops, where
+    the state is repeatedly passed to a jitted function performing a single
+    gradient update step. Since when crossing the jit-boundary, JAX would
+    flatten and unflatten the model, we can save the overhead of flattening, by
+    storing the flat PyTree outside of jit.
+    To avoid unnecessary unflattening, the unflattend PyTree is cached. When
+    crossing jit boundaries the cache is emptied.
 
-    * `model`: The `eqx.Module` (or more generally any PyTree)
-        representing the trainable model.
-    * `opt_state`: The state of the `optax` optimizer.
-    * `run_state`: The user-defined state of the training run, which is
-        passed to the loss function and may be modified via callbacks.
+    This class essentially behaves just like
+    ```python
+        @jax.tree_util.register_dataclass
+        @dataclass
+        class TrainingState:
+            model: PyTree
+            opt_state: PyTree
+            run_state: PyTree
+
+            def replace(self, *, model=None, opt_state=None, run_state=None):
+                return TrainingState(
+                    model if model is not None else self.model,
+                    opt_state if opt_state is not None else self.opt_state,
+                    run_state if run_state is not None else self.run_state,
+                )
+    ```
+
+    Raises:
+        AttributeError: When trying to modify the attributes.
+
     """
 
-    model: PyTree
-    opt_state: PyTree
-    run_state: PyTree
+    __slots__ = ("_leaves", "_treedef", "_cache")
+
+    def __init__(
+        self, model: PyTree, opt_state: PyTree, run_state: PyTree
+    ) -> None:
+        tree = _TrainingState(model, opt_state, run_state)
+        leaves, treedef = jax.tree.flatten(tree)
+        self._leaves = leaves
+        self._treedef = treedef
+        self._cache = None
+
+    def _get(self):
+        if self._cache is None:
+            self._cache = jax.tree_util.tree_unflatten(
+                self._treedef, self._leaves
+            )
+        return self._cache
+
+    @property
+    def model(self):
+        return self._get().model
+
+    @model.setter
+    def model(self, value):
+        raise AttributeError(
+            "TrainingState is immutable; use .replace(model=...) instead."
+        )
+
+    @property
+    def opt_state(self):
+        return self._get().opt_state
+
+    @opt_state.setter
+    def opt_state(self, value):
+        raise AttributeError(
+            "TrainingState is immutable; use .replace(opt_state=...) instead."
+        )
+
+    @property
+    def run_state(self):
+        return self._get().run_state
+
+    @run_state.setter
+    def run_state(self, value):
+        raise AttributeError(
+            "TrainingState is immutable; use .replace(run_state=...) instead."
+        )
+
+    def replace(self, *, model=None, opt_state=None, run_state=None):
+        current = self._get()
+        return TrainingState(
+            model if model is not None else current.model,
+            opt_state if opt_state is not None else current.opt_state,
+            run_state if run_state is not None else current.run_state,
+        )
+
+    @staticmethod
+    def _flatten(state):
+        return state._leaves, state._treedef
+
+    @staticmethod
+    def _unflatten(treedef, leaves):
+        obj = TrainingState.__new__(TrainingState)
+        obj._leaves = leaves
+        obj._treedef = treedef
+        obj._cache = None
+        return obj
+
+
+jax.tree_util.register_pytree_node(
+    TrainingState, TrainingState._flatten, TrainingState._unflatten
+)
 
 
 class TrainingContext:
@@ -58,9 +155,7 @@ class TrainingContext:
         training run.
     """
 
-    _state: TrainingState | None
-    _state_treedef: PyTreeDef  # type: ignore
-    _state_leaves: list
+    state: TrainingState
     optimizer: optax.GradientTransformationExtraArgs
     loss: Loss
     batch_generator: Generator[PyTree, None, None]
@@ -85,30 +180,13 @@ class TrainingContext:
         )
         state = TrainingState(model, opt_state, run_state)
 
-        self._state = state
-        self._state_leaves, self._state_treedef = jax.tree.flatten(state)
+        self.state = state
         self.optimizer = optimizer
         self.loss = loss
         self.batch_generator = batch_generator
         self.step = 0
         self.steps = steps
 
-    @property
-    def state(self) -> TrainingState:
-        if self._state is None:
-            state = jax.tree.unflatten(self._state_treedef, self._state_leaves)
-            self._state = state
-
-        return self._state
-
-    @state.setter
-    def state(self, value) -> None:
-        if jax.tree.structure(value) != self._state_treedef:
-            raise ValueError("PyTree strucutre of state changed.")
-        self._state = value
-        self._state_leaves, _ = jax.tree.flatten(value)
-
-    def update(self, state_leaves, step):
-        self._state = None
-        self._state_leaves = state_leaves
+    def update(self, state, step):
+        self.state = state
         self.step = step
