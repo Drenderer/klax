@@ -14,7 +14,6 @@
 
 """Utilities for logging during training."""
 
-import pickle
 import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -23,12 +22,13 @@ from typing import Any, Literal, Protocol, cast
 
 import equinox as eqx
 import jax
-from jaxtyping import PRNGKeyArray, PyTree
+from jaxtyping import Array, PRNGKeyArray, PyTree
 
 from ._callbacks import Callback
-from ._compat import HAS_TQDM, get_plot, get_tqdm
+from ._compat import HAS_TQDM, get_tqdm
 from ._datahandler import Batcher
-from ._trainstate import TrainingContext
+from ._history import History
+from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(Protocol):
@@ -126,161 +126,6 @@ class BatchMetric:
         """
         batch = next(self.batch_generator)
         return self.func(context.state.model, batch, context.state.run_state)
-
-
-type Steps = list[int]
-type Values = list[Any]
-
-
-class History:
-    """Dict-like object for storing a training history with metadata and utility methods.
-
-    The training history stores (metric) values along with the
-    training steps they correspond to, as well as total training
-    time, total steps, and the final optimizer state.
-    Furthermore, it provides methods for saving/loading the history
-    to/from disk, plotting metrics, and extending the history.
-    """
-
-    content: dict[str, tuple[Steps, Values]]
-    total_time: float  #: Total time spent in training
-    total_steps: int  #: Total number of steps used in the training
-    final_opt_state: PyTree  #: Final optimizer state after training
-
-    def __init__(
-        self,
-        content: dict[str, tuple[Steps, Values]] | None = None,
-        total_time: float = -1.0,
-        total_steps: int = -1,
-        final_opt_state: PyTree | None = None,
-    ):
-        self.content = content if content is not None else {}
-        self.total_time = total_time
-        self.total_steps = total_steps
-        self.final_opt_state = final_opt_state
-
-    def append(self, step: int, key: str, value: Any) -> None:
-        """Add a new value to the history.
-
-        Args:
-            step: Training step the value belongs to.
-            key: Metric name.
-            value: Metric value.
-
-        """
-        if key not in self.content:
-            self.content[key] = ([], [])
-        self.content[key][0].append(step)
-        self.content[key][1].append(value)
-
-    def __getitem__(self, name: str) -> tuple[Steps, Values]:
-        if name not in self.content:
-            raise KeyError(f"Metric '{name}' not found in history.")
-        return self.content[name]
-
-    def keys(self) -> list[str]:
-        """Get the list of metric names stored in the history.
-
-        Returns:
-            A list of metric names.
-
-        """
-        return list(self.content.keys())
-
-    def save(self, path: str | Path) -> None:
-        """Persist the history to disk using pickle.
-
-        Args:
-            path: Destination filepath where the history will be stored.
-
-        """
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "content": self.content,
-            "total_time": self.total_time,
-            "total_steps": self.total_steps,
-            "final_opt_state": self.final_opt_state,
-        }
-        with path.open("wb") as file:
-            pickle.dump(payload, file)
-
-    @classmethod
-    def load(cls, path: str | Path) -> "History":
-        """Restore a history saved with :meth:`save`.
-
-        Args:
-            path: Filepath to load the serialized history from.
-
-        Returns:
-            A populated History instance.
-
-        """
-        path = Path(path)
-        with path.open("rb") as file:
-            payload = pickle.load(file)
-
-        return cls(
-            content=payload.get("content", None),
-            total_time=payload.get("total_time", -1.0),
-            total_steps=payload.get("total_steps", -1),
-            final_opt_state=payload.get("final_opt_state", None),
-        )
-
-    def plot(self, *keys: str, ax: Any = None, **kwargs: Any) -> None:
-        """Plot stored metrics using matplotlib.
-
-        Note:
-            This method requires matplotlib.
-
-        Args:
-            keys: Metric names to plot. If empty, all metrics are plotted.
-            ax: Matplotlib axes to plot into. If ``None`` then a new axis is
-                created. (Defaults to None.)
-            kwargs: Dictionary of keyword arguments passed to
-                matplotlib's ``plot``.
-
-        Raises:
-            ImportError: If matplotlib is not installed.
-
-        """
-        plt = get_plot()
-
-        if ax is None:
-            _, ax = plt.subplots()
-            ax.set(
-                xlabel="Step",
-                ylabel="Metric",
-                yscale="log",
-                title="Training History",
-            )
-            ax.grid(True)
-        keys = keys if keys else list(self.content.keys())
-        for name in keys:
-            steps, values = self.content[name]
-            kwargs["label"] = name  # Overwrite label if provided
-            ax.plot(steps, values, **kwargs)
-        ax.legend()
-        return ax
-
-    def extend(self, other: "History") -> None:
-        """Extend this history with the contents of another history.
-
-        Args:
-            other: Another History instance to extend with.
-
-        """
-        for key, (other_steps, other_values) in other.content.items():
-            if key not in self.content:
-                self.content[key] = ([], [])
-            self.content[key][0].extend(
-                [s + self.total_steps for s in other_steps]
-            )
-            self.content[key][1].extend(other_values)
-
-        self.total_time += other.total_time
-        self.total_steps += other.total_steps
-        self.final_opt_state = other.final_opt_state
 
 
 class MetricLogger(Callback):
@@ -385,7 +230,6 @@ class MetricLogger(Callback):
         end_time = time()
         self.history.total_time = end_time - self.start_time
         self.history.total_steps = context.step
-        self.history.final_opt_state = context.state.opt_state
 
         if self._verbose > 1:
             try:

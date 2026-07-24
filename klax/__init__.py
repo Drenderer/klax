@@ -17,13 +17,13 @@ from ._callbacks import Callback as Callback
 from ._datahandler import Batcher as Batcher
 from ._datahandler import batch_data as batch_data
 from ._datahandler import split_data as split_data
+from ._history import History as History
 from ._initializers import Initializer as Initializer
 from ._initializers import SupportedInitializer as SupportedInitializer
 from ._initializers import canonicalize_initializer as canonicalize_initializer
 from ._initializers import hoedt_bias as hoedt_bias
 from ._initializers import hoedt_normal as hoedt_normal
 from ._logging import BatchMetric as BatchMetric
-from ._logging import History as History
 from ._logging import Metric as Metric
 from ._logging import MetricLogger as MetricLogger
 from ._logging import metric as metric

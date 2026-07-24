@@ -27,7 +27,8 @@ from ._datahandler import (
     Batcher,
     batch_data,
 )
-from ._logging import BatchMetric, History, Metric, MetricLogger
+from ._history import History
+from ._logging import BatchMetric, Metric, MetricLogger
 from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
