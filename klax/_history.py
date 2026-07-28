@@ -17,6 +17,7 @@
 import json
 import pickle
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -70,30 +71,8 @@ class History:
             raise KeyError(f"Metric '{key}' not found in history.")
         return self.content[key]
 
-    def keys(self) -> list[str]:
-        """Get the list of metric names stored in the history.
-
-        Returns:
-            A list of metric names.
-
-        """
-        return list(self.content.keys())
-
-    def extend(self, other: "History") -> None:
-        """Extend this history with the contents of another history.
-
-        Args:
-            other: Another History instance to extend with.
-
-        """
-        for key, (other_steps, other_values) in other.content.items():
-            self.content[key].steps.extend(
-                [s + self.total_steps for s in other_steps]
-            )
-            self.content[key].values.extend(other_values)
-
-        self.total_time += other.total_time
-        self.total_steps += other.total_steps
+    def __repr__(self) -> str:
+        return f"History containing: {list(self.content.keys())}"
 
     def to_dict(self) -> dict:
         return {
@@ -150,7 +129,13 @@ class History:
 
         return cls.from_dict(payload)
 
-    def plot(self, *keys: str, ax: Any = None, **kwargs: Any) -> None:
+    def plot(
+        self,
+        *keys: str,
+        exclude_keys: Iterable[str] | None = None,
+        ax: Any = None,
+        **kwargs: Any,
+    ) -> None:
         """Plot stored metrics using matplotlib.
 
         Note:
@@ -158,6 +143,7 @@ class History:
 
         Args:
             keys: Metric names to plot. If empty, all metrics are plotted.
+            exclude_keys: Metric names to exclude when plotting.
             ax: Matplotlib axes to plot into. If ``None`` then a new axis is
                 created. (Defaults to None.)
             kwargs: Dictionary of keyword arguments passed to
@@ -169,6 +155,8 @@ class History:
         """
         plt = get_plot()
 
+        exclude_keys = [] if exclude_keys is None else exclude_keys
+
         if ax is None:
             _, ax = plt.subplots()
             ax.set(
@@ -179,21 +167,23 @@ class History:
             )
             ax.grid(True)
         keys = keys if keys else tuple(self.content.keys())
-        artists = []
+        artists = {}
         for name in keys:
             if name not in self.content:
                 raise KeyError(
-                    f"Key {name} not in History. Available keys: {self.keys()}"
+                    f"Key {name} not in History. Available keys: {list(self.content.keys())}"
                 )
+            if name in exclude_keys:
+                continue
             steps, values = self.content[name]
             values = jnp.stack(values, axis=0)
             if values.ndim > 2:
                 values = values.reshape(values.shape[0], -1)
             artist = ax.plot(steps, values, **kwargs)
-            artists.append(tuple(artist))
+            artists[name] = tuple(artist)
         ax.legend(
-            artists,
-            keys,
-            handler_map={tuple: HandlerTuple(ndivide=6, pad=0)},
+            artists.values(),
+            artists.keys(),
+            handler_map={tuple: HandlerTuple(ndivide=None, pad=0)},
         )
         return ax
