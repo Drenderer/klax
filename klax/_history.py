@@ -178,9 +178,13 @@ class History:
                 title="Training History",
             )
             ax.grid(True)
-        keys = keys if keys else self.keys()
+        keys = keys if keys else tuple(self.content.keys())
         artists = []
         for name in keys:
+            if name not in self.content:
+                raise KeyError(
+                    f"Key {name} not in History. Available keys: {self.keys()}"
+                )
             steps, values = self.content[name]
             values = jnp.stack(values, axis=0)
             if values.ndim > 2:
