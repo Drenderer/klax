@@ -15,7 +15,6 @@
 """Training history."""
 
 import json
-import pickle
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path

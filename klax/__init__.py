@@ -38,6 +38,7 @@ from ._serialization import (
     text_serialize_filter_spec as text_serialize_filter_spec,
 )
 from ._tools import count_parameters as count_parameters
+from ._training import StepFunction as StepFunction
 from ._training import fit as fit
 from ._training import make_step as make_step
 from ._training import run_training_loop as run_training_loop

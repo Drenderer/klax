@@ -45,7 +45,20 @@ class StepFunction(Protocol):
         batch: PyTree,
         loss: Loss,
         optimizer: optax.GradientTransformationExtraArgs,
-    ) -> TrainingState: ...
+    ) -> TrainingState:
+        """Perform one update step in the iterative training process.
+
+        Args:
+            state: The current [`TrainingState`][klax.TrainingState].
+            batch: The current batch of data.
+            loss: The loss function to optimize.
+            optimizer: The optax optimizer to use.
+
+        Returns:
+            The updated [`TrainingState`][klax.TrainingState].
+
+        """
+        raise NotImplementedError
 
 
 def make_step(
@@ -172,7 +185,7 @@ def fit[T: eqx.Module](
         validation_data: Arbitrary `PyTree` used for validation during
             training. Must have the same tree structure as `data`. (Defaults
             to None.)
-            Internally, the validation data is used to create a [BatchMetric][klax.BatchMetric]
+            Internally, the validation data is used to create a [LossMetric][klax.LossMetric]
             for logging. Each time the metric is evaluated, the loss is computed
             on a batch from the validation dataset with batch size `4*batch_size`.
             Defaults to `None`
