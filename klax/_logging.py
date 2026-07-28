@@ -47,21 +47,21 @@ class LossMetric:
     ):
         self.batch_generator = batch_generator
         self.prefix = prefix
-        loss_func = loss.value_and_aux
+        func = lambda state, batch: loss.value_and_aux(
+            state.model, batch, state.run_state
+        )
         if vmap_ensemble:
-            loss_func = eqx.filter_vmap(
-                loss_func, in_axes=(eqx.if_array(0), None, None)
-            )
+            func = eqx.filter_vmap(func, in_axes=(eqx.if_array(0), None))
         if jit_compile:
-            loss_func = eqx.filter_jit(loss_func)
-        self.loss_func = loss_func
+            func = eqx.filter_jit(func)
+        self.func = func
 
     def __call__(self, state: TrainingState) -> Any:
         batch = next(self.batch_generator)
-        value, aux = self.loss_func(state.model, batch, state.run_state)
+        value, aux = self.func(state, batch)
         if "loss" in aux:
             raise ValueError(
-                f"aux from {type(self.loss_func).__name__} already contains "
+                f"aux from {type(self.func).__name__} already contains "
                 "'loss'; rename this component to avoid clashing with the "
                 "auto-added total loss."
             )

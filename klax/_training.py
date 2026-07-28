@@ -269,11 +269,11 @@ def fit[T: eqx.Module](
     # Transform the step function
     step_function = make_step
     if vmap_ensemble:
-        step_function = eqx.filter_vmap(
+        step_function: StepFunction = eqx.filter_vmap(
             step_function, in_axes=(eqx.if_array(0), None, None, None)
         )
     if jit_compile:
-        step_function = eqx.filter_jit(step_function)
+        step_function: StepFunction = eqx.filter_jit(step_function)
 
     if init_opt_state is None:
         # Initialize the optimizer and 'tell it' to optimize with respect to
