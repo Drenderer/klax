@@ -15,7 +15,7 @@
 """Utilities for logging during training."""
 
 import warnings
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Iterable, Sequence
 from time import time
 from typing import Any, Literal, Protocol
 
@@ -31,13 +31,13 @@ from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(Protocol):
-    def __call__(self, context: TrainingContext) -> dict[str, Array]: ...
+    def __call__(self, state: TrainingState) -> dict[str, Array]: ...
 
 
 class LossMetric:
     """LossMetric = Dataset + Loss."""
 
-    def __init__[T](
+    def __init__(
         self,
         loss: Loss,
         batch_generator: Generator[PyTree, None, None],
@@ -56,11 +56,9 @@ class LossMetric:
             loss_func = eqx.filter_jit(loss_func)
         self.loss_func = loss_func
 
-    def __call__(self, context: TrainingContext) -> Any:
+    def __call__(self, state: TrainingState) -> Any:
         batch = next(self.batch_generator)
-        value, aux = self.loss_func(
-            context.state.model, batch, context.state.run_state
-        )
+        value, aux = self.loss_func(state.model, batch, state.run_state)
         if "loss" in aux:
             raise ValueError(
                 f"aux from {type(self.loss_func).__name__} already contains "
@@ -75,21 +73,10 @@ class LossMetric:
 class MetricLogger(Callback):
     """Callback for logging metrics in a History during training."""
 
-    history: History
-    log_every: int
-    metrics: list[Metric]
-    steps_str_length: int = 0
-    _verbose: Literal[0, 1, 2]
-    start_time: float = 0.0
-    progress_bar: bool
-    tqdm_bar: Any = None
-
     def __init__(
         self,
         log_every: int = 100,
         metrics: Sequence[Metric] | None = None,
-        verbose: Literal[0, 1, 2] = 2,
-        history: History | None = None,
     ):
         """Initialize the MetricLogger.
 
@@ -98,87 +85,158 @@ class MetricLogger(Callback):
             metrics: Sequence of [metrics][klax.Metric] to evaluate.
                 If multiple metrics share the same name, the later metrics will
                 overwrite prior metrics.
-            verbose: Verbosity level for logging metrics to the console. If 0,
-                no metrics will be printed. If 1, the metrics are printed. If
-                2, a progress bar will be shown.
-            history: An existing history object to log metrics to. If `None`,
-                a new history object will be created.
 
         """
         self.metrics = [] if metrics is None else list(metrics)
         self.log_every = log_every
-        self.history = History() if history is None else history
-        self._verbose = verbose
-        if (verbose == 2) and not HAS_TQDM:
-            warnings.warn(
-                "tqdm for progress bar not installed. "
-                "Falling back to verbosity level 1.",
-                category=ImportWarning,
-            )
-            self._verbose = 1
-
-    def add_metric(self, metric: Metric) -> None:
-        """Add a metric to be logged during training.
-
-        Warning:
-            Existing metrics sharing the same name will be overwritten.
-
-        Args:
-            metric: The metric to be added.
-
-        """
-        self.metrics.append(metric)
 
     def on_training_step(self, context: TrainingContext) -> None:
-        """Log metrics at the current training step.
-
-        Args:
-            context: Current training context.
-
-        """
         if context.step % self.log_every == 0:
-            message = []
             for metric in self.metrics:
-                aux = jax.device_get(metric(context))
+                aux = jax.device_get(metric(context.state))
                 for key, value in aux.items():
-                    self.history.append(key, context.step, value)
-                if self._verbose:
-                    try:
-                        formatted_value = f"{value:.4e}"
-                    except TypeError:
-                        formatted_value = str(value)
-                    message.append(f"{key}: {formatted_value}")
-
-            if self._verbose:
-                postfix = ", ".join(message)
-                if self._verbose > 1:
-                    self.tqdm_bar.set_postfix_str(postfix)
-                    if context.step != 0:
-                        self.tqdm_bar.update(self.log_every)
-                else:
-                    print(
-                        f"Step {context.step:>{self.steps_str_length}}/{context.steps}: "
-                        + postfix
-                    )
+                    context.history.append(key, context.step, value)
 
     def on_training_start(self, context: TrainingContext) -> None:
         self.start_time = time()
         self.steps_str_length = len(str(context.steps))
-
-        if self._verbose > 1:
-            tqdm = get_tqdm()
-            self.tqdm_bar = tqdm(total=context.steps, dynamic_ncols=True)
-
         self.on_training_step(context)
 
     def on_training_end(self, context: TrainingContext) -> None:
         end_time = time()
-        self.history.total_time = end_time - self.start_time
-        self.history.total_steps = context.step
+        context.history.total_time = end_time - self.start_time
+        context.history.total_steps = context.step
 
-        if self._verbose > 1:
-            try:
-                self.tqdm_bar.close()
-            # TODO: Don't make this a blanket exception
-            except Exception:
-                pass
+
+class ProgressMeter(Callback):
+    """Callback for reporting the training progress."""
+
+    make_progress_bar: bool
+    update_every: int
+    keys: set[str] | None
+    exclude_keys: set[str] | None
+    steps_str_length: int = 0
+    tqdm_bar: Any = None
+
+    def __init__(
+        self,
+        progress_bar: bool = True,
+        update_every: int = 100,
+        keys: Iterable[str] | None = None,
+        exclude_keys: Iterable[str] | None = None,
+    ):
+        if progress_bar and not HAS_TQDM:
+            warnings.warn(
+                "tqdm for progress bar not installed. "
+                "Falling back to printing.",
+                category=ImportWarning,
+            )
+            progress_bar = False
+        self.make_progress_bar = progress_bar
+
+        self.update_every = update_every
+
+        if keys is not None and exclude_keys is not None:
+            raise ValueError(
+                "Specify either `keys` or `exclude_keys`, not both."
+            )
+
+        self.keys = set(keys) if keys is not None else None
+        self.exclude_keys = (
+            set(exclude_keys) if exclude_keys is not None else None
+        )
+
+    def _selected_keys(self, history: History) -> list[str]:
+        all_keys = list(history.content.keys())
+
+        if self.keys is not None:
+            missing = self.keys - set(all_keys)
+            if missing:
+                warnings.warn(
+                    f"Requested keys not found in history: {sorted(missing)}"
+                )
+            keys = [k for k in all_keys if k in self.keys]
+        elif self.exclude_keys is not None:
+            keys = [k for k in all_keys if k not in self.exclude_keys]
+        else:
+            keys = all_keys
+
+        return sorted(keys)
+
+    @staticmethod
+    def _format_scalar(value: Any) -> str:
+        return f"{float(value):.3e}"
+
+    @classmethod
+    def _format_value(cls, value: Any) -> str:
+        if hasattr(value, "shape"):
+            if value.shape == ():
+                return cls._format_scalar(value)
+            flat = value.reshape(-1)
+            size = flat.shape[0]
+            n_preview = min(3, size)
+            preview = [
+                cls._format_scalar(v) for v in flat[:n_preview].tolist()
+            ]
+            suffix = ", ..." if size > n_preview else ""
+            return "[" + ", ".join(preview) + suffix + "]"
+
+        if isinstance(value, (list, tuple)):
+            size = len(value)
+            n_preview = min(3, size)
+            preview = [cls._format_scalar(v) for v in value[:n_preview]]
+            suffix = ", ..." if size > n_preview else ""
+            return "[" + ", ".join(preview) + suffix + "]"
+
+        return cls._format_scalar(value)
+
+    def on_training_start(self, context: TrainingContext) -> None:
+        # Guard against a leaked bar if start is somehow called twice.
+        if self.tqdm_bar is not None:
+            self.tqdm_bar.close()
+            self.tqdm_bar = None
+
+        self.steps_str_length = (
+            len(str(context.steps)) if context.steps is not None else 0
+        )
+
+        if self.make_progress_bar:
+            tqdm = get_tqdm()
+            self.tqdm_bar = tqdm(
+                total=context.steps,  # tqdm handles total=None fine (unbounded bar)
+                initial=context.step,  # correct if resuming mid-run
+                dynamic_ncols=True,
+            )
+
+    def on_training_step(self, context: TrainingContext) -> None:
+        if context.step % self.update_every != 0:
+            return
+
+        keys = self._selected_keys(context.history)
+        postfix = ", ".join(
+            f"{key}={self._format_value(context.history[key].values[-1])}"
+            for key in keys
+        )
+
+        if self.make_progress_bar and self.tqdm_bar is not None:
+            self.tqdm_bar.set_postfix_str(postfix)
+            # Set absolute position rather than incrementing, so the bar
+            # can't drift out of sync with the real step count (e.g. on
+            # resume, retries, or skipped steps).
+            self.tqdm_bar.n = context.step
+            self.tqdm_bar.refresh()
+        else:
+            step_str = (
+                f"{context.step:>{self.steps_str_length}}/{context.steps}"
+                if context.steps is not None
+                else str(context.step)
+            )
+            print(f"Step {step_str}: {postfix}")
+
+    def on_training_end(self, context: TrainingContext) -> None:
+        if self.tqdm_bar is not None:
+            # Make sure the bar reflects the true final step before closing.
+            self.tqdm_bar.n = context.step
+            self.tqdm_bar.refresh()
+            self.tqdm_bar.close()
+            self.tqdm_bar = None

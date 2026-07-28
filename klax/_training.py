@@ -15,7 +15,7 @@
 """Implements a basic training loop."""
 
 from collections.abc import Callable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 import equinox as eqx
 import jax
@@ -28,7 +28,7 @@ from ._datahandler import (
     batch_data,
 )
 from ._history import History
-from ._logging import LossMetric, Metric, MetricLogger
+from ._logging import LossMetric, Metric, MetricLogger, ProgressMeter
 from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
@@ -36,6 +36,16 @@ from ._wrappers import apply
 type Leaf = Any
 
 param_spec = eqx.is_inexact_array
+
+
+class StepFunction(Protocol):
+    def __call__(
+        self,
+        state: TrainingState,
+        batch: PyTree,
+        loss: Loss,
+        optimizer: optax.GradientTransformationExtraArgs,
+    ) -> TrainingState: ...
 
 
 def make_step(
@@ -68,15 +78,12 @@ def make_step(
     model = apply(model)
 
     return state.replace(model=model, opt_state=opt_state)
-    # return TrainingState(
-    #     model=model, opt_state=opt_state, run_state=state.run_state
-    # )
 
 
 def run_training_loop(
     context: TrainingContext,
     callbacks: Sequence[Callback],
-    step_function: Callable,
+    step_function: StepFunction,
 ) -> TrainingContext:
     for callback in callbacks:
         callback.on_training_start(context)
@@ -128,7 +135,7 @@ def fit[T: eqx.Module](
     jit_compile: bool = True,
     vmap_ensemble: bool = False,
     key: PRNGKeyArray,
-) -> tuple[T, History | None]:
+) -> tuple[T, History]:
     """Train a model using an optimizer from optax.
 
     This is a convenient wrapper around [`run_training_loop`][klax.run_training_loop]
@@ -245,9 +252,6 @@ def fit[T: eqx.Module](
     Returns:
         A tuple of the trained model and the training history.
 
-    Note:
-        The returned history will be `None` if `make_logger=False`.
-
     """
     # Transform the step function
     step_function = make_step
@@ -310,16 +314,17 @@ def fit[T: eqx.Module](
                 )
             )
 
-        logger = MetricLogger(log_every, metrics, verbose)
-        callbacks.append(logger)
+        logger = MetricLogger(log_every, metrics)
+        # Prepend logger to ensure it's the first callback to be evaluated.
+        callbacks = [logger] + callbacks
+
+    if verbose > 0:
+        callbacks.append(
+            ProgressMeter(progress_bar=verbose == 2, update_every=log_every)
+        )
 
     context = run_training_loop(
         context, callbacks, step_function=step_function
     )
 
-    model = context.state.model
-
-    if make_logger:
-        return model, logger.history
-
-    return model, None
+    return context.state.model, context.history

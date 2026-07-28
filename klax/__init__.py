@@ -26,6 +26,7 @@ from ._initializers import hoedt_normal as hoedt_normal
 from ._logging import LossMetric as LossMetric
 from ._logging import Metric as Metric
 from ._logging import MetricLogger as MetricLogger
+from ._logging import ProgressMeter as ProgressMeter
 from ._losses import Loss as Loss
 from ._losses import loss as loss
 from ._losses import mae as mae
