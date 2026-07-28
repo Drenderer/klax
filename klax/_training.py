@@ -28,7 +28,7 @@ from ._datahandler import (
     batch_data,
 )
 from ._history import History
-from ._logging import BatchMetric, Metric, MetricLogger
+from ._logging import LossMetric, Metric, MetricLogger
 from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
@@ -119,7 +119,7 @@ def fit[T: eqx.Module](
     init_opt_state: PyTree[Any] = None,
     batcher: Batcher = batch_data,
     make_logger: bool = True,
-    metrics: Sequence[Metric] | None = None,
+    metrics: dict[str, Metric] | None = None,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
@@ -186,7 +186,7 @@ def fit[T: eqx.Module](
             If `False` the arguments `metrics`, `log_every` and `verbose`
             don't have any effect and `fit` will return `None` instead of a
             `History`. This is useful for implementing custom logging.
-        metrics: Sequence of [metrics][klax.Metric] to be evaluated at regular
+        metrics: FIX ME Sequence of [metrics][klax.Metric] to be evaluated at regular
             intervals during the training. You can overwrite the default "loss"
             and "validation_loss" metrics, by adding custom metrics with the same
             name.
@@ -280,42 +280,32 @@ def fit[T: eqx.Module](
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
 
+    if metrics is None:
+        metrics = {}
+
     if make_logger:
         # Initialize logging and default metrics
-        metric_func = (
-            eqx.filter_vmap(loss, in_axes=(eqx.if_array(0), None, None))
-            if vmap_ensemble
-            else loss
-        )
-        _metrics = []
-        _metrics.append(
-            BatchMetric(
-                "loss",
-                metric_func,
-                data,
-                batcher,
-                batch_size,
-                batch_axes,
-                verbose=True,
-                key=bkey,
+        loss_func = (
+            eqx.filter_jit(
+                eqx.filter_vmap(loss, in_axes=(eqx.if_array(0), None, None))
             )
+            if vmap_ensemble
+            else eqx.filter_jit(loss)
+        )
+
+        metrics["training_loss"] = LossMetric(
+            loss_func,
+            batch_generator=batcher(data, batch_size, batch_axes, key=bkey),
         )
         if validation_data is not None:
-            _metrics.append(
-                BatchMetric(
-                    "validation_loss",
-                    metric_func,
-                    validation_data,
-                    batcher,
-                    4 * batch_size,
-                    batch_axes,
-                    verbose=True,
-                    key=bkey,
+            metrics["validation_loss"] = LossMetric(
+                loss_func,
+                batch_generator=batcher(
+                    validation_data, 4 * batch_size, batch_axes, key=bkey
                 ),
             )
-        if metrics is not None:
-            _metrics += metrics
-        logger = MetricLogger(log_every, _metrics, verbose)
+
+        logger = MetricLogger(log_every, metrics, verbose)
 
         callbacks.append(logger)
 

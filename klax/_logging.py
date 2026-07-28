@@ -15,44 +15,41 @@
 """Utilities for logging during training."""
 
 import warnings
-from collections.abc import Callable, Generator, Sequence
-from pathlib import Path
+from collections.abc import Generator, Sequence
 from time import time
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol
 
 import equinox as eqx
 import jax
-from jaxtyping import Array, PRNGKeyArray, PyTree
+from jaxtyping import Array, PyTree
 
 from ._callbacks import Callback
 from ._compat import HAS_TQDM, get_tqdm
-from ._datahandler import Batcher
 from ._history import History
+from ._losses import Loss
 from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(Protocol):
-    def __call__(self, state: TrainingState) -> Array: ...
+    def __call__(self, context: TrainingContext) -> Array: ...
 
 
-class BatchedMetric:
-    """Loss-like function [`Metric`][klax.Metric].
-
-    A `BatchMetric` uses it's own batch generator and data, to turn a
-    [loss][klax.Loss]-like function evaluation into a [`Metric`][klax.Metric].
-    """
+class LossMetric:
+    """LossMetric = Dataset + Loss."""
 
     def __init__[T](
         self,
-        loss_func: Callable[[PyTree, PyTree[Any, "T"], PyTree], Any],
+        loss_func: Loss,
         batch_generator: Generator[PyTree, None, None],
     ):
         self.loss_func = loss_func
         self.batch_generator = batch_generator
 
-    def __call__(self, state: TrainingState) -> Any:
+    def __call__(self, context: TrainingContext) -> Any:
         batch = next(self.batch_generator)
-        return self.loss_func(state.model, batch, state.run_state)
+        return self.loss_func(
+            context.state.model, batch, context.state.run_state
+        )
 
 
 class MetricLogger(Callback):
@@ -70,7 +67,7 @@ class MetricLogger(Callback):
     def __init__(
         self,
         log_every: int = 100,
-        metrics: Sequence[Metric] | None = None,
+        metrics: dict[str, Metric] | None = None,
         verbose: Literal[0, 1, 2] = 2,
         history: History | None = None,
     ):
@@ -88,7 +85,7 @@ class MetricLogger(Callback):
                 a new history object will be created.
 
         """
-        self.metrics = {} if metrics is None else {m.name: m for m in metrics}
+        self.metrics = {} if metrics is None else metrics
         self.log_every = log_every
         self.history = History() if history is None else history
         self._verbose = verbose
@@ -100,17 +97,18 @@ class MetricLogger(Callback):
             )
             self._verbose = 1
 
-    def add_metric(self, metric: Metric) -> None:
+    def add_metric(self, name: str, metric: Metric) -> None:
         """Add a metric to be logged during training.
 
         Warning:
             Existing metrics sharing the same name will be overwritten.
 
         Args:
+            name: Name of the metric to be added.
             metric: The metric to be added.
 
         """
-        self.metrics[metric.name] = metric
+        self.metrics[name] = metric
 
     def on_training_step(self, context: TrainingContext) -> None:
         """Log metrics at the current training step.
@@ -121,15 +119,15 @@ class MetricLogger(Callback):
         """
         if context.step % self.log_every == 0:
             message = []
-            for metric in self.metrics.values():
+            for name, metric in self.metrics.items():
                 metric_value = jax.device_get(metric(context))
-                self.history.append(context.step, metric.name, metric_value)
-                if self._verbose and metric.verbose:
+                self.history.append(name, context.step, metric_value)
+                if self._verbose:
                     try:
                         formatted_value = f"{metric_value:.4e}"
                     except TypeError:
                         formatted_value = str(metric_value)
-                    message.append(f"{metric.name}: {formatted_value}")
+                    message.append(f"{name}: {formatted_value}")
 
             if self._verbose:
                 postfix = ", ".join(message)
@@ -161,6 +159,6 @@ class MetricLogger(Callback):
         if self._verbose > 1:
             try:
                 self.tqdm_bar.close()
-            # TODO: Done make this a blanket exception
+            # TODO: Don't make this a blanket exception
             except Exception:
                 pass
