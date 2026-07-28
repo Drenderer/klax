@@ -216,7 +216,7 @@ class NonTrainable(Unwrappable[T]):
     """Applies stop gradient to all ArrayLike leaves before unwrapping.
 
     See also [`klax.non_trainable`][], which is probably a generally preferable
-    way to achieve similar behaviour, which wraps the ArrayLike leaves
+    way to achieve similar behavior, which wraps the ArrayLike leaves
     directly, rather than the tree. Useful to mark PyTrees (Arrays, Modules,
     etc.) as frozen/non-trainable. Note that the underlying parameters may
     still be impacted by regularization, so it is generally advised to use this
@@ -457,7 +457,7 @@ def finalize(tree: PyTree):
 
         ```python
         >>> finalized_model = klax.finalize(model)
-        >>> y = finalzed_model(x)            # Call finalized model
+        >>> y = finalized_model(x)            # Call finalized model
         >>> model, history = fit(model, ...) # Continue training with constrained model
         ```
 

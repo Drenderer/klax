@@ -128,7 +128,7 @@ def hoedt_bias() -> Initializer:
 
     A [Hoedt bias initializer](https://arxiv.org/abs/2312.12474) is designed
     for the _unconstrained_ biases in linear layers where the weights are constrained
-    to be positive, such as in [`klax.nn.FICNN`][]. It intializes biases to vectors of
+    to be positive, such as in [`klax.nn.FICNN`][]. It initializes biases to vectors of
     a constant value, computed from the number of input features (`fan_in`).
 
     Tip:
