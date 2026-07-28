@@ -14,13 +14,13 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from functools import update_wrapper
+from functools import wraps
 from typing import Any
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import PyTree, Scalar
+from jaxtyping import Array, PyTree, Scalar
 
 from ._wrappers import unwrap
 
@@ -60,7 +60,7 @@ class Loss(ABC):
         model: PyTree,
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> Scalar:
+    ) -> Scalar | tuple[Scalar, dict[str, Array]]:
         """Abstract method to compute the loss for a given model and data.
 
         Args:
@@ -69,10 +69,45 @@ class Loss(ABC):
             run_state: Auxiliary, user-defined runtime state.
 
         Returns:
-            Scalar: The computed loss value.
+            Scalar or Tuple: If the output is a scalar, it is interpreted as
+                the computed loss value. If it is a tuple, it must be a tuple
+                of `Scalar` and `aux`, where the scalar is the
+                computed loss value and `aux` is a dict of auxiliary quantities
+                (e.g. loss components) to expose for logging/metrics.
 
         """
         pass
+
+    def value_and_aux[T](
+        self,
+        model: PyTree,
+        batch: PyTree[Any, "T"],
+        run_state: PyTree[Any],
+    ) -> tuple[Scalar, dict[str, Array]]:
+        """Compute the loss value and aux.
+
+        This method unwraps the model before computing the loss by calling
+        the `value` method. It then normalizes the output of `value` by
+        adding an empty dictionary as `aux` if `value` does not return any
+        `aux`.
+
+        Args:
+            model: The model parameters or structure to evaluate the loss.
+            batch: The input data or structure used for loss computation.
+            run_state: Auxiliary, user-defined runtime state.
+
+        Returns:
+            Tuple: `Scalar` and `aux`, where the scalar is the
+                computed loss value and `aux` is a dict of auxiliary quantities
+                (e.g. loss components) to expose for logging/metrics.
+
+        """
+        model = unwrap(model)
+        result = self.value(model, batch, run_state)
+        if isinstance(result, tuple):
+            loss, aux = result
+            return loss, aux
+        return result, {}
 
     def __call__[T](
         self,
@@ -94,15 +129,15 @@ class Loss(ABC):
             Scalar: The computed loss value.
 
         """
-        model = unwrap(model)
-        return self.value(model, batch, run_state)
+        loss, _ = self.value_and_aux(model, batch, run_state)
+        return loss
 
     def value_and_grad[T, M](
         self,
         model: PyTree[Any, "M"],
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> tuple[Scalar, PyTree[Any, "M"]]:
+    ) -> tuple[tuple[Scalar, dict[str, Array]], PyTree[Any, "M"]]:
         """Compute the loss value and its gradient.
 
         This method computes the loss value and its gradient with respect to
@@ -118,7 +153,9 @@ class Loss(ABC):
             Tuple of loss value and gradient with respect to the model.
 
         """
-        return eqx.filter_value_and_grad(self)(model, batch, run_state)
+        return eqx.filter_value_and_grad(self.value_and_aux, has_aux=True)(
+            model, batch, run_state
+        )
 
     def partitioned_value[T](
         self,
@@ -148,7 +185,11 @@ class Loss(ABC):
         return self(model, batch, run_state)
 
 
-def loss(func: Callable[[PyTree, PyTree, PyTree], Scalar]) -> Loss:
+def loss(
+    func: Callable[
+        [PyTree, PyTree, PyTree], Scalar | tuple[Scalar, dict[str, Array]]
+    ],
+) -> Loss:
     """Convert a function into a [`klax.Loss`][] object.
 
     Example:
@@ -172,10 +213,11 @@ def loss(func: Callable[[PyTree, PyTree, PyTree], Scalar]) -> Loss:
     """
 
     class FuncLoss(Loss):
+        @wraps(func)
         def value(self, model, batch, run_state):
             return func(model, batch, run_state)
 
-    return update_wrapper(FuncLoss(), func)
+    return FuncLoss()
 
 
 @loss

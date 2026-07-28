@@ -45,7 +45,9 @@ def make_step(
     optimizer: optax.GradientTransformationExtraArgs,
 ) -> TrainingState:
     model_params, model_static = eqx.partition(state.model, param_spec)
-    value, grad = loss.value_and_grad(state.model, batch, state.run_state)
+    (value, aux), grad = loss.value_and_grad(
+        state.model, batch, state.run_state
+    )
     updates, opt_state = optimizer.update(
         grad,
         state.opt_state,
@@ -119,7 +121,7 @@ def fit[T: eqx.Module](
     init_opt_state: PyTree[Any] = None,
     batcher: Batcher = batch_data,
     make_logger: bool = True,
-    metrics: dict[str, Metric] | None = None,
+    metrics: list[Metric] | None = None,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
@@ -280,33 +282,35 @@ def fit[T: eqx.Module](
     # Make callbacks iterable
     callbacks = [] if callbacks is None else list(callbacks)
 
-    if metrics is None:
-        metrics = {}
-
     if make_logger:
-        # Initialize logging and default metrics
-        loss_func = (
-            eqx.filter_jit(
-                eqx.filter_vmap(loss, in_axes=(eqx.if_array(0), None, None))
-            )
-            if vmap_ensemble
-            else eqx.filter_jit(loss)
-        )
+        if metrics is None:
+            metrics = []
 
-        metrics["training_loss"] = LossMetric(
-            loss_func,
-            batch_generator=batcher(data, batch_size, batch_axes, key=bkey),
+        metrics.append(
+            LossMetric(
+                loss,
+                batch_generator=batcher(
+                    data, batch_size, batch_axes, key=bkey
+                ),
+                prefix="training",
+                vmap_ensemble=vmap_ensemble,
+                jit_compile=True,
+            )
         )
         if validation_data is not None:
-            metrics["validation_loss"] = LossMetric(
-                loss_func,
-                batch_generator=batcher(
-                    validation_data, 4 * batch_size, batch_axes, key=bkey
-                ),
+            metrics.append(
+                LossMetric(
+                    loss,
+                    batch_generator=batcher(
+                        validation_data, 4 * batch_size, batch_axes, key=bkey
+                    ),
+                    prefix="validation",
+                    vmap_ensemble=vmap_ensemble,
+                    jit_compile=True,
+                )
             )
 
         logger = MetricLogger(log_every, metrics, verbose)
-
         callbacks.append(logger)
 
     context = run_training_loop(

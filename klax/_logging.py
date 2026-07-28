@@ -31,7 +31,7 @@ from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(Protocol):
-    def __call__(self, context: TrainingContext) -> Array: ...
+    def __call__(self, context: TrainingContext) -> dict[str, Array]: ...
 
 
 class LossMetric:
@@ -39,17 +39,37 @@ class LossMetric:
 
     def __init__[T](
         self,
-        loss_func: Loss,
+        loss: Loss,
         batch_generator: Generator[PyTree, None, None],
+        prefix: str = "",
+        vmap_ensemble: bool = False,
+        jit_compile: bool = True,
     ):
-        self.loss_func = loss_func
         self.batch_generator = batch_generator
+        self.prefix = prefix
+        loss_func = loss.value_and_aux
+        if vmap_ensemble:
+            loss_func = eqx.filter_vmap(
+                loss_func, in_axes=(eqx.if_array(0), None, None)
+            )
+        if jit_compile:
+            loss_func = eqx.filter_jit(loss_func)
+        self.loss_func = loss_func
 
     def __call__(self, context: TrainingContext) -> Any:
         batch = next(self.batch_generator)
-        return self.loss_func(
+        value, aux = self.loss_func(
             context.state.model, batch, context.state.run_state
         )
+        if "loss" in aux:
+            raise ValueError(
+                f"aux from {type(self.loss_func).__name__} already contains "
+                "'loss'; rename this component to avoid clashing with the "
+                "auto-added total loss."
+            )
+        combined = {"loss": value, **aux}
+        prefixed = {f"{self.prefix}/{k}": v for k, v in combined.items()}
+        return prefixed
 
 
 class MetricLogger(Callback):
@@ -57,7 +77,7 @@ class MetricLogger(Callback):
 
     history: History
     log_every: int
-    metrics: dict[str, Metric]
+    metrics: list[Metric]
     steps_str_length: int = 0
     _verbose: Literal[0, 1, 2]
     start_time: float = 0.0
@@ -67,7 +87,7 @@ class MetricLogger(Callback):
     def __init__(
         self,
         log_every: int = 100,
-        metrics: dict[str, Metric] | None = None,
+        metrics: Sequence[Metric] | None = None,
         verbose: Literal[0, 1, 2] = 2,
         history: History | None = None,
     ):
@@ -85,7 +105,7 @@ class MetricLogger(Callback):
                 a new history object will be created.
 
         """
-        self.metrics = {} if metrics is None else metrics
+        self.metrics = [] if metrics is None else list(metrics)
         self.log_every = log_every
         self.history = History() if history is None else history
         self._verbose = verbose
@@ -97,18 +117,17 @@ class MetricLogger(Callback):
             )
             self._verbose = 1
 
-    def add_metric(self, name: str, metric: Metric) -> None:
+    def add_metric(self, metric: Metric) -> None:
         """Add a metric to be logged during training.
 
         Warning:
             Existing metrics sharing the same name will be overwritten.
 
         Args:
-            name: Name of the metric to be added.
             metric: The metric to be added.
 
         """
-        self.metrics[name] = metric
+        self.metrics.append(metric)
 
     def on_training_step(self, context: TrainingContext) -> None:
         """Log metrics at the current training step.
@@ -119,15 +138,16 @@ class MetricLogger(Callback):
         """
         if context.step % self.log_every == 0:
             message = []
-            for name, metric in self.metrics.items():
-                metric_value = jax.device_get(metric(context))
-                self.history.append(name, context.step, metric_value)
+            for metric in self.metrics:
+                aux = jax.device_get(metric(context))
+                for key, value in aux.items():
+                    self.history.append(key, context.step, value)
                 if self._verbose:
                     try:
-                        formatted_value = f"{metric_value:.4e}"
+                        formatted_value = f"{value:.4e}"
                     except TypeError:
-                        formatted_value = str(metric_value)
-                    message.append(f"{name}: {formatted_value}")
+                        formatted_value = str(value)
+                    message.append(f"{key}: {formatted_value}")
 
             if self._verbose:
                 postfix = ", ".join(message)
