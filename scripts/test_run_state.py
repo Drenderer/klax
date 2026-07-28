@@ -7,45 +7,40 @@ from jax import random as jr
 import klax
 
 key = jr.key(0)
-model_key, train_key = jr.split(key, 2)
-
-x = jnp.linspace(-3, 3, 100)
-y = jnp.sin(x)
+model_key, train_key, aux_key = jr.split(key, 3)
 
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 
-@klax.metric("bias")
-def get_bias(context):
-    return context.state.model.layers[0].bias
+class UpdateRunState(klax.Callback):
+    def on_training_step(self, context):
+        new_key, _ = jr.split(context.state.run_state)
+        context.state = context.state.replace(run_state=new_key)
 
 
 @klax.loss
 def my_loss(model, batch, run_state):
-    x, y = batch
+    key = run_state
+    x = jr.normal(key, (64,))
+    y = jnp.sin(x)
     y_pred = jax.vmap(model)(x)
     return jnp.mean((y - y_pred) ** 2)
 
 
 model, history = klax.fit(
     model,
-    (x, y),
-    validation_data=(x, y),
+    data=None,
     steps=30_000,
-    metrics=[get_bias],
-    # callbacks=[MyCallback()],
-    batcher=klax.batch_data,
+    callbacks=[UpdateRunState()],
+    run_state=aux_key,
     loss=my_loss,
     key=train_key,
 )
 
-steps, values = history["bias"]
-fig, ax = plt.subplots()
-ax.plot(steps, values)
-ax.set(xlabel="step", yscale="linear", title="Recorded bias values")
-plt.show()
+x = jnp.linspace(-4, 4, 100)
+y = jnp.sin(x)
 
-ax = history.plot("loss", "validation_loss")
+ax = history.plot()
 plt.show()
 
 y_pred = jax.vmap(model)(x)

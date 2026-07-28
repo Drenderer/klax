@@ -128,7 +128,7 @@ picnn, hist = klax.fit(
     key=next(key),
 )
 
-hist.plot("loss")
+hist.plot()
 
 
 mlp, hist = klax.fit(
@@ -140,4 +140,4 @@ mlp, hist = klax.fit(
     key=next(key),
 )
 
-hist.plot("loss")
+hist.plot()
