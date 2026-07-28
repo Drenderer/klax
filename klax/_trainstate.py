@@ -19,6 +19,7 @@ import jax
 import optax
 from jaxtyping import PyTree
 
+from ._history import History
 from ._losses import Loss
 
 _TrainingState = namedtuple(
@@ -28,21 +29,6 @@ _TrainingState = namedtuple(
 
 class TrainingState:
     """PyTree of the training state, i.e., model, optimizer state and run state.
-
-    This PyTree largely behaves like a named tuple with attributes `model`,
-    `opt_state` and `run_state`.
-    Internally, however, it implements the unflattening trick, mentioned by
-    Patrick Kidger [here](https://docs.kidger.site/equinox/tricks/#low-overhead-training-loops).
-    This means that instead of storing the PyTree of the named tuple internally,
-    the flattened version is stored. Only when a specific attribute, e.g.,
-    `state.model` is used, the flattened internal representation is unflattened.
-    This yields slight performance benefits in tight training loops, where
-    the state is repeatedly passed to a jitted function performing a single
-    gradient update step. Since when crossing the jit-boundary, JAX would
-    flatten and unflatten the model, we can save the overhead of flattening, by
-    storing the flat PyTree outside of jit.
-    To avoid unnecessary unflattening, the unflattend PyTree is cached. When
-    crossing jit boundaries the cache is emptied.
 
     This class essentially behaves just like
     ```python
@@ -60,6 +46,22 @@ class TrainingState:
                     run_state if run_state is not None else self.run_state,
                 )
     ```
+
+    Internally, however, it implements the unflattening trick, mentioned in
+    [equinox low-overhead-training-loops](https://docs.kidger.site/equinox/tricks/#low-overhead-training-loops).
+    This means that instead of storing the PyTree directly,
+    the flattened tree is stored. Only when a specific attribute, e.g.,
+    `state.model` is used, the flat internal representation is unflattened.
+    To avoid repeated unflattening, the unflattend PyTree is cached. When
+    crossing jit boundaries the cache is emptied, ensuring that inside a
+    jit-region the pytree is always first unflattened.
+    This yields performance benefits in tight training loops, where
+    the state is repeatedly passed to a jitted function performing a single
+    gradient update step. Normally, JAX would flatten and unflatten the PyTree
+    when entering and exiting the jit-region. Since this class ensures that
+    the unflattend state is stored outside of jit, we effectively canceled out
+    the flattening and unflattening outside of jit.
+
 
     Raises:
         AttributeError: When trying to modify the attributes.
@@ -163,6 +165,7 @@ class TrainingContext:
     batch_generator: Generator[PyTree, None, None]
     step: int
     steps: int
+    history: History
 
     def __init__(
         self,
@@ -188,6 +191,7 @@ class TrainingContext:
         self.batch_generator = batch_generator
         self.step = 0
         self.steps = steps
+        self.history = History()
 
     def update(self, state, step):
         self.state = state
