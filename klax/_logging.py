@@ -15,7 +15,7 @@
 """Utilities for logging during training."""
 
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from time import time
 from typing import Any, Literal, Protocol, cast
@@ -32,49 +32,10 @@ from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(Protocol):
-    """A metric computing values that can be recorded in the training history.
-
-    Metrics are callables, that take the current
-    [`TrainingContext`][klax.TrainingContext] and return an arbitrary value to
-    be added to the training history by the
-    [`MetricLogger`][klax.MetricLogger]. Additionally, metrics have a `name`
-    and `verbose` property, that determines how they are logged.
-    """
-
-    name: str
-    verbose: bool
-
-    def __call__(self, context: TrainingContext) -> Any: ...
+    def __call__(self, state: TrainingState) -> Array: ...
 
 
-def metric[T](
-    name: str, verbose: bool = False
-) -> Callable[[Callable[[PyTree], T]], Callable[[PyTree], T]]:
-    """Turn a function into a [Metric][klax.Metric] using a decorator factory.
-
-    Intended usage:
-    ```python
-    @metric(name="my_metric", verbose=False)
-    def compute_my_metric(context): ...
-    ```
-
-    Args:
-        name: Name of the metric.
-        verbose: Wether to print the Metrics values to the console during training.
-            Defaults to False.
-
-    """
-
-    def make_metric(func):
-        func.name = name
-        func.verbose = verbose
-
-        return cast(Metric, func)
-
-    return make_metric
-
-
-class BatchMetric:
+class BatchedMetric:
     """Loss-like function [`Metric`][klax.Metric].
 
     A `BatchMetric` uses it's own batch generator and data, to turn a
@@ -83,49 +44,15 @@ class BatchMetric:
 
     def __init__[T](
         self,
-        name: str,
-        func: Callable[[PyTree, PyTree[Any, "T"], PyTree], Any],
-        data: PyTree[Any, "T"],
-        batcher: Batcher,
-        batch_size: int,
-        batch_axes: PyTree[int | str | None, "T ..."] = 0,
-        verbose: bool = False,
-        jit_compile: bool = True,
-        *,
-        key: PRNGKeyArray,
+        loss_func: Callable[[PyTree, PyTree[Any, "T"], PyTree], Any],
+        batch_generator: Generator[PyTree, None, None],
     ):
-        """Initialize the `BatchMetric`.
+        self.loss_func = loss_func
+        self.batch_generator = batch_generator
 
-        Args:
-            name: Name of the metric.
-            func: The evaluation function to compute. It should take the model,
-                a batch of data, and the auxiliary runtime state as input.
-            data: The dataset to generate batches from.
-            batcher: Batch generator factory.
-            batch_size: The size of each batch.
-            batch_axes: The axes corresponding to the batch dimension in the data.
-            verbose: Verbosity level for the metric. Defaults to False.
-            jit_compile: If true, `eqx.filter_jit` is used to jit compile `func`.
-            key: PRNG key for random number generation.
-
-        """
-        self.name = name
-        self.verbose = verbose
-        self.batch_generator = batcher(data, batch_size, batch_axes, key=key)
-        self.func = eqx.filter_jit(func) if jit_compile else func
-
-    def __call__(self, context: TrainingContext) -> Any:
-        """Compute the metric.
-
-        Args:
-            context: TrainingContext to evaluate in.
-
-        Returns:
-            The metric value on the sampled batch.
-
-        """
+    def __call__(self, state: TrainingState) -> Any:
         batch = next(self.batch_generator)
-        return self.func(context.state.model, batch, context.state.run_state)
+        return self.loss_func(state.model, batch, state.run_state)
 
 
 class MetricLogger(Callback):
