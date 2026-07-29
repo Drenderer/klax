@@ -20,8 +20,9 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, NamedTuple
 
+import numpy as np
 from jax import numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, ArrayLike
 from matplotlib.legend_handler import HandlerTuple
 
 from ._compat import get_plot
@@ -29,7 +30,7 @@ from ._compat import get_plot
 
 class StepsAndValues(NamedTuple):
     steps: list[int]
-    values: list[Any]
+    values: list[ArrayLike]
 
 
 def _value_to_json(value: Any) -> Any:
@@ -40,12 +41,23 @@ def _value_to_json(value: Any) -> Any:
             "shape": list(value.shape),
             "dtype": str(value.dtype),
         }
+    if isinstance(value, np.ndarray):
+        return {
+            "__numpy_array__": True,
+            "data": value.tolist(),
+            "shape": list(value.shape),
+            "dtype": str(value.dtype),
+        }
     return value
 
 
 def _value_from_json(value: Any) -> Any:
     if isinstance(value, dict) and value.get("__jax_array__"):
         return jnp.array(value["data"], dtype=value["dtype"]).reshape(
+            value["shape"]
+        )
+    if isinstance(value, dict) and value.get("__numpy_array__"):
+        return np.array(value["data"], dtype=value["dtype"]).reshape(
             value["shape"]
         )
     return value
@@ -61,7 +73,7 @@ class History:
         self.total_time = None
         self.total_steps = None
 
-    def append(self, key: str, step: int, value: Any) -> None:
+    def append(self, key: str, step: int, value: ArrayLike) -> None:
         self.content[key].steps.append(step)
         self.content[key].values.append(value)
 
