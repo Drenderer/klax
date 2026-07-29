@@ -17,7 +17,7 @@
 import warnings
 from collections.abc import Generator, Iterable, Sequence
 from time import time
-from typing import Any, Literal, Protocol
+from typing import Any, Protocol
 
 import equinox as eqx
 import jax
@@ -58,7 +58,7 @@ class LossMetric:
             func = eqx.filter_jit(func)
         self.func = func
 
-    def __call__(self, state: TrainingState) -> Any:
+    def __call__(self, state: TrainingState) -> dict[str, Array]:
         batch = next(self.batch_generator)
         value, aux = self.func(state, batch)
         if self.value_name in aux:
@@ -69,8 +69,9 @@ class LossMetric:
                 "the 'value_name' in the LossMetric."
             )
         combined = {self.value_name: value, **aux}
-        prefixed = {f"{self.prefix}/{k}": v for k, v in combined.items()}
-        return prefixed
+        if self.prefix:
+            combined = {f"{self.prefix}/{k}": v for k, v in combined.items()}
+        return combined
 
 
 class MetricLogger(Callback):
