@@ -42,11 +42,13 @@ class LossMetric:
         loss: Loss,
         batch_generator: Generator[PyTree, None, None],
         prefix: str = "",
+        value_name: str = "loss",
         vmap_ensemble: bool = False,
         jit_compile: bool = True,
     ):
         self.batch_generator = batch_generator
         self.prefix = prefix
+        self.value_name = value_name
         func = lambda state, batch: loss.value_and_aux(
             state.model, batch, state.run_state
         )
@@ -59,13 +61,14 @@ class LossMetric:
     def __call__(self, state: TrainingState) -> Any:
         batch = next(self.batch_generator)
         value, aux = self.func(state, batch)
-        if "loss" in aux:
+        if self.value_name in aux:
             raise ValueError(
-                f"aux from {type(self.func).__name__} already contains "
-                "'loss'; rename this component to avoid clashing with the "
-                "auto-added total loss."
+                f"aux from {type(self.func).__name__} contains the key"
+                f"'{self.value_name}' which clashes with the 'value_name'"
+                "given to the loss value. Change either the key in aux, or"
+                "the 'value_name' in the LossMetric."
             )
-        combined = {"loss": value, **aux}
+        combined = {self.value_name: value, **aux}
         prefixed = {f"{self.prefix}/{k}": v for k, v in combined.items()}
         return prefixed
 
