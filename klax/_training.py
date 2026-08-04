@@ -38,14 +38,11 @@ param_spec = eqx.is_inexact_array
 
 
 def make_step(
-    state_leaves: list[Leaf],
-    state_treedef: Any,
+    state: TrainingState,
     batch: PyTree,
     loss: Loss,
     optimizer: optax.GradientTransformationExtraArgs,
-) -> list[Leaf]:
-    state = jax.tree.unflatten(state_treedef, state_leaves)
-
+) -> TrainingState:
     model_params, model_static = eqx.partition(state.model, param_spec)
     value, grad = loss.value_and_grad(state.model, batch, state.run_state)
     updates, opt_state = optimizer.update(
@@ -67,10 +64,10 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    state = TrainingState(model, opt_state, state.run_state)
-    state_leaves, _ = jax.tree.flatten(state)
-
-    return state_leaves
+    return state.replace(model=model, opt_state=opt_state)
+    # return TrainingState(
+    #     model=model, opt_state=opt_state, run_state=state.run_state
+    # )
 
 
 def run_training_loop(
@@ -78,9 +75,6 @@ def run_training_loop(
     callbacks: Sequence[Callback],
     step_function: Callable,
 ) -> TrainingContext:
-    state_leaves = context._state_leaves
-    state_treedef = context._state_treedef
-
     for callback in callbacks:
         callback.on_training_start(context)
 
@@ -88,15 +82,14 @@ def run_training_loop(
         if context.step >= context.steps:
             break
 
-        state_leaves = step_function(
-            state_leaves,
-            state_treedef,
+        state = step_function(
+            context.state,
             batch,
             context.loss,
             context.optimizer,
         )
         step = context.step + 1
-        context.update(state_leaves, step)
+        context.update(state, step)
 
         stop = False
         for callback in callbacks:
@@ -257,7 +250,7 @@ def fit[T: eqx.Module](
     step_function = make_step
     if vmap_ensemble:
         step_function = eqx.filter_vmap(
-            step_function, in_axes=(eqx.if_array(0), None, None, None, None)
+            step_function, in_axes=(eqx.if_array(0), None, None, None)
         )
     if jit_compile:
         step_function = eqx.filter_jit(step_function)
