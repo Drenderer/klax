@@ -23,7 +23,6 @@ from jaxtyping import Array, Int, PyTree, PyTreeDef
 from ._losses import Loss
 
 
-# NOTE: Unfortunately step cannot be int, otherwise filter_jit does not trace it
 @jax.tree_util.register_dataclass
 @dataclass
 class TrainingState:
