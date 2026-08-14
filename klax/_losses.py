@@ -60,36 +60,8 @@ class Loss(ABC):
         model: PyTree,
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> Scalar | tuple[Scalar, dict[str, Array]]:
-        """Abstract method to compute the loss for a given model and data.
-
-        Args:
-            model: The model parameters or structure to evaluate the loss.
-            batch: The input data or structure used for loss computation.
-            run_state: Auxiliary, user-defined runtime state.
-
-        Returns:
-            Scalar or Tuple: If the output is a scalar, it is interpreted as
-                the computed loss value. If it is a tuple, it must be a tuple
-                of `Scalar` and `aux`, where the scalar is the
-                computed loss value and `aux` is a dict of auxiliary quantities
-                (e.g. loss components) to expose for logging/metrics.
-
-        """
-        pass
-
-    def value_and_aux[T](
-        self,
-        model: PyTree,
-        batch: PyTree[Any, "T"],
-        run_state: PyTree[Any],
     ) -> tuple[Scalar, dict[str, Array]]:
-        """Compute the loss value and aux.
-
-        This method unwraps the model before computing the loss by calling
-        the `value` method. It then normalizes the output of `value` by
-        adding an empty dictionary as `aux` if `value` does not return any
-        `aux`.
+        """Abstract method to compute the loss for a given model and data.
 
         Args:
             model: The model parameters or structure to evaluate the loss.
@@ -102,19 +74,14 @@ class Loss(ABC):
                 (e.g. loss components) to expose for logging/metrics.
 
         """
-        model = unwrap(model)
-        result = self.value(model, batch, run_state)
-        if isinstance(result, tuple):
-            loss, aux = result
-            return loss, aux
-        return result, {}
+        pass
 
     def __call__[T](
         self,
         model: PyTree,
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> Scalar:
+    ) -> tuple[Scalar, dict[str, Array]]:
         """Compute the loss value used during training.
 
         This method unwraps the model before computing the loss by calling
@@ -129,8 +96,8 @@ class Loss(ABC):
             Scalar: The computed loss value.
 
         """
-        loss, _ = self.value_and_aux(model, batch, run_state)
-        return loss
+        model = unwrap(model)
+        return self.value(model, batch, run_state)
 
     def value_and_grad[T, M](
         self,
@@ -153,7 +120,7 @@ class Loss(ABC):
             Tuple of loss value and gradient with respect to the model.
 
         """
-        return eqx.filter_value_and_grad(self.value_and_aux, has_aux=True)(
+        return eqx.filter_value_and_grad(self, has_aux=True)(
             model, batch, run_state
         )
 
@@ -182,13 +149,12 @@ class Loss(ABC):
 
         """
         model = eqx.combine(params, static)
-        return self(model, batch, run_state)
+        value, aux = self(model, batch, run_state)
+        return value
 
 
 def loss(
-    func: Callable[
-        [PyTree, PyTree, PyTree], Scalar | tuple[Scalar, dict[str, Array]]
-    ],
+    func: Callable[[PyTree, PyTree, PyTree], tuple[Scalar, dict[str, Array]]],
 ) -> Loss:
     """Convert a function into a [`klax.Loss`][] object.
 
@@ -199,12 +165,13 @@ def loss(
         def mse(model, data, run_state):
             x, y = data
             y_pred = jax.vmap(model)(x)
-            return jnp.mean(jnp.square(y_pred - y))
+            mse = jnp.mean(jnp.square(y_pred - y))
+            return mse, {"mse": mse}
         ```
 
     Args:
         func: Function that computes the loss. It must have the signature
-            `(model: PyTree, batch: PyTree, run_state: PyTree) -> Scalar`.
+            `(model: PyTree, batch: PyTree, run_state: PyTree) -> Scalar, dict[str, Array]`.
 
     Returns:
         Loss: An instance of a subclass of [`klax.Loss`][] that wraps the given
@@ -229,7 +196,8 @@ def mse(model, data, run_state):
     """
     x, y = data
     y_pred = jax.vmap(model)(x)
-    return jnp.mean(jnp.square(y_pred - y))
+    mse = jnp.mean(jnp.square(y_pred - y))
+    return mse, {"mse": mse}
 
 
 @loss
@@ -241,4 +209,5 @@ def mae(model, data, run_state):
     """
     x, y = data
     y_pred = jax.vmap(model)(x)
-    return jnp.mean(jnp.abs(y_pred - y))
+    mae = jnp.mean(jnp.abs(y_pred - y))
+    return mae, {"mae": mae}

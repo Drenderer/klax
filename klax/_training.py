@@ -14,7 +14,7 @@
 
 """Implements a basic training loop."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any, Literal, Protocol
 
 import equinox as eqx

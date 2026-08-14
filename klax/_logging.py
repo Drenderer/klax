@@ -42,16 +42,12 @@ class LossMetric:
         loss: Loss,
         batch_generator: Generator[PyTree, None, None],
         prefix: str = "",
-        value_name: str = "loss",
         vmap_ensemble: bool = False,
         jit_compile: bool = True,
     ):
         self.batch_generator = batch_generator
         self.prefix = prefix
-        self.value_name = value_name
-        func = lambda state, batch: loss.value_and_aux(
-            state.model, batch, state.run_state
-        )
+        func = lambda state, batch: loss(state.model, batch, state.run_state)
         if vmap_ensemble:
             func = eqx.filter_vmap(func, in_axes=(eqx.if_array(0), None))
         if jit_compile:
@@ -61,17 +57,9 @@ class LossMetric:
     def __call__(self, state: TrainingState) -> dict[str, Array]:
         batch = next(self.batch_generator)
         value, aux = self.func(state, batch)
-        if self.value_name in aux:
-            raise ValueError(
-                f"aux from {type(self.func).__name__} contains the key"
-                f"'{self.value_name}' which clashes with the 'value_name'"
-                "given to the loss value. Change either the key in aux, or"
-                "the 'value_name' in the LossMetric."
-            )
-        combined = {self.value_name: value, **aux}
         if self.prefix:
-            combined = {f"{self.prefix}/{k}": v for k, v in combined.items()}
-        return combined
+            aux = {f"{self.prefix}/{k}": v for k, v in aux.items()}
+        return aux
 
 
 class MetricLogger(Callback):

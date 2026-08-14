@@ -22,7 +22,7 @@ def my_loss(model, batch, run_state):
     diff = y - y_pred
     mse = jnp.mean(diff**2)
     mae = jnp.mean(jnp.abs(diff))
-    return mse, {"mae": mae}
+    return mse, {"mae": mae, "mse": mse}
 
 
 def get_bias(state):
@@ -40,7 +40,7 @@ model, history = klax.fit(
     key=train_key,
 )
 
-history.plot(exclude_keys="bias")
+history.plot(exclude_keys=["bias"])
 plt.show()
 
 fig, ax = plt.subplots()
