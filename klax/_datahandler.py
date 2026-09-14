@@ -315,13 +315,13 @@ def batch_data[T](
             end = start + batch_size
 
 
-def split_data(
-    data: PyTree[Any],
+def split_data[T: PyTree](
+    data: T,
     proportions: Sequence[int | float],
     batch_axes: PyTree[int | str | None] = 0,
     *,
     key: PRNGKeyArray,
-) -> tuple[PyTree[Any], ...]:
+) -> tuple[T, ...]:
     """Split a `PyTree` of data into multiply randomly drawn subsets.
 
     This function is useful for splitting into training and test datasets.

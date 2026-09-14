@@ -88,7 +88,7 @@ class Unwrappable[T](eqx.Module, ABC):
 
 # This function is copied from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
-def unwrap(tree: PyTree) -> PyTree:
+def unwrap[T: PyTree](tree: T) -> T:
     """Map across a PyTree and unwrap all [`klax.Unwrappable`][] objects.
 
     This leaves all other nodes unchanged. If nested, the innermost
@@ -172,7 +172,7 @@ class Parameterize(Unwrappable[T]):
 def non_trainable(tree: PyTree) -> PyTree:
     """Freeze parameters by wrapping inexact arrays.
 
-    This function wraps a [`klax.NonTrainable`][] wrapper around every  inexact
+    This function wraps a [`klax.NonTrainable`][] wrapper around every inexact
     array or [`klax.Constraint`][] in the PyTree.
 
     Note:
@@ -370,7 +370,7 @@ class Constraint(Unwrappable[Array], ABC):
         pass
 
 
-def apply(tree: PyTree):
+def apply[T: PyTree](tree: T) -> T:
     """Map across a PyTree and apply all [Constraints][klax.Constraint].
 
     This leaves all other nodes unchanged.
@@ -438,7 +438,7 @@ class NonNegative(Constraint):
 # ===----------------------------------------------------------------------===#
 
 
-def finalize(tree: PyTree):
+def finalize[T: PyTree](tree: T) -> T:
     """Make a model containing [Constraints][klax.Constraint] callable.
 
     This function combined that functionalities of [`klax.apply`][] and
