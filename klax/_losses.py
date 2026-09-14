@@ -14,13 +14,13 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from functools import update_wrapper
+from functools import wraps
 from typing import Any
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import PyTree, Scalar
+from jaxtyping import Array, PyTree, Scalar
 
 from ._wrappers import unwrap
 
@@ -60,7 +60,7 @@ class Loss(ABC):
         model: PyTree,
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> Scalar:
+    ) -> tuple[Scalar, dict[str, Array]]:
         """Abstract method to compute the loss for a given model and data.
 
         Args:
@@ -69,7 +69,9 @@ class Loss(ABC):
             run_state: Auxiliary, user-defined runtime state.
 
         Returns:
-            Scalar: The computed loss value.
+            Tuple: `Scalar` and `aux`, where the scalar is the
+                computed loss value and `aux` is a dict of auxiliary quantities
+                (e.g. loss components) to expose for logging/metrics.
 
         """
         pass
@@ -79,7 +81,7 @@ class Loss(ABC):
         model: PyTree,
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> Scalar:
+    ) -> tuple[Scalar, dict[str, Array]]:
         """Compute the loss value used during training.
 
         This method unwraps the model before computing the loss by calling
@@ -102,7 +104,7 @@ class Loss(ABC):
         model: PyTree[Any, "M"],
         batch: PyTree[Any, "T"],
         run_state: PyTree[Any],
-    ) -> tuple[Scalar, PyTree[Any, "M"]]:
+    ) -> tuple[tuple[Scalar, dict[str, Array]], PyTree[Any, "M"]]:
         """Compute the loss value and its gradient.
 
         This method computes the loss value and its gradient with respect to
@@ -118,7 +120,9 @@ class Loss(ABC):
             Tuple of loss value and gradient with respect to the model.
 
         """
-        return eqx.filter_value_and_grad(self)(model, batch, run_state)
+        return eqx.filter_value_and_grad(self, has_aux=True)(
+            model, batch, run_state
+        )
 
     def partitioned_value[T](
         self,
@@ -145,10 +149,13 @@ class Loss(ABC):
 
         """
         model = eqx.combine(params, static)
-        return self(model, batch, run_state)
+        value, aux = self(model, batch, run_state)
+        return value
 
 
-def loss(func: Callable[[PyTree, PyTree, PyTree], Scalar]) -> Loss:
+def loss(
+    func: Callable[[PyTree, PyTree, PyTree], tuple[Scalar, dict[str, Array]]],
+) -> Loss:
     """Convert a function into a [`klax.Loss`][] object.
 
     Example:
@@ -158,12 +165,13 @@ def loss(func: Callable[[PyTree, PyTree, PyTree], Scalar]) -> Loss:
         def mse(model, data, run_state):
             x, y = data
             y_pred = jax.vmap(model)(x)
-            return jnp.mean(jnp.square(y_pred - y))
+            mse = jnp.mean(jnp.square(y_pred - y))
+            return mse, {"mse": mse}
         ```
 
     Args:
         func: Function that computes the loss. It must have the signature
-            `(model: PyTree, batch: PyTree, run_state: PyTree) -> Scalar`.
+            `(model: PyTree, batch: PyTree, run_state: PyTree) -> Scalar, dict[str, Array]`.
 
     Returns:
         Loss: An instance of a subclass of [`klax.Loss`][] that wraps the given
@@ -172,10 +180,11 @@ def loss(func: Callable[[PyTree, PyTree, PyTree], Scalar]) -> Loss:
     """
 
     class FuncLoss(Loss):
+        @wraps(func)
         def value(self, model, batch, run_state):
             return func(model, batch, run_state)
 
-    return update_wrapper(FuncLoss(), func)
+    return FuncLoss()
 
 
 @loss
@@ -187,7 +196,8 @@ def mse(model, data, run_state):
     """
     x, y = data
     y_pred = jax.vmap(model)(x)
-    return jnp.mean(jnp.square(y_pred - y))
+    mse = jnp.mean(jnp.square(y_pred - y))
+    return mse, {"mse": mse}
 
 
 @loss
@@ -199,4 +209,5 @@ def mae(model, data, run_state):
     """
     x, y = data
     y_pred = jax.vmap(model)(x)
-    return jnp.mean(jnp.abs(y_pred - y))
+    mae = jnp.mean(jnp.abs(y_pred - y))
+    return mae, {"mae": mae}
