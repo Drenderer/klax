@@ -31,11 +31,29 @@ from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(Protocol):
-    def __call__(self, state: TrainingState) -> dict[str, Array]: ...
+    """The call interface for a metric."""
+
+    def __call__(self, state: TrainingState) -> dict[str, Array]:
+        """Compute the metric.
+
+        Args:
+            state: The current [training state][klax.TrainingState] on which
+                the metric is evaluated.
+
+        Returns:
+            A dictionary with pairs of metric names and values.
+
+        """
+        pass
 
 
 class LossMetric:
-    """LossMetric = Dataset + Loss."""
+    """Evaluates a [`Metric`][klax.Metric] on a dataset given a [`TrainingState`][klax.TrainingState].
+
+    The dataset is provided to the [`LossMetric`][klax.LossMetric] via
+    the `batch_generator` attribute, which returs a batch of data/or the
+    whole dataset, every time the `LossMetric` object is called.
+    """
 
     def __init__(
         self,
@@ -45,6 +63,22 @@ class LossMetric:
         vmap_ensemble: bool = False,
         jit_compile: bool = True,
     ):
+        """Initialize a [`LossMetric`][klax.LossMetric] object.
+
+        Args:
+            loss: A [loss][klax.Loss] returning a scalar a dictionary of scalar
+                values via the `aux` return.
+            batch_generator: A `Generator` returning a batch of data on which
+                the [loss][klax.Loss] is evaluated, everytime the
+                [LossMetric][klax.LossMetric] is called.
+            prefix: A string prefix to prepend to the keys returned by loss.
+            vmap_ensemble: Set to `True` if the
+                [`TrainingState`][klax.TrainingState] passed to
+                [`LossMetric`][klax.LossMetric] contains an ensamble.
+            jit_compile: Whether to jit compile the loss function for faster
+                metric compuations.
+
+        """
         self.batch_generator = batch_generator
         self.prefix = prefix
         func = lambda state, batch: loss(state.model, batch, state.run_state)
@@ -55,22 +89,33 @@ class LossMetric:
         self.func = func
 
     def __call__(self, state: TrainingState) -> dict[str, Array]:
+        """Compute the metrics.
+
+        Args:
+            state: A [`TrainingState`][klax.TrainingState] containing the
+                `model` and `run_state` that are passed to the
+                [loss][klax.Loss].
+
+        Returns:
+            A dictionary containing pairs of metrics names and loss values.
+
+        """
         batch = next(self.batch_generator)
-        value, aux = self.func(state, batch)
+        _, aux = self.func(state, batch)
         if self.prefix:
             aux = {f"{self.prefix}/{k}": v for k, v in aux.items()}
         return aux
 
 
 class MetricLogger(Callback):
-    """Callback for logging metrics in a History during training."""
+    """Callback for logging [metrics][klax.Metric] in a [history][klax.History] during training."""
 
     def __init__(
         self,
         log_every: int = 100,
         metrics: Sequence[Metric] | None = None,
     ):
-        """Initialize the MetricLogger.
+        """Initialize the [`MetricLogger`][klax.MetricLogger].
 
         Args:
             log_every: Frequency of logging metrics (in steps).
@@ -101,7 +146,7 @@ class MetricLogger(Callback):
 
 
 class ProgressMeter(Callback):
-    """Callback for reporting the training progress."""
+    """A [callback][klax.Callback] for reporting the training progress."""
 
     make_progress_bar: bool
     update_every: int
@@ -117,6 +162,18 @@ class ProgressMeter(Callback):
         keys: Iterable[str] | None = None,
         exclude_keys: Iterable[str] | None = None,
     ):
+        """Initialize a [`ProgressMeter`][klax.ProgressMeter].
+
+        Args:
+            progress_bar: Whether to print a progress bar. (Requires `tqdm`.)
+            update_every: The step interval at which the progress meter shall
+                be updated during training.
+            keys: The keys of the metrics that shall be printed alongside the
+                progress meter.
+            exclude_keys: The keys of the metrics that shell be excluded from
+                the progress meter.
+
+        """
         if progress_bar and not HAS_TQDM:
             warnings.warn(
                 "tqdm for progress bar not installed. "
@@ -139,7 +196,7 @@ class ProgressMeter(Callback):
         )
 
     def _selected_keys(self, history: History) -> list[str]:
-        all_keys = list(history.content.keys())
+        all_keys = list(history.keys())
 
         if self.keys is not None:
             missing = self.keys - set(all_keys)
