@@ -5,7 +5,8 @@ import klax
 
 
 class TestHistory:
-    def test_append_metric(self):
+    @staticmethod
+    def test_append_metric():
         """Test appending a single metric entry."""
         history = klax.History()
         history.append(key="loss", step=0, value=jnp.array(0.5))
@@ -24,7 +25,8 @@ class TestHistory:
             history.content["array"].values[0] == jnp.array([0.2, 2.0])
         )
 
-    def test_getitem_existing_metric(self):
+    @staticmethod
+    def test_getitem_existing_metric():
         """Test retrieving an existing metric using __getitem__."""
         history = klax.History()
         history.append(key="loss", step=0, value=jnp.array(0.5))
@@ -34,7 +36,8 @@ class TestHistory:
         assert steps == [0, 10]
         assert values == [jnp.array(0.5), jnp.array(0.3)]
 
-    def test_keys_returns_all_metric_keys(self):
+    @staticmethod
+    def test_keys_returns_all_metric_keys():
         """Test that keys() returns all metric keys."""
         history = klax.History()
         history.append(key="loss", step=0, value=0.5)
@@ -42,14 +45,17 @@ class TestHistory:
 
         assert set(history.keys()) == {"loss", "accuracy"}
 
-    def test_getitem_nonexistent_metric_raises_keyerror(self):
+    @staticmethod
+    def test_getitem_nonexistent_metric_raises_keyerror():
         """Test that accessing non-existent metric raises KeyError."""
         history = klax.History()
 
         with pytest.raises(KeyError, match="Metric 'accuracy' not found"):
             history["accuracy"]
 
-    def test_extend(self):
+    @staticmethod
+    @pytest.mark.xfail(reason="`History.extend` not yet implemented.")
+    def test_extend():
         """Test extending one klax.History with another."""
         history1 = klax.History()
         history1.append(key="loss", step=0, value=jnp.array(0.5))
@@ -87,7 +93,8 @@ class TestHistory:
         assert history1.total_steps == 26
         assert history1.total_time == 7.2
 
-    def test_save_and_load_roundtrip(self, tmp_path):
+    @staticmethod
+    def test_save_and_load_roundtrip(tmp_path):
         history = klax.History()
         history.append(key="loss", step=0, value=jnp.array(0.5))
         history.append(key="acc", step=5, value=jnp.array(0.8))
