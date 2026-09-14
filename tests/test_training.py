@@ -55,11 +55,9 @@ class TestMakeStep:
         y = jnp.array([3.0, 7.0])
 
         state = klax.TrainingState(model, opt_state, run_state=None)
-        state_leaves, state_treedef = jax.tree.flatten(state)
 
-        new_state_leaves = klax.make_step(
-            state_leaves,
-            state_treedef,
+        new_state = klax.make_step(
+            state,
             batch=(x, y),
             loss=klax.mse,
             optimizer=optimizer,
@@ -71,8 +69,8 @@ class TestMakeStep:
                 lambda a, b: jnp.array_equal(a, b)
                 if isinstance(a, jnp.ndarray)
                 else a == b,
-                state_leaves,
-                new_state_leaves,
+                state,
+                new_state,
             )
         )
 

@@ -40,26 +40,26 @@ ys = func(xs, ps)
 
 # %% Try to plot the function if the dimensionality allows
 
-if n != 1:
-    raise ValueError("Cannot plot higher dimensional functions.")
+if n == 1:
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection="3d")
 
-fig = plt.figure(figsize=(10, 8))
-ax = fig.add_subplot(111, projection="3d")
+    # Create a meshgrid for surface plotting
+    X, P = np.meshgrid(np.linspace(-1, 1, 100), np.linspace(-1, 1, 100))
+    Y = func(
+        X[..., None], P[..., None]
+    )  # Calculate Y values using the function
 
-# Create a meshgrid for surface plotting
-X, P = np.meshgrid(np.linspace(-1, 1, 100), np.linspace(-1, 1, 100))
-Y = func(X[..., None], P[..., None])  # Calculate Y values using the function
+    # Create the surface plot
+    surf = ax.plot_surface(X, P, Y, cmap="viridis", edgecolor="none")
 
-# Create the surface plot
-surf = ax.plot_surface(X, P, Y, cmap="viridis", edgecolor="none")
+    ax.set_xlabel("x")
+    ax.set_ylabel("p")
+    ax.set_zlabel("y")
+    ax.set_title("Function Surface Plot")
 
-ax.set_xlabel("x")
-ax.set_ylabel("p")
-ax.set_zlabel("y")
-ax.set_title("Function Surface Plot")
-
-plt.colorbar(surf, ax=ax, label="y value")
-plt.show()
+    plt.colorbar(surf, ax=ax, label="y value")
+    plt.show()
 
 # %% Fit the PICNN
 
@@ -92,24 +92,22 @@ mlp = BaselineMLP(n)
 
 # %% Try to plot the model if the dimensionality allows
 
-if n != 1:
-    raise ValueError("Cannot plot higher dimensional functions.")
+if n == 1:
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection="3d")
 
-fig = plt.figure(figsize=(10, 8))
-ax = fig.add_subplot(111, projection="3d")
+    X, P = np.meshgrid(np.linspace(-1, 1, 100), np.linspace(-1, 1, 100))
+    Y = jax.vmap(jax.vmap(klax.finalize(picnn)))(X[..., None], P[..., None])
 
-X, P = np.meshgrid(np.linspace(-1, 1, 100), np.linspace(-1, 1, 100))
-Y = jax.vmap(jax.vmap(klax.finalize(picnn)))(X[..., None], P[..., None])
+    surf = ax.plot_surface(X, P, Y, cmap="viridis", edgecolor="none")
 
-surf = ax.plot_surface(X, P, Y, cmap="viridis", edgecolor="none")
+    ax.set_xlabel("x")
+    ax.set_ylabel("p")
+    ax.set_zlabel("y")
+    ax.set_title("Function Surface Plot")
 
-ax.set_xlabel("x")
-ax.set_ylabel("p")
-ax.set_zlabel("y")
-ax.set_title("Function Surface Plot")
-
-plt.colorbar(surf, ax=ax, label="y value")
-plt.show()
+    plt.colorbar(surf, ax=ax, label="y value")
+    plt.show()
 
 # %% Fit the PICNN
 
