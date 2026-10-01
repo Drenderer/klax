@@ -66,6 +66,7 @@ plugins:
         - optax.GradientTransformationExtraArgs
         - jax.nn.initializers.Initializer
         - jax.numpy.float64
+        - scipy.optimize.OptimizeResult
   - mkdocstrings:
       handlers:
         python:
@@ -114,3 +115,5 @@ nav:
           - api/nn/linear.md
           - api/nn/mlp.md
           - api/nn/matrices.md
+      - Experimental Features:
+          - api/experimental/scipyopt.md

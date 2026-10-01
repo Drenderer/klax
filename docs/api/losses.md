@@ -24,3 +24,5 @@ To define a custom loss function use the [loss][klax.loss] decorator. Behind the
             - value
             - value_and_grad
 
+    """_summary_
+    """
