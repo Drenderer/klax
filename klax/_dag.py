@@ -143,80 +143,6 @@ class Graph:
                 env[k] = v
         return {w: env[w] for w in want}
 
-    def to_dot(
-        self,
-        have: Iterable[str] = (),
-        want: Iterable[str] | None = None,
-    ) -> str:
-        """Return a Graphviz DOT description of the graph.
-
-        If `want` is given, blocks that `plan(have, want)` would not execute
-        are drawn dashed and gray (top level only).
-        """
-        active = None if want is None else set(self.plan(have, want))
-        lines = [
-            "digraph G {",
-            "  rankdir=LR;",
-            "  compound=true;",
-            '  node [fontname="Helvetica"];',
-        ]
-        self._dot_body(lines, "", active, "  ")
-        lines.append("}")
-        return "\n".join(lines)
-
-    def _dot_body(
-        self,
-        lines: list[str],
-        prefix: str,
-        active: set[int] | None,
-        indent: str,
-    ) -> None:
-        def q(s: str) -> str:
-            return str(s).replace("\\", "\\\\").replace('"', '\\"')
-
-        declared: set[str] = set()
-
-        def var(name: str) -> str:
-            vid = f"{prefix}v:{name}"
-            if vid not in declared:
-                declared.add(vid)
-                lines.append(
-                    f'{indent}"{q(vid)}" [shape=ellipse, label="{q(name)}"];'
-                )
-            return vid
-
-        for i, b in enumerate(self.blocks):
-            bid = f"{prefix}b{i}"
-            inactive = active is not None and i not in active
-            style = (
-                ", style=dashed, color=gray, fontcolor=gray"
-                if inactive
-                else ""
-            )
-            lines.append(
-                f'{indent}"{q(bid)}" [shape=box, label="{q(b.name)}"{style}];'
-            )
-            for v in b.inputs:
-                lines.append(f'{indent}"{q(var(v))}" -> "{q(bid)}";')
-            for v in b.outputs:
-                lines.append(f'{indent}"{q(bid)}" -> "{q(var(v))}";')
-
-            if b.subgraph is not None:
-                cid = f"cluster_{bid}"
-                lines.append(f'{indent}subgraph "{q(cid)}" {{')
-                lines.append(
-                    f'{indent}  label="{q(b.name)} (subgraph)"; style=rounded;'
-                )
-                b.subgraph._dot_body(lines, f"{bid}/", None, indent + "  ")
-                lines.append(f"{indent}}}")
-                if (
-                    b.subgraph.blocks
-                ):  # anchor for the dotted link to the cluster
-                    lines.append(
-                        f'{indent}"{q(bid)}" -> "{q(bid)}/b0" '
-                        f'[style=dotted, arrowhead=none, lhead="{q(cid)}"];'
-                    )
-
 
 class GraphModel(eqx.Module):
     """A model consisting of modules and a directed acyclic graph."""
@@ -238,6 +164,88 @@ class GraphModel(eqx.Module):
 
         """
         return self.graph.run(self.params, have, want)
+
+
+def graph_to_dot(
+    graph: "Graph",
+    have: Iterable[str] = (),
+    want: Iterable[str] | None = None,
+) -> str:
+    """Return a Graphviz DOT description of a `Graph`.
+
+    Variables are drawn as ellipses and blocks as boxes. Subgraphs are drawn
+    as clusters, with their variables namespaced so that inner and outer
+    names cannot collide.
+
+    Args:
+        graph: The graph to draw.
+        have: Names of the variables that are supplied (only used with `want`).
+        want: If given, top-level blocks that `graph.plan(have, want)` would
+            not execute are drawn dashed and gray.
+
+    Returns:
+        The DOT source as a string.
+
+    """
+    active = None if want is None else set(graph.plan(have, want))
+
+    def q(s: object) -> str:
+        return str(s).replace("\\", "\\\\").replace('"', '\\"')
+
+    lines = [
+        "digraph G {",
+        "  rankdir=LR;",
+        "  compound=true;",
+        '  node [fontname="Helvetica"];',
+    ]
+
+    def emit(
+        g: "Graph", prefix: str, active: set[int] | None, ind: str
+    ) -> None:
+        declared: set[str] = set()
+
+        def var(name: str) -> str:
+            vid = f"{prefix}v:{name}"
+            if vid not in declared:
+                declared.add(vid)
+                lines.append(
+                    f'{ind}"{q(vid)}" [shape=ellipse, label="{q(name)}"];'
+                )
+            return vid
+
+        for i, b in enumerate(g.blocks):
+            bid = f"{prefix}b{i}"
+            inactive = active is not None and i not in active
+            style = (
+                ", style=dashed, color=gray, fontcolor=gray"
+                if inactive
+                else ""
+            )
+            lines.append(
+                f'{ind}"{q(bid)}" [shape=box, label="{q(b.name)}"{style}];'
+            )
+            for v in b.inputs:
+                lines.append(f'{ind}"{q(var(v))}" -> "{q(bid)}";')
+            for v in b.outputs:
+                lines.append(f'{ind}"{q(bid)}" -> "{q(var(v))}";')
+
+            if b.subgraph is not None:
+                cid = f"cluster_{bid}"
+                lines.append(f'{ind}subgraph "{q(cid)}" {{')
+                lines.append(
+                    f'{ind}  label="{q(b.name)} (subgraph)"; style=rounded;'
+                )
+                emit(b.subgraph, f"{bid}/", None, ind + "  ")
+                lines.append(f"{ind}}}")
+                if b.subgraph.blocks:  # anchor for the link into the cluster
+                    lines.append(
+                        f'{ind}"{q(bid)}" -> "{q(bid)}/b0" '
+                        f'[style=dotted, arrowhead=none, lhead="{q(cid)}"];'
+                    )
+
+    emit(graph, "", active, "  ")
+    lines.append("}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
@@ -265,12 +273,29 @@ if __name__ == "__main__":
         mlp: MLP
 
     normalizer = Normalizer(shift=jnp.array(1.0), scale=jnp.array(3.0))
-    mlp = MLP(in_size=3, out_size=3, width_sizes=[16], key=jr.key(0))
+    mlp = MLP(in_size=3, out_size="scalar", width_sizes=[16], key=jr.key(0))
 
     params = Params(normalizer, mlp)
 
+    subgraph = Graph(
+        blocks=(
+            Block.make(
+                "mlp",
+                "z",
+                "alpha_normalized",
+                fn=lambda m, x: m.mlp(x),
+            ),
+            Block.make(
+                "denormalize alpha",
+                "alpha_normalized",
+                "alpha",
+                fn=lambda m, x: m.normalizer.inverse(x),
+            ),
+        )
+    )
+
     graph = Graph(
-        (
+        blocks=(
             Block.make(
                 "normalize x",
                 "x",
@@ -284,27 +309,31 @@ if __name__ == "__main__":
                 fn=lambda m, x, u: jnp.concat([x, u]),
             ),
             Block.make(
-                "mlp",
+                "grad_alpha",
                 "z",
-                "y_normalized",
-                fn=lambda m, x: m.mlp(x),
+                "grad_alpha",
+                subgraph=subgraph,
+                fn=lambda m, z: jax.grad(
+                    lambda z: subgraph.run(m, have={"z": z}, want=("alpha",))[
+                        "alpha"
+                    ]
+                )(z),
             ),
             Block.make(
-                "denormalize y",
-                "y_normalized",
-                "y",
-                fn=lambda m, y: m.normalizer.inverse(y[0]),
+                "normalize grad_alpha",
+                "grad_alpha",
+                "grad_alpha_normalized",
+                fn=lambda m, y: m.normalizer.inverse(y),
             ),
         )
     )
     model = GraphModel(params, graph)
-    print(model)
 
     have: dict[str, Array] = {
         "x": jnp.array([1.0, 2.0]),
         "u": jnp.array([1.0]),
     }
-    want = ("y", "x_normalized")
+    want = ("grad_alpha_normalized", "x_normalized")
 
     @eqx.filter_jit
     def run(model, have, want):
@@ -316,6 +345,10 @@ if __name__ == "__main__":
 
     print(out)
 
-    dot = graph.to_dot()  # whole graph
-    dot = graph.to_dot(have=("x", "u"), want=("y",))  # grey out unused blocks
+    # whole graph
+    dot = graph_to_dot(graph)
+
+    # grey out unused blocks
+    dot = graph_to_dot(graph, have=("x", "u"), want=("grad_alpha_normalized",))
+
     print(dot)
