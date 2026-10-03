@@ -1,193 +1,321 @@
 """Implements the core elements of a graph-based model building approach."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from functools import cached_property
+from graphlib import CycleError, TopologicalSorter
 from typing import Any
 
 import equinox as eqx
+from jaxtyping import PyTree
+
+
+def _as_tuple(x) -> tuple:
+    return (x,) if not isinstance(x, tuple) else x
 
 
 @dataclass(frozen=True)
-class Edge:
-    """An edge in a graph.
+class Block:
+    """A compute node in a graph.
 
     Attributes:
-        src: ID(s) of the inputs node(s) of the present edge.
-        dst: ID(s) of the output node(s) of the present edge.
-        apply: The function to apply to mapping from `src` to `dst`.
+        name: Name of the computation. Only used for visualizations.
+        inputs: Names of the value nodes the block consumes.
+        outputs: Names of the value nodes the block produces.
+        fn: Callable implementing the block.
+        subgraph: Optional nested graph the block may run (e.g. a vector field).
 
     """
 
-    src: str | tuple[str, ...]
-    dst: str | tuple[str, ...]
-    apply: Callable
+    name: str
+    inputs: tuple[str, ...]
+    outputs: tuple[str, ...]
+    fn: Callable[[PyTree, tuple], tuple]
+    subgraph: "Graph | None" = None
+
+    @classmethod
+    def make(
+        cls,
+        name: str,
+        inputs: str | Iterable[str],
+        outputs: str | Iterable[str],
+        fn: Callable,
+        subgraph: "Graph | None" = None,
+    ) -> "Block":
+        return cls(name, _as_tuple(inputs), _as_tuple(outputs), fn, subgraph)
+
+    def __post_init__(self):
+        if not self.outputs:
+            raise ValueError(f"block {self.name!r} has no outputs")
+        if len(set(self.outputs)) != len(self.outputs):
+            raise ValueError(f"block {self.name!r} has duplicate outputs")
+        if not callable(self.fn):
+            raise TypeError(f"block {self.name!r}: fn must be callable")
+
+    def __call__(self, params, *args):
+        """Wrap fn and return a tuple, even if it has only one output."""
+        out = self.fn(params, *args)
+        return (out,) if len(self.outputs) == 1 else out
 
 
 @dataclass(frozen=True)
 class Graph:
-    """A directed acyclic graph consisting of `Edge`s."""
+    """A directed acyclic bipartite defined by multiple `Block`s."""
 
-    edges: dict[str, Edge]
+    blocks: tuple[Block, ...]
+
+    def __post_init__(self):
+        self._rank  # validates duplicates (via producers) and cycles
+
+    # cached property to stay hashable
+    @cached_property
+    def producers(self) -> dict[str, int]:
+        producers = {}
+        for i, block in enumerate(self.blocks):
+            for variable in block.outputs:
+                if variable in producers:
+                    raise ValueError(f"duplicate output {variable!r}")
+                producers[variable] = i
+        return producers
+
+    @cached_property
+    def _rank(self) -> dict[int, int]:
+        deps = {
+            i: {self.producers[v] for v in b.inputs if v in self.producers}
+            for i, b in enumerate(self.blocks)
+        }
+        try:
+            order = tuple(TopologicalSorter(deps).static_order())
+        except CycleError as e:
+            cycle = " -> ".join(self.blocks[i].name for i in e.args[1])
+            raise ValueError(f"cycle in graph: {cycle}") from e
+        return {i: r for r, i in enumerate(order)}
+
+    def plan(
+        self, have: Iterable[str], want: Iterable[str]
+    ) -> tuple[int, ...]:
+        want, have = tuple(want), frozenset(have)
+        required_blocks: set[int] = set()
+        seen_variables: set[str] = set()
+        missing: set[str] = set()
+        stack = list(want)
+        while stack:
+            v = stack.pop()
+            if v in have or v in seen_variables:
+                continue
+            seen_variables.add(v)
+            b = self.producers.get(v)
+            if b is None:
+                missing.add(v)
+                continue
+            required_blocks.add(b)
+            stack.extend(self.blocks[b].inputs)
+
+        if missing:
+            raise ValueError(
+                f"cannot compute {sorted(want)}: missing {sorted(missing)}"
+            )
+
+        clash = {
+            v: self.blocks[b].name
+            for b in required_blocks
+            for v in self.blocks[b].outputs
+            if v in have
+        }
+        if clash:
+            raise ValueError(
+                f"supplied values would be overwritten by blocks: {clash}"
+            )
+
+        return tuple(sorted(required_blocks, key=self._rank.__getitem__))
 
     def run(
         self,
-        modules: dict[str, Any],
-        inputs: dict[str, Any],
-        path: list[str],
-        keep: set[str] | None = None,
+        params: dict[str, Any],
+        have: dict[str, Any],
+        want: Sequence[str],
     ) -> dict:
-        """Seed node values with `inputs`, traverse `path`, return node values.
+        env = dict(have)
+        for b in self.plan(have.keys(), want):
+            block = self.blocks[b]
+            out = block(params, *(env[i] for i in block.inputs))
+            for k, v in zip(block.outputs, out, strict=True):
+                env[k] = v
+        return {w: env[w] for w in want}
 
-        If `keep` is given, nodes are pruned from the working dict as soon as
-        they are no longer needed as edge inputs (and are absent from `keep`),
-        and only the requested keys are returned.  Passing ``keep=None``
-        (default) preserves the original behaviour of returning every node.
+    def to_dot(
+        self,
+        have: Iterable[str] = (),
+        want: Iterable[str] | None = None,
+    ) -> str:
+        """Return a Graphviz DOT description of the graph.
 
-        Args:
-            modules: A dictionary of modules containing the components used on
-                the edges of the graph.
-            inputs: A dictionary of inputs. The keys match the inputs nodes of
-                of the provided path.
-            path: A path along with the graph shall be evaluated given the
-                input dictionary.
-            keep: Whether or which intermediate results to keep in the output
-                dictionary after having traversed the graph. The default is
-                `None` meaning that all intermediate values are collected.
-
-        Returns:
-            A dictionary containing the outputs of the path as well as all
-            stored intermediate values.
-
+        If `want` is given, blocks that `plan(have, want)` would not execute
+        are drawn dashed and gray (top level only).
         """
-        nodes = dict(inputs)
+        active = None if want is None else set(self.plan(have, want))
+        lines = [
+            "digraph G {",
+            "  rankdir=LR;",
+            "  compound=true;",
+            '  node [fontname="Helvetica"];',
+        ]
+        self._dot_body(lines, "", active, "  ")
+        lines.append("}")
+        return "\n".join(lines)
 
-        # Precompute the last step index at which each node is consumed as a
-        # source, so we know when it is safe to evict it.
-        last_used: dict[str, int] | None = None
-        if keep is not None:
-            last_used = {}
-            for i, name in enumerate(path):
-                e = self.edges[name]
-                srcs = e.src if isinstance(e.src, tuple) else (e.src,)
-                for s in srcs:
-                    last_used[s] = i
+    def _dot_body(
+        self,
+        lines: list[str],
+        prefix: str,
+        active: set[int] | None,
+        indent: str,
+    ) -> None:
+        def q(s: str) -> str:
+            return str(s).replace("\\", "\\\\").replace('"', '\\"')
 
-        for i, name in enumerate(path):
-            e = self.edges[name]
-            x = (
-                tuple(nodes[s] for s in e.src)
-                if isinstance(e.src, tuple)
-                else nodes[e.src]
+        declared: set[str] = set()
+
+        def var(name: str) -> str:
+            vid = f"{prefix}v:{name}"
+            if vid not in declared:
+                declared.add(vid)
+                lines.append(
+                    f'{indent}"{q(vid)}" [shape=ellipse, label="{q(name)}"];'
+                )
+            return vid
+
+        for i, b in enumerate(self.blocks):
+            bid = f"{prefix}b{i}"
+            inactive = active is not None and i not in active
+            style = (
+                ", style=dashed, color=gray, fontcolor=gray"
+                if inactive
+                else ""
             )
-            out = e.apply(modules, x)
-            if isinstance(e.dst, tuple):
-                for d, o in zip(e.dst, out):
-                    nodes[d] = o
-            else:
-                nodes[e.dst] = out
+            lines.append(
+                f'{indent}"{q(bid)}" [shape=box, label="{q(b.name)}"{style}];'
+            )
+            for v in b.inputs:
+                lines.append(f'{indent}"{q(var(v))}" -> "{q(bid)}";')
+            for v in b.outputs:
+                lines.append(f'{indent}"{q(bid)}" -> "{q(var(v))}";')
 
-            if last_used is not None:
-                for key in [
-                    k
-                    for k in nodes
-                    if k not in keep and last_used.get(k, -1) <= i
-                ]:
-                    del nodes[key]
+            if b.subgraph is not None:
+                cid = f"cluster_{bid}"
+                lines.append(f'{indent}subgraph "{q(cid)}" {{')
+                lines.append(
+                    f'{indent}  label="{q(b.name)} (subgraph)"; style=rounded;'
+                )
+                b.subgraph._dot_body(lines, f"{bid}/", None, indent + "  ")
+                lines.append(f"{indent}}}")
+                if (
+                    b.subgraph.blocks
+                ):  # anchor for the dotted link to the cluster
+                    lines.append(
+                        f'{indent}"{q(bid)}" -> "{q(bid)}/b0" '
+                        f'[style=dotted, arrowhead=none, lhead="{q(cid)}"];'
+                    )
 
-        if keep is not None:
-            return {k: nodes[k] for k in keep if k in nodes}
-        return nodes
 
-
-class DAGModel(eqx.Module):
+class GraphModel(eqx.Module):
     """A model consisting of modules and a directed acyclic graph."""
 
-    modules: dict[str, Any]
+    params: PyTree
     graph: Graph = eqx.field(static=True)
 
-    def run(
-        self, inputs: dict, path: list[str], keep: set[str] | None = None
-    ) -> dict:
-        """Traverse the graph along a given path, given a set of inputs.
+    def run(self, have: dict, want: Sequence[str]) -> dict:
+        """Compute the variables in want.
 
         Args:
-            inputs: A dictionary of inputs. The keys match the inputs nodes of
-                of the provided path.
-            path: A path along with the graph shall be evaluated given the
-                input dictionary.
-            keep: Whether or which intermediate results to keep in the output
-                dictionary after having traversed the graph. The default is
-                `None` meaning that all intermediate values are collected.
-
+            have: A dictionary of have, mapping each variable name to the
+                corresponding input object.
+            want: A sequence of variable names to compute.
 
         Returns:
             A dictionary containing the outputs of the path as well as all
             stored intermediate values.
 
         """
-        return self.graph.run(self.modules, inputs, path, keep)
-
-
-def diff_edge(dst, wrt, out, subpath, graph, diff: Callable):
-    """Create an `Edge` that differentiates a subgraph.
-
-    Args:
-        dst: The output nodes of the differentiation.
-        wrt: The nodes with respect to which the subgraph is differentiated.
-        out: The output of the subgraph, which is differentiated with respect
-            to `wrt`.
-        subpath: The path along the subgraph is evaluated.
-        graph: The sub-graph that is differentiated.
-        diff: The gradient function to apply for the differentiation, e.g.,
-            `jax.grad`, ...
-
-    Returns:
-        A new `Edge` mapping from `wrt` to `dst`.
-
-    """
-
-    def apply(m, x):
-        return diff(lambda v: graph.run(m, {wrt: v}, subpath)[out])(x)
-
-    return Edge(src=wrt, dst=dst, apply=apply)
+        return self.graph.run(self.params, have, want)
 
 
 if __name__ == "__main__":
+    from typing import NamedTuple
+
+    import jax
     import jax.numpy as jnp
+    import jax.random as jr
+    from jaxtyping import Array
 
-    # In this example, we are building a DAG model for the
-    # f(x,y) = sqr(x^2 + exp(y)) function.
+    from klax.nn import MLP
 
-    # Place all atomic building blocks in a module. Usually the modules are
-    # the components holding the parameters. For this example we simply use
-    # scalar functions
-    modules = {"sqrt": jnp.sqrt, "exp": jnp.exp}
+    class Normalizer(eqx.Module):
+        shift: Array
+        scale: Array
 
-    # Next, we create the edges, which connect the node. Here, every node and
-    # every edge has a unique name. Note, edges can also map from multiple
-    # source to multiple destinations
-    edges = {
-        "x->x**2": Edge("x", "x**2", apply=lambda _, x: x**2),
-        "y->exp(y)": Edge("y", "exp(y)", apply=lambda m, x: m["exp"](x)),
-        "sum&sqrt": Edge(
-            ("x**2", "exp(y)"), "z", apply=lambda m, x: m["sqrt"](x[0] + x[1])
-        ),
-    }
+        def forward(self, x):
+            return (x - self.shift) / self.scale
 
-    graph = Graph(edges)
-    model = DAGModel(modules, graph)
+        def inverse(self, x):
+            return self.scale * x + self.shift
+
+    class Params(NamedTuple):
+        normalizer: Normalizer
+        mlp: MLP
+
+    normalizer = Normalizer(shift=jnp.array(1.0), scale=jnp.array(3.0))
+    mlp = MLP(in_size=3, out_size=3, width_sizes=[16], key=jr.key(0))
+
+    params = Params(normalizer, mlp)
+
+    graph = Graph(
+        (
+            Block.make(
+                "normalize x",
+                "x",
+                "x_normalized",
+                fn=lambda m, x: m.normalizer.forward(x),
+            ),
+            Block.make(
+                "concat",
+                ("x", "u"),
+                "z",
+                fn=lambda m, x, u: jnp.concat([x, u]),
+            ),
+            Block.make(
+                "mlp",
+                "z",
+                "y_normalized",
+                fn=lambda m, x: m.mlp(x),
+            ),
+            Block.make(
+                "denormalize y",
+                "y_normalized",
+                "y",
+                fn=lambda m, y: m.normalizer.inverse(y[0]),
+            ),
+        )
+    )
+    model = GraphModel(params, graph)
     print(model)
 
-    # Now, let's evaluate the model along a provided path and with a certain
-    # input seed. Thereby the path, simply contains the names of the edges
-    # along the graph shall be evaluated.
-    path = ["x->x**2", "y->exp(y)", "sum&sqrt"]
-    seed = {
-        "x": jnp.array(2.0),
-        "y": jnp.array(1.5),
+    have: dict[str, Array] = {
+        "x": jnp.array([1.0, 2.0]),
+        "u": jnp.array([1.0]),
     }
-    out = model.run(seed, path)
+    want = ("y", "x_normalized")
 
-    # As you can see, the final outputs contains all intermediate as well as
-    # the final result.
+    @eqx.filter_jit
+    def run(model, have, want):
+        return model.run(have, want)
+
+    jax.config.update("jax_log_compiles", True)
+    out = run(model, have, want)
+    out = run(model, have, want)
+
     print(out)
+
+    dot = graph.to_dot()  # whole graph
+    dot = graph.to_dot(have=("x", "u"), want=("y",))  # grey out unused blocks
+    print(dot)
