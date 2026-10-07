@@ -30,11 +30,13 @@ class Loss(ABC):
 
     Inherit from this class to define a custom loss that can be passed to
     [`fit`][klax.fit].
-    An instance of the loss class has two methods - `value` and `value_and_grad` -
+    An instance of the loss class has methods `value` and `value_and_grad`,
     which determine how the loss value and it's gradients are calculated.
     To define a custom loss, implement a custom `value` method. When calling
     the loss instance, the model will first be [unwrapped][klax.unwrap], and
-    then passed to the `value` method.
+    then passed to the `value` method. The output of the `value` method is a
+    tuple of the loss value and a dictionary of auxiliary quantities (e.g. loss
+    components) to expose for logging/metrics.
     The `value_and_grad` function per default computes the gradient based on
     the `value` function. You should only overwrite it to specify a custom
     gradient computation.
@@ -49,7 +51,8 @@ class Loss(ABC):
         ...     def value(self, model, data, run_state):
         ...         x, y = data
         ...         y_pred = jax.vmap(model)(x)
-        ...         return jnp.mean(jnp.square(y_pred - y))
+        ...         mse = jnp.mean(jnp.square(y_pred - y))
+        ...         return mse, {"mse": mse}
         ```
 
     """
@@ -156,7 +159,7 @@ class Loss(ABC):
 def loss(
     func: Callable[[PyTree, PyTree, PyTree], tuple[Scalar, dict[str, Array]]],
 ) -> Loss:
-    """Convert a function into a [`klax.Loss`][] object.
+    """Convert a function into a [`klax.Loss`][] instance.
 
     Example:
         To create a mean squared error loss using this decorator, you can do:
