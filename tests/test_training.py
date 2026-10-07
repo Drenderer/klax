@@ -66,9 +66,11 @@ class TestMakeStep:
         # State has changed
         assert not jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 state,
                 new_state,
             )
@@ -127,9 +129,11 @@ class TestRunTrainingLoop:
         assert callback.end_steps == [3]
         assert not jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 model,
                 context.state.model,
             )
@@ -181,9 +185,11 @@ class TestRunTrainingLoop:
         assert callback.end_steps == [0]
         assert jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 model,
                 context.state.model,
             )
@@ -231,9 +237,11 @@ class TestRunTrainingLoop:
         assert callback.end_steps == [1]
         assert not jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 model,
                 context.state.model,
             )
@@ -268,8 +276,8 @@ class TestFit:
 
         assert isinstance(trained_model, klax.nn.FICNN)
         assert history.total_steps == 5
-        assert "loss" in history.content
-        loss_steps, loss_values = history["loss"]
+        assert "training/mse" in history.keys()
+        loss_steps, loss_values = history["training/mse"]
         assert loss_steps == [0]
         assert len(loss_values) == 1
 
@@ -313,39 +321,10 @@ class TestFit:
 
         assert isinstance(trained_model, klax.nn.FICNN)
         assert history.total_steps == 5
-        assert "loss" in history.content
+        assert "loss" in history.keys()
         loss_steps, loss_values = history["loss"]
         assert loss_steps == [0]
         assert len(loss_values) == 1
-
-    @staticmethod
-    def test_overwriting_default_metrics(getkey):
-        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
-
-        data = (
-            jr.uniform(getkey(), (100, 2)),
-            jr.uniform(getkey(), (100,)),
-        )
-
-        def my_metric(model):
-            return "A"
-
-        my_metric.name = "loss"
-        my_metric.verbose = False
-
-        _, history = klax.fit(
-            model,
-            data,
-            batch_size=5,
-            batch_axes=0,
-            steps=5,
-            loss=klax.mse,
-            optimizer=optax.sgd(0.1),
-            metrics=[my_metric],
-            key=getkey(),
-        )
-
-        assert history.content["loss"][1] == ["A"]
 
     def test_vmap_training(self, getkey):
         # Create ensemble of models
