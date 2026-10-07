@@ -37,6 +37,7 @@ a `tqdm` progress bar.
             - keys
             - save
             - load
+            - stack
             - plot
 
 ---

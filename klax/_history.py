@@ -73,19 +73,21 @@ class History:
     # deserialization.
     # TODO: Add methods for `hdf5` export of the history.
     _content: dict[str, StepsAndValues]
-    total_time: float | None
-    total_steps: int | None
+    total_time: float
+    total_steps: int
 
     def __init__(self):
         """Initialize an empty [history][klax.History]."""
-        self._content = defaultdict(
-            lambda: StepsAndValues(steps=[], values=[])
-        )
-        self.total_time = None
-        self.total_steps = None
+        self._content = dict()
+        self.total_time = 0.0
+        self.total_steps = 0
 
     def append(self, key: str, step: int, value: ArrayLike) -> None:
         """Add an entry to the [history][klax.History].
+
+        If the key does not exist yet, it is created. If the key already
+        exists, the new value is appended to the existing list of
+        values for that key.
 
         Args:
             key: The metric name for which a new value is inserted.
@@ -93,6 +95,8 @@ class History:
             value: The actual `ArrayLike` value that is inserted.
 
         """
+        if key not in self._content:
+            self._content[key] = StepsAndValues(steps=[], values=[])
         self._content[key].steps.append(step)
         self._content[key].values.append(value)
 
@@ -106,12 +110,13 @@ class History:
         return list(self._content.keys())
 
     def __getitem__(self, key: str) -> StepsAndValues:
-        if key not in self._content:
+        try:
+            return self._content[key]
+        except KeyError:
             raise KeyError(f"Metric '{key}' not found in history.")
-        return self._content[key]
 
     def __repr__(self) -> str:
-        return f"History containing: {list(self._content.keys())}"
+        return f"History containing: {self.keys()}"
 
     def to_dict(self) -> dict:
         """Return the [history][klax.History] as a JSON-serialized dictionary.
@@ -243,3 +248,33 @@ class History:
             handler_map={tuple: HandlerTuple(ndivide=None, pad=0)},
         )
         return ax
+
+    @classmethod
+    def stack(cls, histories: dict[str, "History"]) -> Self:
+        """Combine multiple histories into a single history, differentiated by a prefix.
+
+        !!!TIP
+            Use this method to combine multiple histories from different
+            training stages of a single model trianing run. For example:
+            ```python
+            klax.History.stack({"pretrain": history1, "finetune": history2})
+            ```
+
+        Args:
+            histories (dict[str, History]): Dictionary mapping prefixes to
+                `History` objects. Each prefix will be prepended to the metric
+                names in the resulting combined history.
+
+        Returns:
+            Self: History object containing all metrics from the input
+                histories, with metric names prefixed by their corresponding
+                keys in the input dictionary.
+
+        """
+        new_history = cls()
+        for prefix, history in histories.items():
+            new_history.total_time += history.total_time
+            new_history.total_steps += history.total_steps
+            for k, v in history._content.items():
+                new_history._content[f"{prefix}/{k}"] = v
+        return new_history
