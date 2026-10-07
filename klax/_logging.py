@@ -224,9 +224,7 @@ class ProgressMeter(Callback):
             flat = value.reshape(-1)
             size = flat.shape[0]
             n_preview = min(3, size)
-            preview = [
-                cls._format_scalar(v) for v in flat[:n_preview].tolist()
-            ]
+            preview = [cls._format_scalar(v) for v in flat[:n_preview].tolist()]
             suffix = ", ..." if size > n_preview else ""
             return "[" + ", ".join(preview) + suffix + "]"
 
