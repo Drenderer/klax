@@ -67,6 +67,19 @@ def make_step(
     loss: Loss,
     optimizer: optax.GradientTransformationExtraArgs,
 ) -> TrainingState:
+    """Default [step function][klax.StepFunction] used in [`fit`][klax.fit].
+
+    Args:
+        state (TrainingState): Current [training state][klax.TrainingState]
+        batch (PyTree): Pytree of training data in the current batch.
+        loss (Loss): [Loss][klax.Loss] function to minimize.
+        optimizer (optax.GradientTransformationExtraArgs): Opatx optimizer to
+            use for the update step.
+
+    Returns:
+        TrainingState: Updated [training state][klax.TrainingState].
+
+    """
     model_params, model_static = eqx.partition(state.model, param_spec)
     (value, aux), grad = loss.value_and_grad(
         state.model, batch, state.run_state
@@ -98,6 +111,23 @@ def run_training_loop(
     callbacks: Sequence[Callback],
     step_function: StepFunction,
 ) -> TrainingContext:
+    """Run training loop.
+
+    Repeatedly call the `step_function` for a given number of steps,
+    applying the specified step function and invoking callbacks.
+
+    Args:
+        context (TrainingContext): The initial
+            [training context][klax.TrainingContext].
+        callbacks (Sequence[Callback]): The list of [callbacks][klax.Callback]
+            to invoke.
+        step_function (StepFunction): The [step function][klax.StepFunction] to
+            call at each step.
+
+    Returns:
+        TrainingContext: The updated [training context][klax.TrainingContext].
+
+    """
     for callback in callbacks:
         callback.on_training_start(context)
 
@@ -306,9 +336,7 @@ def fit[T: eqx.Module](
         metrics.append(
             LossMetric(
                 loss,
-                batch_generator=batcher(
-                    data, batch_size, batch_axes, key=bkey
-                ),
+                batch_generator=batcher(data, batch_size, batch_axes, key=bkey),
                 prefix="training",
                 vmap_ensemble=vmap_ensemble,
                 jit_compile=True,
@@ -336,8 +364,6 @@ def fit[T: eqx.Module](
             ProgressMeter(progress_bar=verbose == 2, update_every=log_every)
         )
 
-    context = run_training_loop(
-        context, callbacks, step_function=step_function
-    )
+    context = run_training_loop(context, callbacks, step_function=step_function)
 
     return context.state.model, context.history

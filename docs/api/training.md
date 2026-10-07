@@ -27,9 +27,9 @@ that go beyond the capabilities of [`klax.fit`][klax.fit]
 ::: klax.TrainingContext
     options:
         members: false
-::: klax.run_training_loop
 ::: klax.StepFunction
     options:
         members:
             - __call__
 ::: klax.make_step
+::: klax.run_training_loop
