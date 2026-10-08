@@ -100,7 +100,12 @@ class Loss(ABC):
 
         """
         model = unwrap(model)
-        return self.value(model, batch, run_state)
+        value_and_aux = self.value(model, batch, run_state)
+        if not isinstance(value_and_aux, tuple) or len(value_and_aux) != 2:
+            raise ValueError(
+                "The `value` method must return a tuple of (loss_value, aux_dict)."
+            )
+        return value_and_aux
 
     def value_and_grad[T, M](
         self,
