@@ -32,9 +32,11 @@ def count_parameters(model: PyTree) -> int:
     return jax.tree.reduce(
         operator.add,
         jax.tree.map(
-            lambda x: x.size
-            if eqx.is_inexact_array(x) and not isinstance(x, NonTrainable)
-            else None,
+            lambda x: (
+                x.size
+                if eqx.is_inexact_array(x) and not isinstance(x, NonTrainable)
+                else None
+            ),
             model,
             is_leaf=lambda x: isinstance(x, NonTrainable),
         ),

@@ -47,6 +47,6 @@ def get_xarray():
     except ImportError as exc:
         raise ImportError(
             "This feature requires the 'xarray-experimental' extra. "
-            "Install with: pip install mypkg[xarray-experimental]"
+            "Install with: pip install klax[xarray-experimental]"
         ) from exc
     return xr, jxr

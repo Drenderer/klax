@@ -45,6 +45,7 @@ class PrintWeightsEvery(klax.Callback):
             f"Training has finished! This is the final weight matrix: \n{context.state.model.weight}."
         )
 
+
 # Initialize the callback
 my_callback = PrintWeightsEvery(100)
 
@@ -60,8 +61,8 @@ trained_model, history = klax.fit(
     model,
     data=(x, y),
     steps=500,
-    callbacks=[my_callback], # <- Tell the training loop about the callback.
-    verbose=0, # We don't use the default logging here, since this interferes with printing the weights.
+    callbacks=[my_callback],  # <- Tell the training loop about the callback.
+    verbose=0,  # We don't use the default logging here, since this interferes with printing the weights.
     key=key,
 )
 ```
