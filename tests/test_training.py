@@ -298,7 +298,8 @@ class TestFit:
         class MyLoss(klax.Loss):
             def value(self, model, batch, run_state):
                 y_pred = jax.vmap(model)(batch.x.data)
-                return jnp.mean((batch.y.data - y_pred) ** 2)
+                mse = jnp.mean((batch.y.data - y_pred) ** 2)
+                return mse, {"mse": mse}
 
         data = xr.Dataset(
             {
@@ -321,8 +322,8 @@ class TestFit:
 
         assert isinstance(trained_model, klax.nn.FICNN)
         assert history.total_steps == 5
-        assert "loss" in history.keys()
-        loss_steps, loss_values = history["loss"]
+        assert "training/mse" in history.keys()
+        loss_steps, loss_values = history["training/mse"]
         assert loss_steps == [0]
         assert len(loss_values) == 1
 
