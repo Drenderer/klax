@@ -1,90 +1,98 @@
-import inspect
-import re
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 
-from ._dag import Block, Graph, SubFunctionDef, _as_tuple
-
-_SPEC = re.compile(r"^\s*([^()]+?)\s*\(\s*([^()]*?)\s*\)\s*$")
-
-
-def _split(s: str) -> tuple[str, ...]:
-    return tuple(p.strip() for p in s.split(",") if p.strip())
+from ._dag import Block, Graph, GraphFunctionDef, _as_tuple
 
 
-def parse_subfunction(spec: str) -> SubFunctionDef:
-    """Parse "out1, out2(in1, in2)" into a SubFunctionDef."""
-    m = _SPEC.match(spec)
-    if m is None:
+# Frozen dataclass wrapper to ensure equality and hashability of the block's callable.
+@dataclass(frozen=True)
+class BlockCallableWrapper:
+    """Wrap a callable to make it a `BlockCallable`."""
+
+    fn: Callable
+    len_uses: int
+    singelton_output: bool
+
+    def __call__(self, params, subfns, *args):
+        if self.len_uses == 0:
+            out = self.fn(params, *args)
+        elif self.len_uses == 1:
+            out = self.fn(params, subfns[0], *args)
+        else:
+            out = self.fn(params, subfns, *args)
+        return (out,) if self.singelton_output else out
+
+
+def _gfd(spec: str) -> GraphFunctionDef:
+    """Parse "x, y -> f, g" into GraphFunctionDef(("x", "y"), ("f", "g"))."""
+    try:
+        lhs, rhs = spec.split("->")
+    except ValueError:
         raise ValueError(
-            f"bad subfunction spec {spec!r}; expected 'out(in1, in2)'"
-        )
-    return SubFunctionDef(inputs=_split(m[2]), outputs=_split(m[1]))
+            f"expected 'inputs -> outputs', got {spec!r}"
+        ) from None
+
+    def names(side: str) -> tuple[str, ...]:
+        return tuple(s.strip() for s in side.split(",") if s.strip())
+
+    return GraphFunctionDef(names(lhs), names(rhs))
 
 
-class _Sub:
-    """A subfunction bound to params. Call it as f(*inputs)."""
+def _make_block(
+    name: str,
+    inputs: str | Iterable[str],
+    outputs: str | Iterable[str],
+    fn: Callable,
+    uses: str | Iterable[str] | None = None,
+) -> Block:
+    """Create a `Block` from a callable and its input/output names."""
+    inputs = _as_tuple(inputs)
+    outputs = _as_tuple(outputs)
 
-    def __init__(self, raw: Callable, params, single: bool):
-        self._raw, self._params, self._single = raw, params, single
+    uses: tuple[GraphFunctionDef, ...] = (
+        () if uses is None else tuple(_gfd(u) for u in _as_tuple(uses))
+    )
 
-    def unbound(self, params, *args):
-        out = self._raw(params, *args)
-        return out[0] if self._single else out
+    fn_wrapped = BlockCallableWrapper(fn, len(uses), len(outputs) == 1)
 
-    def __call__(self, *args):
-        return self.unbound(self._params, *args)
+    return Block(
+        name=name, inputs=inputs, outputs=outputs, fn=fn_wrapped, uses=uses
+    )
+
+
+def block(
+    inputs: str | Iterable[str],
+    outputs: str | Iterable[str],
+    uses: str | Iterable[str] | None = None,
+    name=None,
+):
+    def decorator(fn):
+        return _make_block(name or fn.__name__, inputs, outputs, fn, uses)
+
+    return decorator
 
 
 class GraphBuilder:
+    """A builder for a `Graph`."""
+
     def __init__(self):
         self._blocks: list[Block] = []
 
     def block(
         self,
-        outputs: str | Iterable[str] | None = None,
-        uses: str | Iterable[str] = (),
-        inputs: str | Iterable[str] | None = None,
-        name: str | None = None,
+        inputs: str | Iterable[str],
+        outputs: str | Iterable[str],
+        uses: str | Iterable[str] | None = None,
+        name=None,
     ):
-        specs = tuple(
-            parse_subfunction(s)
-            for s in ((uses,) if isinstance(uses, str) else uses)
-        )
-
-        def deco(fn):
-            params = list(inspect.signature(fn).parameters)
-            n_skip = 1 + len(
-                specs
-            )  # params tree + one parameter per subfunction
-            if len(params) < n_skip:
-                raise TypeError(
-                    f"{fn.__name__}: needs (params, {len(specs)} subfunction(s), *inputs)"
-                )
-            ins = (
-                _as_tuple(inputs)
-                if inputs is not None
-                else tuple(params[n_skip:])
-            )
-            outs = (
-                _as_tuple(outputs) if outputs is not None else (fn.__name__,)
-            )
-            singles = tuple(len(sf.outputs) == 1 for sf in specs)
-
-            def wrapped(p, raw_subfns, *args):
-                subs = tuple(
-                    _Sub(r, p, s)
-                    for r, s in zip(raw_subfns, singles, strict=True)
-                )
-                return fn(p, *subs, *args)
-
+        def decorator(fn):
             self._blocks.append(
-                Block(name or fn.__name__, ins, outs, wrapped, specs)
+                _make_block(name or fn.__name__, inputs, outputs, fn, uses)
             )
-            return (
-                fn  # the decorated function stays a plain, testable function
-            )
+            return fn
 
-        return deco
+        return decorator
 
     def build(self) -> Graph:
+        """Return the built `Graph`."""
         return Graph(tuple(self._blocks))

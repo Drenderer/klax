@@ -1,7 +1,7 @@
 import html
 from collections.abc import Iterable
 
-from ._dag import Graph, SubFunctionDef, _as_tuple
+from ._dag import Graph, GraphFunctionDef, _as_tuple
 
 # (edge/border color, light fill color) pairs, one per subfunction.
 _PALETTE = (
@@ -54,7 +54,7 @@ def graph_to_dot(
     # ---- collect subfunction information --------------------------------
     island: dict[int, list[tuple[str, str]]] = {}  # block -> palette entries
     uses_rows: dict[
-        int, list[tuple[int, SubFunctionDef, tuple[str, str]]]
+        int, list[tuple[int, GraphFunctionDef, tuple[str, str]]]
     ] = {}
     var_marks: dict[str, tuple[str, str]] = {}
     dashed_links: list[tuple[str, int, tuple[str, str], int]] = []

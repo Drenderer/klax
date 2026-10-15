@@ -1,23 +1,53 @@
 """Implements the core elements of a graph-based model building approach."""
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
+from functools import cached_property
 from graphlib import CycleError, TopologicalSorter
-from typing import Any
+from typing import Any, Protocol
 
 import equinox as eqx
+import jax
 from jaxtyping import PyTree
-
-
-@dataclass(frozen=True)
-class SubFunctionDef:
-    inputs: tuple[str, ...]
-    outputs: tuple[str, ...]
 
 
 def _as_tuple(x) -> tuple:
     return (x,) if isinstance(x, str) else tuple(x)
+
+
+@dataclass(frozen=True)
+class GraphFunctionDef:
+    inputs: tuple[str, ...]
+    outputs: tuple[str, ...]
+
+
+class GraphFunction(eqx.Module):
+    """A slice of a graph, bound to params, as a pure callable."""
+
+    params: PyTree
+    graph: "Graph" = eqx.field(static=True)
+    defn: GraphFunctionDef = eqx.field(static=True)
+
+    def __call__(self, *args):
+        if len(args) != len(self.defn.inputs):
+            raise TypeError(
+                f"expected {len(self.defn.inputs)} arguments, got {len(args)}"
+            )
+        env = self.graph.run(
+            self.params,
+            have=dict(zip(self.defn.inputs, args, strict=True)),
+            want=self.defn.outputs,
+        )
+        out = tuple(env[o] for o in self.defn.outputs)
+        return out[0] if len(out) == 1 else out
+
+
+class BlockCallable(Protocol):
+    """A callable that can be used as a block in a graph."""
+
+    def __call__(
+        self, params: PyTree, subfns: tuple[GraphFunction, ...], *args
+    ) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -29,8 +59,8 @@ class Block:
         inputs: Names of the value nodes the block consumes.
         outputs: Names of the value nodes the block produces.
         fn: Callable implementing the block. It takes the parameters, the
-            required subfunctions and the inputs, and computes the outputs.
-        uses: A tuple of SubFunctionDefs, that define the subfunctions used
+            required sub-graphs and the inputs, and computes the outputs.
+        uses: A tuple of sub-graphDefs, that define the sub-graphs used
             by this Block.
 
     """
@@ -38,22 +68,8 @@ class Block:
     name: str
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
-    fn: Callable[
-        [PyTree, tuple[Callable, ...], *tuple[Any, ...]],
-        tuple[Any, ...],
-    ]
-    uses: tuple[SubFunctionDef, ...] = ()
-
-    @classmethod
-    def make(
-        cls,
-        name: str,
-        inputs: str | Iterable[str],
-        outputs: str | Iterable[str],
-        fn: Callable,
-        uses: tuple[SubFunctionDef, ...] = (),
-    ) -> "Block":
-        return cls(name, _as_tuple(inputs), _as_tuple(outputs), fn, uses)
+    fn: BlockCallable
+    uses: tuple[GraphFunctionDef, ...] = ()
 
     def __post_init__(self):
         if not self.outputs:
@@ -62,11 +78,6 @@ class Block:
             raise ValueError(f"block {self.name!r} has duplicate outputs")
         if not callable(self.fn):
             raise TypeError(f"block {self.name!r}: fn must be callable")
-
-    def __call__(self, params, subfns, *args):
-        """Wrap fn and return a tuple, even if it has only one output."""
-        out = self.fn(params, subfns, *args)
-        return (out,) if len(self.outputs) == 1 else out
 
 
 @dataclass(frozen=True)
@@ -77,6 +88,14 @@ class Graph:
 
     def __post_init__(self):
         self._check_valid()
+        self._hash
+
+    @cached_property
+    def _hash(self) -> int:
+        return hash(self.blocks)
+
+    def __hash__(self) -> int:
+        return self._hash
 
     # cached property to stay hashable
     @cached_property
@@ -108,7 +127,10 @@ class Graph:
             raise ValueError(f"cycle in graph: {cycle}") from e
         return {i: r for r, i in enumerate(order)}
 
-    # TODO: The plans could be cached, to not recompute them every time.
+    @cached_property
+    def _plan_cache(self) -> dict:
+        return {}
+
     def plan(
         self, have: Iterable[str], want: Iterable[str]
     ) -> tuple[int, ...]:
@@ -129,7 +151,15 @@ class Graph:
                 should be executed.
 
         """
-        want, have = tuple(want), frozenset(have)
+        have, want = frozenset(_as_tuple(have)), _as_tuple(want)
+        try:
+            return self._plan_cache[have, want]
+        except KeyError:
+            result = self._plan(have, want)
+            self._plan_cache[have, want] = result
+            return result
+
+    def _plan(self, have: frozenset[str], want: tuple[str]) -> tuple[int, ...]:
         required_blocks: set[int] = set()
         seen_variables: set[str] = set()
         missing: set[str] = set()
@@ -166,7 +196,7 @@ class Graph:
 
     @cached_property
     def _subplans(self) -> dict[tuple[int, int], tuple[int, ...]]:
-        """Compute the plan for the j-th subfunction of the i-th block."""
+        """Compute the plan for the j-th sub-graph of the i-th block."""
         plans = {}
         for i, b in enumerate(self.blocks):
             for j, sf in enumerate(b.uses):
@@ -174,7 +204,7 @@ class Graph:
                     plans[i, j] = self.plan(sf.inputs, sf.outputs)
                 except ValueError as e:
                     raise ValueError(
-                        f"block {b.name!r}, subfunction {j}: {e}"
+                        f"block {b.name!r}, sub-graph {j}: {e}"
                     ) from e
         return plans
 
@@ -184,54 +214,39 @@ class Graph:
 
         # Next, we compute the call graph. In this directed graph each node is a
         # block and an edge A -> B indicates that B uses A in at least one of
-        # it's subfunctions.
+        # it's sub-graphs.
         calls = {
             i: {k for j in range(len(b.uses)) for k in self._subplans[i, j]}
             for i, b in enumerate(self.blocks)
         }
         # We now have to check if the call graph is acyclic. If it is not, then
-        # there exists at least one block who's subfunction requires the
+        # there exists at least one block who's sub-graph requires the
         # exection of itself, which is not allowed.
         try:
             tuple(TopologicalSorter(calls).static_order())
         except CycleError as e:
             cycle = " -> ".join(self.blocks[i].name for i in e.args[1])
-            raise ValueError(f"recursive subfunction use: {cycle}") from e
+            raise ValueError(f"recursive sub-graph use: {cycle}") from e
 
-    def build_subfunction(self, subfndef: SubFunctionDef) -> Callable:
-        """Build a callable `subfn: (params, *inputs) -> (*outputs)`.
-
-        Args:
-            subfndef (SubFunctionDef): Definition of the subfunction.
-
-        Returns:
-            Callable: Callable subfunction.
-
-        """
-
-        def subfn(params, *args):
-            env = self.run(
-                params,
-                have=dict(zip(subfndef.inputs, args, strict=True)),
-                want=subfndef.outputs,
-            )
-            return tuple(env[o] for o in subfndef.outputs)
-
-        return subfn
+    def build_graph_function(
+        self, params: PyTree, defn: GraphFunctionDef
+    ) -> GraphFunction:
+        """Build a GraphFunction bound to the given parameters."""
+        self.plan(defn.inputs, defn.outputs)  # Check
+        return GraphFunction(params, self, defn)
 
     def run(
         self,
-        params: dict[str, Any],
+        params: PyTree,
         have: dict[str, Any],
         want: tuple[str, ...],
     ) -> dict:
         env = dict(have)
+        want = _as_tuple(want)
         for b in self.plan(tuple(have.keys()), want):
             block = self.blocks[b]
-            subfns = tuple(
-                self.build_subfunction(subfndef) for subfndef in block.uses
-            )
-            out = block(params, subfns, *(env[i] for i in block.inputs))
+            subfns = tuple(GraphFunction(params, self, d) for d in block.uses)
+            out = block.fn(params, subfns, *(env[i] for i in block.inputs))
             for k, v in zip(block.outputs, out, strict=True):
                 env[k] = v
         return {w: env[w] for w in want}
@@ -252,8 +267,11 @@ class GraphModel(eqx.Module):
             want: A sequence of variable names to compute.
 
         Returns:
-            A dictionary containing the outputs of the path as well as all
-            stored intermediate values.
+            A dictionary containing the variables in want.
 
         """
         return self.graph.run(self.params, have, want)
+
+    def function(self, defn: GraphFunctionDef) -> GraphFunction:
+        """Return a GraphFunction bound to the model's parameters."""
+        return self.graph.build_graph_function(self.params, defn)
