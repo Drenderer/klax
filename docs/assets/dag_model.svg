@@ -1,0 +1,147 @@
+<svg width="635pt" height="511pt" viewBox="0.00 0.00 634.95 510.60" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 506.6)">
+<title>G</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-506.6 630.95,-506.6 630.95,4 -4,4"/>
+<!-- v:isochoric_invariants -->
+<g id="node1" class="node">
+<title>v:isochoric_invariants</title>
+<ellipse fill="none" stroke="#d62728" stroke-width="2.5" cx="317.1" cy="-338.6" rx="95.84" ry="18"/>
+<text text-anchor="middle" x="317.1" y="-334.4" font-family="Helvetica,sans-Serif" font-size="14.00">isochoric_invariants</text>
+</g>
+<!-- b0 -->
+<g id="node7" class="node">
+<title>b0</title>
+<polygon fill="none" stroke="#d62728" stroke-width="2.5" points="119.1,-274.8 65.1,-274.8 65.1,-238.8 119.1,-238.8 119.1,-274.8"/>
+<text text-anchor="start" x="77.71" y="-253.6" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="14.00">icnn</text>
+</g>
+<!-- v:isochoric_invariants&#45;&gt;b0 -->
+<g id="edge1" class="edge">
+<title>v:isochoric_invariants-&gt;b0</title>
+<path fill="none" stroke="#d62728" stroke-width="2" d="M255.5,-324.05C219.02,-314.93 172.4,-301.32 133.1,-283.6 131.83,-283.03 130.56,-282.43 129.29,-281.79"/>
+<polygon fill="#d62728" stroke="#d62728" stroke-width="2" points="131.07,-278.78 120.62,-277.03 127.69,-284.91 131.07,-278.78"/>
+</g>
+<!-- b3 -->
+<g id="node10" class="node">
+<title>b3</title>
+<polygon fill="none" stroke="black" points="486.46,-283.6 147.74,-283.6 147.74,-230 486.46,-230 486.46,-283.6"/>
+<text text-anchor="start" x="224.51" y="-265" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="14.00">compute stress coefficients</text>
+<polygon fill="#f8d4d4" stroke="none" points="155.74,-234 155.74,-256.8 478.46,-256.8 478.46,-234 155.74,-234"/>
+<text text-anchor="start" x="158.74" y="-241.2" font-family="Helvetica,sans-Serif" font-size="14.00">uses ƒ0: isochoric_invariants → psi_nn_normalized</text>
+</g>
+<!-- v:isochoric_invariants&#45;&gt;b3 -->
+<g id="edge7" class="edge">
+<title>v:isochoric_invariants-&gt;b3</title>
+<path fill="none" stroke="black" d="M317.1,-319.89C317.1,-312.63 317.1,-303.93 317.1,-295.38"/>
+<polygon fill="black" stroke="black" points="320.6,-295.46 317.1,-285.46 313.6,-295.46 320.6,-295.46"/>
+</g>
+<!-- v:psi_nn -->
+<g id="node2" class="node">
+<title>v:psi_nn</title>
+<ellipse fill="none" stroke="black" cx="92.1" cy="-175" rx="39.49" ry="18"/>
+<text text-anchor="middle" x="92.1" y="-170.8" font-family="Helvetica,sans-Serif" font-size="14.00">psi_nn</text>
+</g>
+<!-- b1 -->
+<g id="node8" class="node">
+<title>b1</title>
+<polygon fill="none" stroke="#d62728" stroke-width="2.5" points="168.83,-109 15.36,-109 15.36,-73 168.83,-73 168.83,-109"/>
+<text text-anchor="start" x="26.36" y="-87.8" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="14.00">normalize_potential</text>
+</g>
+<!-- v:psi_nn&#45;&gt;b1 -->
+<g id="edge3" class="edge">
+<title>v:psi_nn-&gt;b1</title>
+<path fill="none" stroke="#d62728" stroke-width="2" d="M92.1,-156.61C92.1,-146.74 92.1,-134.11 92.1,-122.63"/>
+<polygon fill="#d62728" stroke="#d62728" stroke-width="2" points="95.6,-122.96 92.1,-112.96 88.6,-122.96 95.6,-122.96"/>
+</g>
+<!-- v:psi_nn_normalized -->
+<g id="node3" class="node">
+<title>v:psi_nn_normalized</title>
+<ellipse fill="none" stroke="#d62728" stroke-width="2.5" cx="92.1" cy="-18" rx="92.1" ry="18"/>
+<text text-anchor="middle" x="92.1" y="-13.8" font-family="Helvetica,sans-Serif" font-size="14.00">psi_nn_normalized</text>
+</g>
+<!-- v:psi_nn_normalized&#45;&gt;b3 -->
+<g id="edge12" class="edge">
+<title>v:psi_nn_normalized-&gt;b3</title>
+<path fill="none" stroke="#d62728" stroke-dasharray="5,2" d="M127.15,-35.52C145.05,-44.97 166.5,-57.94 183.1,-73 183.52,-73.38 252.52,-167.6 291.33,-220.61"/>
+<polygon fill="#d62728" stroke="#d62728" points="288.35,-222.46 297.08,-228.46 294,-218.32 288.35,-222.46"/>
+<text text-anchor="middle" x="236.82" y="-130" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#d62728">ƒ0</text>
+</g>
+<!-- v:stretch -->
+<g id="node4" class="node">
+<title>v:stretch</title>
+<ellipse fill="lightgray" stroke="black" cx="470.1" cy="-484.6" rx="40.02" ry="18"/>
+<text text-anchor="middle" x="470.1" y="-480.4" font-family="Helvetica,sans-Serif" font-size="14.00">stretch</text>
+</g>
+<!-- b2 -->
+<g id="node9" class="node">
+<title>b2</title>
+<polygon fill="none" stroke="black" points="463.28,-429.6 312.91,-429.6 312.91,-393.6 463.28,-393.6 463.28,-429.6"/>
+<text text-anchor="start" x="323.91" y="-408.4" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="14.00">compute invariants</text>
+</g>
+<!-- v:stretch&#45;&gt;b2 -->
+<g id="edge5" class="edge">
+<title>v:stretch-&gt;b2</title>
+<path fill="none" stroke="black" d="M452.3,-468.19C441.94,-459.22 428.64,-447.7 416.83,-437.48"/>
+<polygon fill="black" stroke="black" points="419.16,-434.86 409.3,-430.96 414.57,-440.15 419.16,-434.86"/>
+</g>
+<!-- b4 -->
+<g id="node11" class="node">
+<title>b4</title>
+<polygon fill="none" stroke="black" points="626.95,-109 397.25,-109 397.25,-73 626.95,-73 626.95,-109"/>
+<text text-anchor="start" x="408.25" y="-87.8" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="14.00">compute Piola-Kirchhoff stress</text>
+</g>
+<!-- v:stretch&#45;&gt;b4 -->
+<g id="edge9" class="edge">
+<title>v:stretch-&gt;b4</title>
+<path fill="none" stroke="black" d="M492.78,-469.36C509.77,-456.75 530.1,-436.65 530.1,-412.6 530.1,-412.6 530.1,-412.6 530.1,-174 530.1,-155.7 525.77,-135.63 521.36,-119.93"/>
+<polygon fill="black" stroke="black" points="524.85,-119.38 518.63,-110.8 518.14,-121.39 524.85,-119.38"/>
+</g>
+<!-- v:stress_coefficients -->
+<g id="node5" class="node">
+<title>v:stress_coefficients</title>
+<ellipse fill="none" stroke="black" cx="376.1" cy="-175" rx="90.47" ry="18"/>
+<text text-anchor="middle" x="376.1" y="-170.8" font-family="Helvetica,sans-Serif" font-size="14.00">stress_coefficients</text>
+</g>
+<!-- v:stress_coefficients&#45;&gt;b4 -->
+<g id="edge10" class="edge">
+<title>v:stress_coefficients-&gt;b4</title>
+<path fill="none" stroke="black" d="M403.62,-157.41C423.68,-145.31 451.12,-128.76 473.39,-115.34"/>
+<polygon fill="black" stroke="black" points="475.16,-118.36 481.91,-110.2 471.54,-112.37 475.16,-118.36"/>
+</g>
+<!-- v:pk11_stress -->
+<g id="node6" class="node">
+<title>v:pk11_stress</title>
+<ellipse fill="none" stroke="black" cx="512.1" cy="-18" rx="63.1" ry="18"/>
+<text text-anchor="middle" x="512.1" y="-13.8" font-family="Helvetica,sans-Serif" font-size="14.00">pk11_stress</text>
+</g>
+<!-- b0&#45;&gt;v:psi_nn -->
+<g id="edge2" class="edge">
+<title>b0-&gt;v:psi_nn</title>
+<path fill="none" stroke="#d62728" stroke-width="2" d="M92.1,-238.09C92.1,-228.73 92.1,-216.97 92.1,-206.22"/>
+<polygon fill="#d62728" stroke="#d62728" stroke-width="2" points="95.6,-206.41 92.1,-196.41 88.6,-206.41 95.6,-206.41"/>
+</g>
+<!-- b1&#45;&gt;v:psi_nn_normalized -->
+<g id="edge4" class="edge">
+<title>b1-&gt;v:psi_nn_normalized</title>
+<path fill="none" stroke="#d62728" stroke-width="2" d="M92.1,-72.08C92.1,-65.22 92.1,-57.18 92.1,-49.47"/>
+<polygon fill="#d62728" stroke="#d62728" stroke-width="2" points="95.6,-49.69 92.1,-39.69 88.6,-49.69 95.6,-49.69"/>
+</g>
+<!-- b2&#45;&gt;v:isochoric_invariants -->
+<g id="edge6" class="edge">
+<title>b2-&gt;v:isochoric_invariants</title>
+<path fill="none" stroke="black" d="M370.91,-393.41C362.4,-384.91 351.96,-374.47 342.55,-365.05"/>
+<polygon fill="black" stroke="black" points="345.24,-362.79 335.69,-358.19 340.29,-367.74 345.24,-362.79"/>
+</g>
+<!-- b3&#45;&gt;v:stress_coefficients -->
+<g id="edge8" class="edge">
+<title>b3-&gt;v:stress_coefficients</title>
+<path fill="none" stroke="black" d="M336.42,-229.67C342.93,-220.86 350.2,-211.02 356.72,-202.21"/>
+<polygon fill="black" stroke="black" points="359.4,-204.47 362.53,-194.35 353.77,-200.31 359.4,-204.47"/>
+</g>
+<!-- b4&#45;&gt;v:pk11_stress -->
+<g id="edge11" class="edge">
+<title>b4-&gt;v:pk11_stress</title>
+<path fill="none" stroke="black" d="M512.1,-72.81C512.1,-65.23 512.1,-56.1 512.1,-47.54"/>
+<polygon fill="black" stroke="black" points="515.6,-47.54 512.1,-37.54 508.6,-47.54 515.6,-47.54"/>
+</g>
+</g>
+</svg>
