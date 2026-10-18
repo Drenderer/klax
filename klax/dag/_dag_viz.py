@@ -14,7 +14,7 @@ _PALETTE = (
 )
 
 
-def graph_to_dot(
+def to_dot(
     graph: Graph,
     have: Iterable[str] = (),
     want: Iterable[str] | str | None = None,
@@ -36,13 +36,14 @@ def graph_to_dot(
         execute are drawn dashed and gray.
 
     Args:
-        graph: The graph to draw.
-        have: Names of the supplied variables (only used together with `want`).
-        want: Names of the requested variables, or None to draw everything
-            as active.
+        graph (Graph): The graph to draw.
+        have (Iterable[str]): Names of the supplied variables (only used
+            together with `want`).
+        want (Iterable[str] | str | None): Names of the requested variables,
+            or None to draw everything as active.
 
     Returns:
-        The DOT source as a string.
+        str: The DOT source.
 
     """
     active = (
@@ -52,41 +53,52 @@ def graph_to_dot(
     )
 
     # ---- collect subfunction information --------------------------------
-    island: dict[int, list[tuple[str, str]]] = {}  # block -> palette entries
-    uses_rows: dict[
+    subfunction_blocks: dict[int, list[tuple[str, str]]] = {}
+    block_uses: dict[
         int, list[tuple[int, GraphFunctionDef, tuple[str, str]]]
     ] = {}
-    var_marks: dict[str, tuple[str, str]] = {}
-    dashed_links: list[tuple[str, int, tuple[str, str], int]] = []
+    variable_colors: dict[str, tuple[str, str]] = {}
+    subfunction_links: list[tuple[str, int, tuple[str, str], int]] = []
 
-    for k, ((i, j), plan) in enumerate(graph._subplans.items()):
-        pal = _PALETTE[k % len(_PALETTE)]
-        sf = graph.blocks[i].uses[j]
-        uses_rows.setdefault(i, []).append((j, sf, pal))
-        for b in plan:
-            island.setdefault(b, []).append(pal)
-        for v in (*sf.inputs, *sf.outputs):
-            var_marks.setdefault(v, pal)
-        for v in sf.outputs:
-            dashed_links.append((v, i, pal, j))
+    for subfunction_index, ((block_index, use_index), plan) in enumerate(
+        graph._subplans.items()
+    ):
+        palette = _PALETTE[subfunction_index % len(_PALETTE)]
+        subfunction = graph.blocks[block_index].uses[use_index]
+        block_uses.setdefault(block_index, []).append(
+            (use_index, subfunction, palette)
+        )
+        for planned_block_index in plan:
+            subfunction_blocks.setdefault(planned_block_index, []).append(
+                palette
+            )
+        for variable in (*subfunction.inputs, *subfunction.outputs):
+            variable_colors.setdefault(variable, palette)
+        for variable in subfunction.outputs:
+            subfunction_links.append(
+                (variable, block_index, palette, use_index)
+            )
 
     # ---- helpers ----------------------------------------------------------
-    def q(s: object) -> str:
+    def quote(value: object) -> str:
         """Quote a string for use as a DOT id or plain attribute value."""
-        return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+        return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
-    def edge(src: str, dst: str, block: int) -> str:
-        pals = island.get(block, [])
-        inactive = active is not None and block not in active
-        attrs = []
-        if pals:
-            attrs += [f"color={q(':'.join(p[0] for p in pals))}", "penwidth=2"]
-        elif inactive:
-            attrs.append("color=gray")
-        if inactive:
-            attrs.append("style=dashed")
-        suffix = f" [{', '.join(attrs)}]" if attrs else ""
-        return f"  {q(src)} -> {q(dst)}{suffix};"
+    def format_edge(source: str, destination: str, block_index: int) -> str:
+        colors = subfunction_blocks.get(block_index, [])
+        is_inactive = active is not None and block_index not in active
+        attributes = []
+        if colors:
+            attributes += [
+                f"color={quote(':'.join(color[0] for color in colors))}",
+                "penwidth=2",
+            ]
+        elif is_inactive:
+            attributes.append("color=gray")
+        if is_inactive:
+            attributes.append("style=dashed")
+        suffix = f" [{', '.join(attributes)}]" if attributes else ""
+        return f"  {quote(source)} -> {quote(destination)}{suffix};"
 
     lines = [
         "digraph G {",
@@ -98,32 +110,38 @@ def graph_to_dot(
     ]
 
     # ---- variable nodes ---------------------------------------------------
-    names: list[str] = []
-    for b in graph.blocks:
-        for v in (*b.inputs, *b.outputs):
-            if v not in names:
-                names.append(v)
-    for sf_vars in var_marks:
-        if sf_vars not in names:
-            names.append(sf_vars)
+    variable_names: list[str] = []
+    for block in graph.blocks:
+        for variable in (*block.inputs, *block.outputs):
+            if variable not in variable_names:
+                variable_names.append(variable)
+    for variable in variable_colors:
+        if variable not in variable_names:
+            variable_names.append(variable)
 
-    for v in names:
-        attrs = ["shape=ellipse", f"label={q(v)}"]
-        if v not in graph.producers:
-            attrs += ["style=filled", "fillcolor=lightgray"]
-        if v in var_marks:
-            attrs += [f"color={q(var_marks[v][0])}", "penwidth=2.5"]
-        lines.append(f"  {q('v:' + v)} [{', '.join(attrs)}];")
+    for variable in variable_names:
+        attributes = ["shape=ellipse", f"label={quote(variable)}"]
+        if variable not in graph.producers:
+            attributes += ["style=filled", "fillcolor=lightgray"]
+        if variable in variable_colors:
+            attributes += [
+                f"color={quote(variable_colors[variable][0])}",
+                "penwidth=2.5",
+            ]
+        lines.append(f"  {quote('v:' + variable)} [{', '.join(attributes)}];")
 
     # ---- block nodes and their edges --------------------------------------
-    for i, b in enumerate(graph.blocks):
-        bid = f"b{i}"
-        inactive = active is not None and i not in active
+    for block_index, block in enumerate(graph.blocks):
+        block_id = f"b{block_index}"
+        is_inactive = active is not None and block_index not in active
 
-        rows = [f"<tr><td><b>{html.escape(b.name)}</b></td></tr>"]
-        for j, sf, (_, fill) in uses_rows.get(i, []):
+        rows = [f"<tr><td><b>{html.escape(block.name)}</b></td></tr>"]
+        for use_index, subfunction, (_, fill) in block_uses.get(
+            block_index, []
+        ):
             text = (
-                f"uses ƒ{j}: {', '.join(sf.inputs)} → {', '.join(sf.outputs)}"
+                f"uses ƒ{use_index}: {', '.join(subfunction.inputs)} → "
+                f"{', '.join(subfunction.outputs)}"
             )
             rows.append(
                 f'<tr><td bgcolor="{fill}">{html.escape(text)}</td></tr>'
@@ -134,27 +152,30 @@ def graph_to_dot(
             + "</table>>"
         )
 
-        attrs = ["shape=box", f"label={label}"]
-        if i in island:
-            attrs += [f"color={q(island[i][0][0])}", "penwidth=2.5"]
-        elif inactive:
-            attrs.append("color=gray")
-        if inactive:
-            attrs += ["style=dashed", "fontcolor=gray"]
-        lines.append(f"  {q(bid)} [{', '.join(attrs)}];")
+        attributes = ["shape=box", f"label={label}"]
+        if block_index in subfunction_blocks:
+            attributes += [
+                f"color={quote(subfunction_blocks[block_index][0][0])}",
+                "penwidth=2.5",
+            ]
+        elif is_inactive:
+            attributes.append("color=gray")
+        if is_inactive:
+            attributes += ["style=dashed", "fontcolor=gray"]
+        lines.append(f"  {quote(block_id)} [{', '.join(attributes)}];")
 
-        for v in b.inputs:
-            lines.append(edge("v:" + v, bid, i))
-        for v in b.outputs:
-            lines.append(edge(bid, "v:" + v, i))
+        for variable in block.inputs:
+            lines.append(format_edge("v:" + variable, block_id, block_index))
+        for variable in block.outputs:
+            lines.append(format_edge(block_id, "v:" + variable, block_index))
 
     # ---- "uses" links: subfunction output -> using block -------------------
     # constraint=false keeps these edges from distorting the top-to-bottom layout.
-    for v, i, (color, _), j in dashed_links:
+    for variable, block_index, (color, _), use_index in subfunction_links:
         lines.append(
-            f"  {q('v:' + v)} -> {q(f'b{i}')} "
-            f"[color={q(color)}, style=dashed, constraint=false, "
-            f"label={q(f'ƒ{j}')}, fontcolor={q(color)}];"
+            f"  {quote('v:' + variable)} -> {quote(f'b{block_index}')} "
+            f"[color={quote(color)}, style=dashed, constraint=false, "
+            f"label={quote(f'ƒ{use_index}')}, fontcolor={quote(color)}];"
         )
 
     lines.append("}")

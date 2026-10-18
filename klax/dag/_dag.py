@@ -4,10 +4,9 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from graphlib import CycleError, TopologicalSorter
-from typing import Any, Protocol
+from typing import Any
 
 import equinox as eqx
-import jax
 from jaxtyping import PyTree
 
 
@@ -17,21 +16,43 @@ def _as_tuple(x) -> tuple:
 
 @dataclass(frozen=True)
 class GraphFunctionDef:
+    """Definition of a graph function in terms of inputs to outputs."""
+
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
 
 
 class GraphFunction(eqx.Module):
-    """A slice of a graph, bound to params, as a pure callable."""
+    """A section of a [graph][klax.dag.Graph] as a pure callable.
+
+    !!!Note:
+        The entire parameter container is bound to the function. If the
+        function only uses a subset of the parameters this can sometimes lead to
+        inefficiencies. For example, if the function is a vector field that is
+        passed to `diffrax.diffeqsolve`, then `BacksolveAdjoint` will carry
+        cotangents for the entire parameter container, even if only a subset of
+        the parameters are actually used in the vector field.
+    """
 
     params: PyTree
     graph: "Graph" = eqx.field(static=True)
     defn: GraphFunctionDef = eqx.field(static=True)
 
-    def __call__(self, *args):
+    def __call__(self, *args) -> Any:
+        """Evaluate the graph function.
+
+        Raises:
+            TypeError: If an unexpected number of inputs arguments are passed.
+
+        Returns:
+            Any: The value of the output variable, or a tuple of output variable
+                values, if the graph function has multiple outputs.
+
+        """
         if len(args) != len(self.defn.inputs):
             raise TypeError(
-                f"expected {len(self.defn.inputs)} arguments, got {len(args)}"
+                f"expected {len(self.defn.inputs)} arguments "
+                f"({', '.join(self.defn.inputs)}), got {len(args)}"
             )
         env = self.graph.run(
             self.params,
@@ -42,34 +63,28 @@ class GraphFunction(eqx.Module):
         return out[0] if len(out) == 1 else out
 
 
-class BlockCallable(Protocol):
-    """A callable that can be used as a block in a graph."""
-
-    def __call__(
-        self, params: PyTree, subfns: tuple[GraphFunction, ...], *args
-    ) -> Any: ...
-
-
 @dataclass(frozen=True)
 class Block:
-    """A compute node in a graph.
+    """A compute node in a [graph][klax.dag.Graph].
 
     Attributes:
         name: Name of the computation. Only used for visualizations.
-        inputs: Names of the value nodes the block consumes.
-        outputs: Names of the value nodes the block produces.
-        fn: Callable implementing the block. It takes the parameters, the
-            required sub-graphs and the inputs, and computes the outputs.
-        uses: A tuple of sub-graphDefs, that define the sub-graphs used
-            by this Block.
+        inputs: Names of the variables the block consumes.
+        outputs: Names of the variables the block produces.
+        fn: Callable implementing the block computation.
+        uses: A tuple of [`GraphFunctionDef`][klax.dag.GraphFunctionDef]s
+            defining the [`GraphFunction`][klax.dag.GraphFunction]s used by this
+            Block. This is useful, if the block needs to perform a function
+            transformation (e.g. take the derivative) of a sub-graph of the
+            overall graph.
 
     """
 
     name: str
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
-    fn: BlockCallable
-    uses: tuple[GraphFunctionDef, ...] = ()
+    fn: Callable
+    uses: tuple[GraphFunctionDef, ...]
 
     def __post_init__(self):
         if not self.outputs:
@@ -82,7 +97,7 @@ class Block:
 
 @dataclass(frozen=True)
 class Graph:
-    """A directed acyclic bipartite graph defined by multiple `Block`s."""
+    """A directed acyclic bipartite graph defined by multiple [`Block`s][klax.dag.Block]."""
 
     blocks: tuple[Block, ...]
 
@@ -97,10 +112,17 @@ class Graph:
     def __hash__(self) -> int:
         return self._hash
 
-    # cached property to stay hashable
-    @cached_property
+    @cached_property  # stays hashable
     def producers(self) -> dict[str, int]:
-        """Computes the mapping from output variable names to the index of the block that produces them."""
+        """Return the producer map.
+
+        Raises:
+            ValueError: If two blocks compute the same output variable.
+
+        Returns:
+            dict[str, int]: Map from variables to the block that produces them.
+
+        """
         producers = {}
         for i, block in enumerate(self.blocks):
             for variable in block.outputs:
@@ -111,7 +133,18 @@ class Graph:
 
     @cached_property
     def _rank(self) -> dict[int, int]:
-        """Compute the mapping from block indices to their topological rank (the order in which they should be executed)."""
+        """Return the topological ranks of each block.
+
+        The topological ranks indicate the order in which the blocks should be
+        executed so that all dependencies are satisfied.
+
+        Raises:
+            ValueError: If the graph is contains a cycle.
+
+        Returns:
+            dict[int, int]: Mapping from block index to its topological rank.
+
+        """
         # Build the dependency graph: A directed graph, where each node is a
         # block and an edge A -> B indicates, that at least one of block A's
         # outputs is used by B.
@@ -119,7 +152,6 @@ class Graph:
             i: {self.producers[v] for v in b.inputs if v in self.producers}
             for i, b in enumerate(self.blocks)
         }
-        # Next, check that the dependency graph is acyclic.
         try:
             order = tuple(TopologicalSorter(deps).static_order())
         except CycleError as e:
@@ -134,7 +166,10 @@ class Graph:
     def plan(
         self, have: Iterable[str], want: Iterable[str]
     ) -> tuple[int, ...]:
-        """Return topologically sorted block incices to compute `want` from `have`.
+        """Return a plan to compute `want` from `have`.
+
+        A plan is a tuple of block indices in the order in which they should be
+        executed.
 
         Args:
             have (Iterable[str]): Iterable of variable names that are available.
@@ -231,7 +266,17 @@ class Graph:
     def build_graph_function(
         self, params: PyTree, defn: GraphFunctionDef
     ) -> GraphFunction:
-        """Build a GraphFunction bound to the given parameters."""
+        """Build a GraphFunction bound to the given parameters.
+
+        Args:
+            params (PyTree): Container of parameters
+            defn (GraphFunctionDef): A definition of the function to build in
+                terms of its inputs and outputs.
+
+        Returns:
+            GraphFunction: A graph function bound to the given parameters.
+
+        """
         self.plan(defn.inputs, defn.outputs)  # Check
         return GraphFunction(params, self, defn)
 
@@ -241,6 +286,19 @@ class Graph:
         have: dict[str, Any],
         want: tuple[str, ...],
     ) -> dict:
+        """Execute a graph computation.
+
+        Args:
+            params (PyTree): Container of parameters.
+            have (dict[str, Any]): Avialable inputs in a dictionary, mapping
+                each variable name to the corresponding input object.
+            want (tuple[str, ...]): Sequence of variables to compute.
+
+        Returns:
+            dict: A dictionary mapping the names of the variables in want to
+                their computed values.
+
+        """
         env = dict(have)
         want = _as_tuple(want)
         for b in self.plan(tuple(have.keys()), want):
@@ -253,25 +311,34 @@ class Graph:
 
 
 class GraphModel(eqx.Module):
-    """A model consisting of modules and a directed acyclic graph."""
+    """Parameters bound to a graph."""
 
     params: PyTree
     graph: Graph = eqx.field(static=True)
 
     def run(self, have: dict, want: tuple[str, ...]) -> dict:
-        """Compute the variables in want.
+        """Execute a graph computation.
 
         Args:
-            have: A dictionary of have, mapping each variable name to the
-                corresponding input object.
-            want: A sequence of variable names to compute.
+            have (dict[str, Any]): Avialable inputs in a dictionary, mapping
+                each variable name to the corresponding input object.
+            want (tuple[str, ...]): Sequence of variables to compute.
 
         Returns:
-            A dictionary containing the variables in want.
+            dict: A dictionary mapping the names of the variables in want to
+                their computed values.
 
         """
         return self.graph.run(self.params, have, want)
 
     def function(self, defn: GraphFunctionDef) -> GraphFunction:
-        """Return a GraphFunction bound to the model's parameters."""
+        """Return a GraphFunction bound to the model's parameters.
+
+        Args:
+            defn (GraphFunctionDef): _description_
+
+        Returns:
+            GraphFunction: _description_
+
+        """
         return self.graph.build_graph_function(self.params, defn)

@@ -8,7 +8,7 @@ import jax.random as jr
 from jaxtyping import Array
 
 import klax
-from klax.dag import GraphBuilder, GraphModel, graph_to_dot
+from klax.dag import GraphBuilder, GraphModel, to_dot
 from klax.nn import FICNN
 
 
@@ -223,7 +223,5 @@ if __name__ == "__main__":
     out = run(model, have, want)
     out = run(model, have, want)
 
-    print(out)
-
-    dot = graph_to_dot(graph, have=("x"), want=("hamiltonian",))
+    dot = to_dot(graph, have=("x"), want=("hamiltonian",))
     print(dot)
