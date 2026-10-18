@@ -401,9 +401,7 @@ class TestSplitData:
             coords={"batch": jnp.arange(64)},
             dims="batch",
         )
-        s1, s2 = klax.split_data(
-            data, (3, 1), batch_axes="batch", key=getkey()
-        )
+        s1, s2 = klax.split_data(data, (3, 1), batch_axes="batch", key=getkey())
         assert s1.sizes["batch"] == 48
         assert s2.sizes["batch"] == 16
         s1_idx = set(np.asarray(s1.batch).tolist())

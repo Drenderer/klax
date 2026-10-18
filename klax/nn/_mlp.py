@@ -124,9 +124,7 @@ class MLP(eqx.Module, strict=True):
                 dtype=dtype,
                 key=key,
             )
-            for sin, sout, ub, key in zip(
-                in_sizes, out_sizes, use_biases, keys
-            )
+            for sin, sout, ub, key in zip(in_sizes, out_sizes, use_biases, keys)
         )
 
         # In case `activation` or `final_activation` are learnt, then make a

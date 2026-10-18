@@ -39,10 +39,8 @@ class Initializer(Protocol):
 type SupportedInitializer = Initializer | jax.nn.initializers.Initializer
 
 
-def canonicalize_initializer(
-    init: Initializer | jax.nn.initializers.Initializer,
-) -> Initializer:
-    """Convert any supported initializer to an `Initializer`.
+def canonicalize_initializer(init: SupportedInitializer) -> Initializer:
+    """Convert any supported initializer to an [`Initializer`][klax.Initializer].
 
     Args:
         init: The initializers to convert.
@@ -63,6 +61,8 @@ def canonicalize_initializer(
 
     if "fan_in" in sig.parameters:
         return cast(Initializer, init)
+
+    init = cast(jax.nn.initializers.Initializer, init)
 
     @wraps(init)
     def wrapper(
@@ -89,7 +89,7 @@ def hoedt_normal(
     signal propagation through layers with non-negative weights.
 
     Tip:
-        This initiailzation should be paired with the [`klax.hoedt_bias`][]
+        This initialization should be paired with the [`klax.hoedt_bias`][]
         initializer for biases of constrained layers.
 
     Args:
@@ -122,13 +122,13 @@ def hoedt_normal(
     return init
 
 
-# TODO: Add an option to the factory to choose between constant and random intialization
+# TODO: Add an option to the factory to choose between constant and random initialization
 def hoedt_bias() -> Initializer:
     """Build a Hoedt bias initializer (for layers with positivity constrained weights).
 
     A [Hoedt bias initializer](https://arxiv.org/abs/2312.12474) is designed
     for the _unconstrained_ biases in linear layers where the weights are constrained
-    to be positive, such as in [`klax.nn.FICNN`][]. It intializes biases to vectors of
+    to be positive, such as in [`klax.nn.FICNN`][]. It initializes biases to vectors of
     a constant value, computed from the number of input features (`fan_in`).
 
     Tip:

@@ -287,9 +287,9 @@ def batch_data[T](
     # for slicing.
     if convert_to_numpy:
         data = jax.tree.map(
-            lambda x, spec: x
-            if (spec is None or isinstance(spec, str))
-            else np.array(x),
+            lambda x, spec: (
+                x if (spec is None or isinstance(spec, str)) else np.array(x)
+            ),
             data,
             resolved_axes,
             is_leaf=_is_leaf,
