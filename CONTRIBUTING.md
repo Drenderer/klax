@@ -83,3 +83,38 @@ To update the minimal dependency versions and to sync the virtual environment ac
 uv lock --upgrade
 uv sync
 ```
+
+
+# Releasing a new version
+
+Version bumps are done with [commitizen](https://commitizen-tools.github.io/commitizen/), which determines the new version from the commit messages since the last release (see [Commit messages](#commit-messages)). A `fix` commit leads to a patch bump, a `feat` commit to a minor bump. While klax is below version 1.0, breaking changes also lead to a minor bump. Commits that do not follow the convention are ignored.
+
+Releases are prepared on the `dev` branch. Make sure it is up to date and that your working tree is clean, since all modified files are included in the bump commit:
+
+```bash
+git switch dev
+git pull
+```
+
+Preview the new version and the changelog entry with
+
+```bash
+uv run cz bump --dry-run
+```
+
+If everything looks right, run
+
+```bash
+uv run cz bump
+```
+
+This updates the version in `pyproject.toml`, adds the changes to `CHANGELOG.md`, creates a `bump: version X → Y` commit, and tags it as `vY`. To override the detected increment, pass `--increment PATCH|MINOR|MAJOR`.
+
+Push the commit and the tag
+
+```bash
+git push
+git push --tags
+```
+
+and open a pull request from `dev` into `main`. Merging it publishes the new version to PyPI.
