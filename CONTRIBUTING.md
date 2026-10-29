@@ -25,12 +25,14 @@ from the project root. This will create a virtual environment with all the repen
 
 Next install the git hook scripts
 ```bash
-pre-commit install
+uv run pre-commit install
 ```
+
+This installs two hooks: a `pre-commit` hook that lints and formats your code with ruff, and a `commit-msg` hook that checks your commit messages (see [Commit messages](#commit-messages)).
 
 (optional) Run against all the files. It's usually a good idea to run the hooks against all of the files when adding new hooks (usually pre-commit will only run on the changed files during git hooks)
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ---
@@ -43,6 +45,17 @@ pytest
 ```
 
 Then push your changes to GitHub and open a pull request describing your changes.
+
+---
+
+## Commit messages
+klax uses [Conventional Commits](https://www.conventionalcommits.org/), which are checked by [commitizen](https://commitizen-tools.github.io/commitizen/). Version bumps and the changelog are generated from the commit history, so every commit message must follow the format
+```
+<type>(<optional scope>): <description>
+```
+for example `feat(klax.Loss): add helpful error message` or `fix(test): fix failing training test`. Common types are `feat`, `fix`, `docs`, `test`, `refactor`, `build`, and `ci`. Mark breaking changes with a `!` after the type (e.g., `feat!: ...`) or a `BREAKING CHANGE:` footer.
+
+The `commit-msg` hook rejects non-conforming messages locally, and the CI checks all commits of a pull request. If you are unsure about the format, `uv run cz commit` guides you through writing a commit message interactively.
 
 ---
 
