@@ -114,4 +114,5 @@ tag_format = "v$version"
 version_scheme = "pep440"
 version_provider = "uv"
 update_changelog_on_bump = true
+changelog_incremental = true
 major_version_zero = true
