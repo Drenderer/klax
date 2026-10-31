@@ -26,29 +26,16 @@ import jax.random as jr
 import numpy as np
 from jaxtyping import PRNGKeyArray, PyTree
 
-from ._compat import HAS_XARRAY, get_xarray
-
-
-def _is_xarray(x: Any) -> bool:
-    """Return True if `x` is an xarray container that klax handles natively."""
-    if HAS_XARRAY:
-        xr, _ = get_xarray()
-        return isinstance(x, (xr.Dataset, xr.DataArray, xr.Variable))
-    else:
-        return False
-
 
 def _is_leaf(x: Any) -> bool:
     """Tree-traversal stop predicate used throughout this module.
 
-    Stops at `None` (the "do not batch this subtree" sentinel) and at xarray
-    containers (treated as opaque leaves so we can use named-dim slicing
-    instead of fighting xarray's invariants during tree reconstruction).
+    Stops at `None` (the "do not batch this subtree" sentinel).
     """
-    return x is None or _is_xarray(x)
+    return x is None
 
 
-def _resolve_one(spec: Any, leaf: Any) -> int | str | None:
+def _resolve_one(spec: Any, leaf: Any) -> int | None:
     """Resolve one `(spec, leaf)` pair to its normalized form.
 
     The normalized value is a single token that downstream code can carry in a
@@ -56,28 +43,13 @@ def _resolve_one(spec: Any, leaf: Any) -> int | str | None:
 
     - `None`  — do not batch this leaf
     - `int`   — positional axis on an array leaf
-    - `str`   — dim name on an xarray leaf
     """
     if spec is None:
         return None
-    if _is_xarray(leaf):
-        if not isinstance(spec, str):
-            raise TypeError(
-                f"batch_axes spec for an xarray leaf must be a `str` dim name, "
-                f"got {type(spec).__name__} ({spec!r}). "
-                f"Available dims: {leaf.dims}"
-            )
-        if spec not in leaf.dims:
-            raise ValueError(
-                f"Dim '{spec}' not present on xarray leaf. "
-                f"Available dims: {leaf.dims}"
-            )
-        return spec
-    # Non-xarray, non-None leaf.
-    if isinstance(spec, str):
+    if not isinstance(spec, (int, np.integer)):
         raise TypeError(
-            f"String dim names are only valid for xarray leaves; "
-            f"got '{spec}' on a leaf of type {type(leaf).__name__}"
+            f"batch_axes leaves must be `int` or `None`, "
+            f"got {type(spec).__name__} ({spec!r})"
         )
     if not eqx.is_array(leaf):
         # Mirror the legacy `eqx.if_array` behavior: a non-array leaf paired
@@ -97,19 +69,15 @@ def _broadcast_spec(spec: Any, subtree: Any) -> Any:
     )
 
 
-def _leaf_size(leaf: Any, spec: int | str | None) -> int | None:
+def _leaf_size(leaf: Any, spec: int | None) -> int | None:
     if spec is None:
         return None
-    if isinstance(spec, str):
-        return int(leaf.sizes[spec])
     return int(leaf.shape[spec])
 
 
-def _leaf_take(leaf: Any, spec: int | str | None, indices: Any) -> Any:
+def _leaf_take(leaf: Any, spec: int | None, indices: Any) -> Any:
     if spec is None:
         return leaf
-    if isinstance(spec, str):
-        return leaf.isel({spec: indices})
     if spec == 0:
         return leaf[indices]
     if isinstance(leaf, np.ndarray):
@@ -119,36 +87,32 @@ def _leaf_take(leaf: Any, spec: int | str | None, indices: Any) -> Any:
 
 def broadcast_and_get_size[T](
     data: PyTree[Any, "T"],
-    batch_axes: PyTree[int | str | None, "T ..."],
-) -> tuple[PyTree[int | str | None, "T"], int]:
+    batch_axes: PyTree[int | None, "T ..."],
+) -> tuple[PyTree[int | None, "T"], int]:
     """Broadcast `batch_axes` to the same structure as `data` and get size.
 
     Args:
-        data: PyTree of data. Leaves may be JAX/NumPy arrays, xarray
-            `Dataset`/`DataArray`/`Variable` objects, or non-array Python
-            values (which are passed through unchanged).
+        data: PyTree of data. Leaves may be JAX/NumPy arrays or non-array
+            Python values (which are passed through unchanged).
         batch_axes: PyTree of batch-axis specifications. Each leaf is one of:
 
             - `int`: positional axis on an array leaf.
-            - `str`: dim name on an xarray leaf (requires xarray dependency).
             - `None`: the corresponding leaf or subtree in `data` is not
               batched.
 
             `batch_axes` must have the same structure as `data` or have
             `data` as a prefix. When `batch_axes` is a prefix, the spec at
             each prefix leaf is broadcast over the corresponding subtree of
-            `data`: array leaves get the spec, non-array non-xarray leaves
-            (scalars, strings, ...) are silently treated as non-batched.
+            `data`: array leaves get the spec, non-array leaves (scalars,
+            strings, ...) are silently treated as non-batched.
 
     Raises:
-        TypeError: If a `str` spec is given for a non-xarray leaf or an
-            `int` spec is given for an xarray leaf.
-        ValueError: If a `str` dim name is not present on the corresponding
-            xarray leaf, or if not all batched arrays have equal batch sizes.
+        TypeError: If a `batch_axes` leaf is neither an `int` nor `None`.
+        ValueError: If not all batched arrays have equal batch sizes.
 
     Returns:
         Tuple of the resolved `batch_axes` (same structure as `data`,
-        leaves are `int | str | None`) and the `dataset_size`.
+        leaves are `int | None`) and the `dataset_size`.
 
     """
     resolved_axes = jax.tree.map(
@@ -186,7 +150,7 @@ class Batcher(Protocol):
         self,
         data: PyTree[Any],
         batch_size: int,
-        batch_axes: PyTree[int | str | None],
+        batch_axes: PyTree[int | None],
         *,
         key: PRNGKeyArray,
     ) -> Generator[PyTree[Any], None, None]:
@@ -196,26 +160,23 @@ class Batcher(Protocol):
 def batch_data[T](
     data: PyTree[Any, "T"],
     batch_size: int,
-    batch_axes: PyTree[int | str | None] = 0,
+    batch_axes: PyTree[int | None] = 0,
     convert_to_numpy: bool = True,
     *,
     key: PRNGKeyArray,
 ) -> Generator[PyTree[Any, "T"], None, None]:
     """Create a `Generator` that draws subsets of data without replacement.
 
-    The data can be any `PyTree` whose leaves are arrays, xarray
-    `Dataset`/`DataArray`/`Variable` objects, or non-array Python values.
-    `batch_axes` is a `PyTree` whose leaves are either positional axis
-    indices (`int`) for array leaves, dim names (`str`) for xarray leaves,
-    or `None` for leaves that should not be batched. A generator is returned
+    The data can be any `PyTree` whose leaves are arrays or non-array Python
+    values. `batch_axes` is a `PyTree` whose leaves are either positional
+    axis indices (`int`) for array leaves or `None` for leaves that should
+    not be batched. A generator is returned
     that indefinitely yields batches of data with size `batch_size`.
     Examples are drawn without replacement until the remaining dataset is
     smaller than `batch_size`, at which point the dataset is reshuffled and
     the process starts over.
 
     Example:
-        Plain-array pytree:
-
         ```python
         >>> import klax
         >>> import jax
@@ -233,35 +194,18 @@ def batch_data[T](
         ... )
         ```
 
-        xarray dataset (requires the `xarray` extra, e.g.
-        `pip install klax[xarray]`):
-
-        ```python
-        >>> import xarray as xr  # doctest: +SKIP
-        >>> data = xr.Dataset(  # doctest: +SKIP
-        ...     {"y": (("batch", "i"), jnp.ones((100, 4)))},
-        ...     coords={"batch": jnp.arange(100), "i": jnp.arange(4)},
-        ... )
-        >>> batch = klax.batch_data(  # doctest: +SKIP
-        ...     data, 10, batch_axes="batch", key=jax.random.key(0)
-        ... )
-        ```
-
     Args:
         data: The data that shall be batched.
         batch_size: The number of examples in a batch.
-        batch_axes: PyTree of batch-axis specifications. Each leaf is one of
-            `int` (positional axis on an array leaf), `str` (dim name on an
-            xarray leaf), or `None` (do not batch this subtree). `batch_axes`
-            must have the same structure as `data` or have `data` as a
-            prefix. (Defaults to `0`, meaning all array leaves in `data` are
-            batched along their first dimension. Note that with the default,
-            xarray leaves will raise a `TypeError`; you must pass an explicit
-            dim name for them.)
+        batch_axes: PyTree of batch-axis specifications. Each leaf is either
+            an `int` (positional axis on an array leaf) or `None` (do not
+            batch this subtree). `batch_axes` must have the same structure
+            as `data` or have `data` as a prefix. (Defaults to `0`, meaning
+            all array leaves in `data` are batched along their first
+            dimension.)
         convert_to_numpy: If `True`, batched array leaves are converted to
             NumPy arrays before batching. Numpy's slicing is much faster
-            than JAX's when running on CPU. xarray leaves are not touched
-            by this flag.
+            than JAX's when running on CPU.
         key: A `jax.random.PRNGKey` used to provide randomness for batch
             generation. (Keyword only argument.)
 
@@ -282,14 +226,9 @@ def batch_data[T](
     # Convert to Numpy arrays. Numpy's slicing is much faster than JAX's, so
     # for fast model training steps this actually makes a huge difference!
     # However, be aware that this is likely only true if JAX runs on CPU.
-    # xarray containers are passed through unchanged — their internal data
-    # is already numpy-backed (or user-provided) and `.isel(...)` is used
-    # for slicing.
     if convert_to_numpy:
         data = jax.tree.map(
-            lambda x, spec: (
-                x if (spec is None or isinstance(spec, str)) else np.array(x)
-            ),
+            lambda x, spec: x if spec is None else np.array(x),
             data,
             resolved_axes,
             is_leaf=_is_leaf,
@@ -318,7 +257,7 @@ def batch_data[T](
 def split_data[T: PyTree](
     data: T,
     proportions: Sequence[int | float],
-    batch_axes: PyTree[int | str | None] = 0,
+    batch_axes: PyTree[int | None] = 0,
     *,
     key: PRNGKeyArray,
 ) -> tuple[T, ...]:
@@ -327,12 +266,9 @@ def split_data[T: PyTree](
     This function is useful for splitting into training and test datasets.
     The axis of the split is controlled by the `batch_axes` argument, which
     specifies the batch axis for each leaf in `data` (positional `int` for
-    array leaves, dim-name `str` for xarray leaves, or `None` to leave a
-    leaf unsplit).
+    array leaves, or `None` to leave a leaf unsplit).
 
     Example:
-        Plain-array pytree:
-
         ```python
         >>> import klax
         >>> import jax
@@ -355,11 +291,10 @@ def split_data[T: PyTree](
         proportions: Proportions of the split that will be applied to the
             data, e.g., `(80, 20)` for a 80% to 20% split. The proportions
             must be non-negative.
-        batch_axes: PyTree of batch-axis specifications. Each leaf is one of
-            `int` (positional axis on an array leaf), `str` (dim name on an
-            xarray leaf), or `None` (do not split this subtree). `batch_axes`
-            must have the same structure as `data` or have `data` as a
-            prefix. (Defaults to `0`.)
+        batch_axes: PyTree of batch-axis specifications. Each leaf is either
+            an `int` (positional axis on an array leaf) or `None` (do not
+            split this subtree). `batch_axes` must have the same structure
+            as `data` or have `data` as a prefix. (Defaults to `0`.)
         key: A `jax.random.PRNGKey` used to provide randomness to the split.
             (Keyword only argument.)
 
