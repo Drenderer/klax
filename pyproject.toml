@@ -60,10 +60,6 @@ dev = [
     "ruff>=0.11.10",
     "ty>=0.0.53",
 ]
-xarray-experimental = [
-    "gdm-xarray-jax",
-    "xarray>=2026.4.0",
-]
 
 [tool.hatch.build.targets.wheel]
 packages = ["klax"]
@@ -103,6 +99,3 @@ ignore = [
     "E741",
     "UP038",
 ]
-
-[tool.uv.sources]
-gdm-xarray-jax = { git = "https://github.com/google-deepmind/xarray_jax.git", rev = "v0.1.1" }
