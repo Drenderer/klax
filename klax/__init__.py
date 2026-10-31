@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from . import dag as dag
 from . import nn as nn
 from ._callbacks import Callback as Callback
 from ._datahandler import Batcher as Batcher
