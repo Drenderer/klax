@@ -275,7 +275,7 @@ def fit[T: eqx.Module](
             !!!Example
                 ```python
                     @eqx.filter_vmap
-                    def make_mlp_ensemble(key):
+                    def make_ensemble(key):
                         return klax.nn.MLP("scalar", "scalar", [16, 16], key=key)
 
                     mlp_ensemble = make_ensemble(jr.split(key, 10))
