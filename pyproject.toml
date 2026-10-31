@@ -55,6 +55,7 @@ tqdm = [
 
 [dependency-groups]
 dev = [
+    "commitizen>=4.19.3",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "ruff>=0.11.10",
@@ -99,3 +100,12 @@ ignore = [
     "E741",
     "UP038",
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+changelog_incremental = true
+major_version_zero = true
