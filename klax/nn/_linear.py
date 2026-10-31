@@ -85,7 +85,7 @@ class Linear(eqx.Module, strict=True):
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
             Note that `in_features` also supports the string `"scalar"` as a

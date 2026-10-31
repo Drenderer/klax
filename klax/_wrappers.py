@@ -457,7 +457,7 @@ def finalize[T: PyTree](tree: T) -> T:
 
         ```python
         >>> finalized_model = klax.finalize(model)
-        >>> y = finalized_model(x)            # Call finalized model
+        >>> y = finalized_model(x)           # Call finalized model
         >>> model, history = fit(model, ...) # Continue training with constrained model
         ```
 
