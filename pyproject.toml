@@ -39,6 +39,10 @@ Issues = "https://github.com/Drenderer/klax/issues"
 [project.optional-dependencies]
 plot = ["matplotlib>=3.10.3"]
 docs = [
+    # Pin griffe to 1.x: griffe 2.x renamed the `on_package_loaded` extension
+    # hook to `on_package` and removed the old name, which silently disables
+    # hippogriffe's [source] links and base-class rendering.
+    "griffe<2",
     "hippogriffe>=0.2.2",
     "mkdocs>=1.6.1",
     "mkdocs-ipynb>=0.1.1",
@@ -54,6 +58,7 @@ dev = [
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "ruff>=0.11.10",
+    "ty>=0.0.53",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -64,7 +69,7 @@ addopts = "-p no:faulthandler"
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 79
+line-length = 80
 
 [tool.ruff.format]
 docstring-code-format = true

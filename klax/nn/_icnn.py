@@ -729,7 +729,7 @@ class PICNN(eqx.Module, strict=True):
 
                 Note: If `use_passthrough=True` and `non_decreasing=True` then
                 `activation_xu` has to be a non-negative function to guarantee
-                convexity with respect to `x`. We recomment avoiding passthrough
+                convexity with respect to `x`. We recommend avoiding passthrough
                 for non-decreasing PICNNs.
                 Defaults to False.
             weight_init: The weight initializer of type `SupportedInitializer`
