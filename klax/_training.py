@@ -336,7 +336,7 @@ def fit[T: eqx.Module](
             LossMetric(
                 loss,
                 batch_generator=batcher(data, batch_size, batch_axes, key=bkey),
-                prefix="training",
+                name="training",
                 vmap_ensemble=vmap_ensemble,
                 jit_compile=True,
             )
@@ -348,13 +348,13 @@ def fit[T: eqx.Module](
                     batch_generator=batcher(
                         validation_data, 4 * batch_size, batch_axes, key=bkey
                     ),
-                    prefix="validation",
+                    name="validation",
                     vmap_ensemble=vmap_ensemble,
                     jit_compile=True,
                 )
             )
 
-        logger = MetricLogger(log_every, metrics)
+        logger = MetricLogger(metrics, log_every)
         # Prepend logger to ensure it's the first callback to be evaluated.
         callbacks = [logger] + callbacks
 

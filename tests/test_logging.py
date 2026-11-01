@@ -9,6 +9,34 @@ import pytest
 import klax
 
 
+@pytest.fixture()
+def simple_metric():
+    class MyMetric(klax.Metric):
+        def __init__(self, name):
+            super().__init__(name)
+
+        def values(self, state):
+            return {"value": jnp.array(5.0)}
+
+    return MyMetric(name="test")
+
+
+# ===---------------------------------------------------------------------=== #
+# klax.Metric
+# ===---------------------------------------------------------------------=== #
+
+
+class TestMetric:
+    def test_call(self, simple_metric):
+        """Test klax.Metric returns prefixed dict."""
+        state = klax.TrainingState(model=None, opt_state=None, run_state=None)
+
+        result = simple_metric(state)
+
+        assert isinstance(result, dict)
+        assert result == {"test/value": jnp.array(5.0)}
+
+
 # ===---------------------------------------------------------------------=== #
 # klax.LossMetric
 # ===---------------------------------------------------------------------=== #
@@ -24,7 +52,7 @@ class TestLossMetric:
         metric = klax.LossMetric(
             loss=klax.mse,
             batch_generator=batch_generator,
-            prefix="test",
+            name="test",
             vmap_ensemble=False,
             jit_compile=False,
         )
@@ -66,48 +94,48 @@ def build_ctx():
 
 
 class TestMetricLogger:
-    @staticmethod
-    def test_add_metric_and_logging_frequency(build_ctx):
+    def test_logging_frequency(self, build_ctx, simple_metric):
 
-        def my_metric(state):
-            return {"m1": jnp.array(1.0)}
-
-        logger = klax.MetricLogger(log_every=2, metrics=[my_metric])
+        logger = klax.MetricLogger(log_every=2, metrics=[simple_metric])
 
         context = build_ctx(step=1, steps=10)
 
         # Step 1: not divisible by 2 -> no log
         logger.on_training_step(context)
-        assert "m1" not in context.history.keys()
+        assert "test/value" not in context.history.keys()
 
         # Step 2: divisible by 2 -> should log
         context.step = 2
         logger.on_training_step(context)
-        assert "m1" in context.history.keys()
-        assert context.history["m1"].steps == [2]
+        assert "test/value" in context.history.keys()
+        assert context.history["test/value"].steps == [2]
 
         # Step 4: divisible by 2 -> should log again
         context.step = 4
         logger.on_training_step(context)
-        assert context.history["m1"].steps == [2, 4]
+        assert context.history["test/value"].steps == [2, 4]
 
-    @staticmethod
-    def test_on_training_start_and_end_sets_history(build_ctx):
+    def test_on_training_start_and_end_sets_history(
+        self, build_ctx, simple_metric
+    ):
 
-        def my_metric(state):
-            return {"m": jnp.array(1.0)}
-
-        logger = klax.MetricLogger(log_every=1, metrics=[my_metric])
+        logger = klax.MetricLogger(log_every=1, metrics=[simple_metric])
 
         context = build_ctx(steps=7)
 
         logger.on_training_start(context)
         # At start, one log happens at step 0
-        assert "m" in context.history.keys()
-        assert context.history["m"][0] == [0]
+        assert "test/value" in context.history.keys()
+        assert context.history["test/value"][0] == [0]
 
         context.step = 5
         logger.on_training_end(context)
         assert context.history.total_steps == 5
         assert isinstance(context.history.total_time, float)
         assert context.history.total_time >= 0.0
+
+    def test_duplicate_namespaces_raises_error(self, simple_metric):
+        with pytest.raises(ValueError):
+            klax.MetricLogger(
+                log_every=1, metrics=[simple_metric, simple_metric]
+            )

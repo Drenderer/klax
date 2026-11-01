@@ -15,9 +15,11 @@
 """Utilities for logging during training."""
 
 import warnings
+from abc import ABC, abstractmethod
+from collections import Counter
 from collections.abc import Generator, Iterable, Sequence
 from time import time
-from typing import Any, Protocol
+from typing import Any
 
 import equinox as eqx
 import jax
@@ -30,11 +32,15 @@ from ._losses import Loss
 from ._trainstate import TrainingContext, TrainingState
 
 
-class Metric(Protocol):
-    """The call interface for a metric."""
+class Metric(ABC):
+    name: str
 
-    def __call__(self, state: TrainingState) -> dict[str, Array]:
-        """Compute the metric.
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @abstractmethod
+    def values(self, state: TrainingState) -> dict[str, Array]:
+        """Compute the metric values.
 
         Args:
             state: The current [training state][klax.TrainingState] on which
@@ -44,10 +50,24 @@ class Metric(Protocol):
             A dictionary with pairs of metric names and values.
 
         """
-        pass
+        ...
+
+    def __call__(self, state: TrainingState) -> dict[str, Array]:
+        """Compute the metric values and prefix the key by the metrics name.
+
+        Args:
+            state: The current [training state][klax.TrainingState] on which
+                the metric is evaluated.
+
+        Returns:
+            A dictionary with pairs of metric names prefixed by the metrics name
+                and the corresponding values.
+
+        """
+        return {f"{self.name}/{k}": v for k, v in self.values(state).items()}
 
 
-class LossMetric:
+class LossMetric(Metric):
     """Evaluates a [`Metric`][klax.Metric] on a dataset given a [`TrainingState`][klax.TrainingState].
 
     The dataset is provided to the [`LossMetric`][klax.LossMetric] via
@@ -59,7 +79,7 @@ class LossMetric:
         self,
         loss: Loss,
         batch_generator: Generator[PyTree, None, None],
-        prefix: str = "",
+        name: str = "",
         vmap_ensemble: bool = False,
         jit_compile: bool = True,
     ):
@@ -71,7 +91,7 @@ class LossMetric:
             batch_generator: A `Generator` returning a batch of data on which
                 the [loss][klax.Loss] is evaluated, everytime the
                 [LossMetric][klax.LossMetric] is called.
-            prefix: A string prefix to prepend to the keys returned by loss.
+            name: A string prefix to prepend to the keys returned by loss.
             vmap_ensemble: Set to `True` if the
                 [`TrainingState`][klax.TrainingState] passed to
                 [`LossMetric`][klax.LossMetric] contains an ensamble.
@@ -79,8 +99,8 @@ class LossMetric:
                 metric compuations.
 
         """
+        super().__init__(name=name)
         self.batch_generator = batch_generator
-        self.prefix = prefix
         func = lambda state, batch: loss(state.model, batch, state.run_state)
         if vmap_ensemble:
             func = eqx.filter_vmap(func, in_axes=(eqx.if_array(0), None))
@@ -88,22 +108,9 @@ class LossMetric:
             func = eqx.filter_jit(func)
         self.func = func
 
-    def __call__(self, state: TrainingState) -> dict[str, Array]:
-        """Compute the metrics.
-
-        Args:
-            state: A [`TrainingState`][klax.TrainingState] containing the
-                `model` and `run_state` that are passed to the
-                [loss][klax.Loss].
-
-        Returns:
-            A dictionary containing pairs of metrics names and loss values.
-
-        """
+    def values(self, state):
         batch = next(self.batch_generator)
         _, aux = self.func(state, batch)
-        if self.prefix:
-            aux = {f"{self.prefix}/{k}": v for k, v in aux.items()}
         return aux
 
 
@@ -112,19 +119,27 @@ class MetricLogger(Callback):
 
     def __init__(
         self,
+        metrics: Sequence[Metric],
         log_every: int = 100,
-        metrics: Sequence[Metric] | None = None,
     ):
         """Initialize the [`MetricLogger`][klax.MetricLogger].
 
         Args:
-            log_every: Frequency of logging metrics (in steps).
             metrics: Sequence of [metrics][klax.Metric] to evaluate.
                 If multiple metrics share the same name, the later metrics will
                 overwrite prior metrics.
+            log_every: Frequency of logging metrics (in steps).
 
         """
-        self.metrics = [] if metrics is None else list(metrics)
+        metrics = list(metrics)
+        names = [m.name for m in metrics]
+        duplicates = [
+            name for name, count in Counter(names).items() if count > 1
+        ]
+        if duplicates:
+            raise ValueError(f"Duplicate metric namespaces: {duplicates}")
+
+        self.metrics = metrics
         self.log_every = log_every
 
     def on_training_step(self, context: TrainingContext) -> None:
