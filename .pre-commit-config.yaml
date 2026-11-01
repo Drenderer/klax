@@ -1,7 +1,8 @@
+default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff Version
-    rev: v0.12.1
+    rev: v0.16.10
     hooks:
       # Run the linter.
       - id: ruff-check
@@ -10,3 +11,8 @@ repos:
       # Run the formatter
       - id: ruff-format
         types_or: [python, pyi, jupyter, toml]
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.19.3
+    hooks:
+      # Check commit messages against conventional commits
+      - id: commitizen

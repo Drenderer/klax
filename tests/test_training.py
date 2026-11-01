@@ -7,8 +7,13 @@ import pytest
 
 import klax
 
+# ===---------------------------------------------------------------------=== #
+# klax.make_step
+# ===---------------------------------------------------------------------=== #
+
 
 class TestMakeStep:
+    @staticmethod
     @pytest.mark.parametrize(
         "optimizer",
         [
@@ -29,7 +34,7 @@ class TestMakeStep:
             optax.lion(1.0),
             optax.nadam(1.0),
             optax.nadamw(1.0),
-            optax.noisy_sgd(1.0),
+            optax.noisy_sgd(1.0, key=jr.key(0)),
             optax.novograd(1.0),
             optax.optimistic_gradient_descent(1.0),
             optax.optimistic_adam(1.0),
@@ -42,43 +47,44 @@ class TestMakeStep:
             optax.yogi(1.0),
         ],
     )
-    def test_make_step_updates_state(self, optimizer, getkey):
+    def test_make_step_updates_state(optimizer, getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
 
         x = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         y = jnp.array([3.0, 7.0])
 
-        state = klax.TrainingState(
-            model, opt_state, run_state=None, step=jnp.array(0.0)
-        )
-        state_leaves, state_treedef = jax.tree.flatten(state)
+        state = klax.TrainingState(model, opt_state, run_state=None)
 
-        new_state_leaves, new_state_treedef = klax.make_step(
-            state_leaves,
-            state_treedef,
+        new_state = klax.make_step(
+            state,
             batch=(x, y),
             loss=klax.mse,
             optimizer=optimizer,
         )
 
-        # State structure has not changed
-        assert new_state_treedef == state_treedef
-
         # State has changed
         assert not jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
-                state_leaves,
-                new_state_leaves,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
+                state,
+                new_state,
             )
         )
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.run_training_loop
+# ===---------------------------------------------------------------------=== #
+
+
 class TestRunTrainingLoop:
-    def test_invokes_callbacks(self, getkey):
+    @staticmethod
+    def test_invokes_callbacks(getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -86,13 +92,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.state.step)
+                self.start_steps.append(context.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -114,22 +120,27 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        context = klax.run_training_loop(context, [callback])
+        context = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.start_steps == [0]
         assert callback.steps == [1, 2, 3]
         assert callback.end_steps == [3]
         assert not jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 model,
                 context.state.model,
             )
         )
 
-    def test_zero_steps_no_updates(self, getkey):
+    @staticmethod
+    def test_zero_steps_no_updates(getkey):
         class RecordingCallback(klax.Callback):
             def __init__(self):
                 self.start_steps = []
@@ -137,13 +148,13 @@ class TestRunTrainingLoop:
                 self.end_steps = []
 
             def on_training_start(self, context):
-                self.start_steps.append(context.state.step)
+                self.start_steps.append(context.step)
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -165,33 +176,38 @@ class TestRunTrainingLoop:
 
         callback = RecordingCallback()
 
-        updated_view = klax.run_training_loop(context, [callback])
+        updated_view = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.start_steps == [0]
         assert callback.steps == []
         assert callback.end_steps == [0]
         assert jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 model,
                 context.state.model,
             )
         )
 
-    def test_stops_on_callback(self, getkey):
+    @staticmethod
+    def test_stops_on_callback(getkey):
         class StopAfterOne(klax.Callback):
             def __init__(self):
                 self.steps = []
                 self.end_steps = []
 
             def on_training_step(self, context):
-                self.steps.append(context.state.step)
+                self.steps.append(context.step)
                 return True  # request stop after first step
 
             def on_training_end(self, context):
-                self.end_steps.append(context.state.step)
+                self.end_steps.append(context.step)
 
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
         optimizer = optax.sgd(1.0)
@@ -213,23 +229,33 @@ class TestRunTrainingLoop:
 
         callback = StopAfterOne()
 
-        context = klax.run_training_loop(context, [callback])
+        context = klax.run_training_loop(
+            context, [callback], step_function=klax.make_step
+        )
 
         assert callback.steps == [1]
         assert callback.end_steps == [1]
         assert not jax.tree.all(
             jax.tree.map(
-                lambda a, b: jnp.array_equal(a, b)
-                if isinstance(a, jnp.ndarray)
-                else a == b,
+                lambda a, b: (
+                    jnp.array_equal(a, b)
+                    if isinstance(a, jnp.ndarray)
+                    else a == b
+                ),
                 model,
                 context.state.model,
             )
         )
 
 
+# ===---------------------------------------------------------------------=== #
+# klax.fit
+# ===---------------------------------------------------------------------=== #
+
+
 class TestFit:
-    def test_basic_behavior(self, getkey):
+    @staticmethod
+    def test_fit(getkey):
         model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
 
         data = (
@@ -250,35 +276,32 @@ class TestFit:
 
         assert isinstance(trained_model, klax.nn.FICNN)
         assert history.total_steps == 5
-        assert "loss" in history.content
-        loss_steps, loss_values = history["loss"]
+        assert "training/mse" in history.keys()
+        loss_steps, loss_values = history["training/mse"]
         assert loss_steps == [0]
         assert len(loss_values) == 1
 
-    def test_overwriting_default_metrics(self, getkey):
-        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
+    def test_vmap_training(self, getkey):
+        # Create ensemble of models
+        keys = jr.split(getkey(), 3)
 
-        data = (
-            jr.uniform(getkey(), (100, 2)),
-            jr.uniform(getkey(), (100,)),
-        )
+        @eqx.filter_vmap
+        def make_ensemble(key):
+            return klax.nn.FICNN("scalar", "scalar", [4, 4], key=key)
 
-        def my_metric(model):
-            return "A"
+        model_ensemble = make_ensemble(keys)
 
-        my_metric.name = "loss"
-        my_metric.verbose = False
+        # Create simple data
+        x = jr.uniform(getkey(), (20,))
+        y = jr.uniform(getkey(), (20,))
 
-        trained_model, history = klax.fit(
-            model,
-            data,
+        trained_ensemble, history = klax.fit(
+            model_ensemble,
+            (x, y),
             batch_size=5,
-            batch_axes=0,
-            steps=5,
+            steps=4,
             loss=klax.mse,
             optimizer=optax.sgd(0.1),
-            metrics=[my_metric],
+            vmap_ensemble=True,
             key=getkey(),
         )
-
-        assert history.content["loss"][1] == ["A"]

@@ -88,7 +88,7 @@ class Unwrappable[T](eqx.Module, ABC):
 
 # This function is copied from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
-def unwrap(tree: PyTree) -> PyTree:
+def unwrap[T: PyTree](tree: T) -> T:
     """Map across a PyTree and unwrap all [`klax.Unwrappable`][] objects.
 
     This leaves all other nodes unchanged. If nested, the innermost
@@ -172,7 +172,7 @@ class Parameterize(Unwrappable[T]):
 def non_trainable(tree: PyTree) -> PyTree:
     """Freeze parameters by wrapping inexact arrays.
 
-    This function wraps a [`klax.NonTrainable`][] wrapper around every  inexact
+    This function wraps a [`klax.NonTrainable`][] wrapper around every inexact
     array or [`klax.Constraint`][] in the PyTree.
 
     Note:
@@ -216,7 +216,7 @@ class NonTrainable(Unwrappable[T]):
     """Applies stop gradient to all ArrayLike leaves before unwrapping.
 
     See also [`klax.non_trainable`][], which is probably a generally preferable
-    way to achieve similar behaviour, which wraps the ArrayLike leaves
+    way to achieve similar behavior, which wraps the ArrayLike leaves
     directly, rather than the tree. Useful to mark PyTrees (Arrays, Modules,
     etc.) as frozen/non-trainable. Note that the underlying parameters may
     still be impacted by regularization, so it is generally advised to use this
@@ -370,7 +370,7 @@ class Constraint(Unwrappable[Array], ABC):
         pass
 
 
-def apply(tree: PyTree):
+def apply[T: PyTree](tree: T) -> T:
     """Map across a PyTree and apply all [Constraints][klax.Constraint].
 
     This leaves all other nodes unchanged.
@@ -438,7 +438,7 @@ class NonNegative(Constraint):
 # ===----------------------------------------------------------------------===#
 
 
-def finalize(tree: PyTree):
+def finalize[T: PyTree](tree: T) -> T:
     """Make a model containing [Constraints][klax.Constraint] callable.
 
     This function combined that functionalities of [`klax.apply`][] and
@@ -457,7 +457,7 @@ def finalize(tree: PyTree):
 
         ```python
         >>> finalized_model = klax.finalize(model)
-        >>> y = finalzed_model(x)            # Call finalized model
+        >>> y = finalized_model(x)            # Call finalized model
         >>> model, history = fit(model, ...) # Continue training with constrained model
         ```
 

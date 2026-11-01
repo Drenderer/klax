@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Serialization deseriablizastion specs for `equinox.Module`."""
+"""Serialization deserialization specs for `equinox.Module`."""
 
 from typing import Any, BinaryIO
 
