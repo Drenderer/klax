@@ -233,14 +233,13 @@ def fit[T: eqx.Module](
             Defaults to `None`.
         batcher: The data loader that splits inputs and targets into batches.
             Defaults to `batch_data`.
-        make_logger: Wether to create a [`MetricLogger`][klax.MetricLogger].
-            If `False` the arguments `metrics`, `log_every` and `verbose`
-            don't have any effect and `fit` will return `None` instead of a
-            `History`. This is useful for implementing custom logging.
-        metrics: FIX ME Sequence of [metrics][klax.Metric] to be evaluated at regular
-            intervals during the training. You can overwrite the default "loss"
-            and "validation_loss" metrics, by adding custom metrics with the same
-            name.
+        make_logger: Whether to create a [`MetricLogger`][klax.MetricLogger].
+        metrics: List of [metrics][klax.Metric] to be added to the
+            [`MetricLogger`][klax.MetricLogger].
+            To overwrite the default metrics `"training"` and `"validation"`
+            (if `validation_data` is set) use `make_logger=False` and create
+            your own [metric logger][klax.MetricLogger] and pass it as a
+            callback.
             Defaults to `None`.
         log_every: Interval for both metric evaluation and progress logging.
             A value `log_every=n` means that every `n` steps during the training
@@ -255,7 +254,7 @@ def fit[T: eqx.Module](
             implement early stopping, custom logging and more. The argument
             to the callback function is aCallbackArgs object.
             Defaults to `None`.
-        jit_compile: Wether to compile the function that computes the gradient
+        jit_compile: Whether to compile the function that computes the gradient
             update step (this includes the loss function). You generally want
             this to be `True`. However, in cases where the loss function itself
             is not jit-able (e.g., when computing different parts of the

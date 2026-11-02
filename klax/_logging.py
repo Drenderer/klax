@@ -33,9 +33,34 @@ from ._trainstate import TrainingContext, TrainingState
 
 
 class Metric(ABC):
+    """Abstract metric.
+
+    At its core, a metric is a simple function that computes a dictionary
+    `dict[str, Array]` from a given [training state][klax.TrainingState].
+    A metric additionally has a name that is used as a prefix to the
+    dictionary keys. This avoids name conflicts, if the same keys are used
+    in different metrics, e.g., `"training/loss"` and `"validation/loss"`
+    for two metrics with names `"training"` and `"validation"`.
+
+    Metrics are given to the [`MetricLogger`][klax.MetricLogger] callback,
+    which evaluates the metrics periodically during training and adds the
+    key value pairs to the [`History`][klax.History].
+
+    !!!warning
+        Stateful metrics can carry information about past evaluations and
+        should therefore not be reused for different training runs.
+
+    """
+
     name: str
 
     def __init__(self, name: str) -> None:
+        """Initialize the metric.
+
+        Args:
+            name: The metrics namespace prefix.
+
+        """
         self.name = name
 
     @abstractmethod
@@ -68,11 +93,16 @@ class Metric(ABC):
 
 
 class LossMetric(Metric):
-    """Evaluates a [`Metric`][klax.Metric] on a dataset given a [`TrainingState`][klax.TrainingState].
+    """A metric based on a [`loss`][klax.Loss] and a dataset.
 
-    The dataset is provided to the [`LossMetric`][klax.LossMetric] via
-    the `batch_generator` attribute, which returs a batch of data/or the
-    whole dataset, every time the `LossMetric` object is called.
+    A stateful metric, that owns it own batch generator to evaluate a loss
+    function. The metric values are given by the loss' auxiliary quantities.
+
+    !!!warning
+        Reusing the same LossMetric instance for multiple training runs
+        may result in different logged metric values due to the stateful nature
+        of a batch generator. It is therefore recommended to create a new
+        LossMetric instance for each run.
     """
 
     def __init__(
@@ -83,20 +113,21 @@ class LossMetric(Metric):
         vmap_ensemble: bool = False,
         jit_compile: bool = True,
     ):
-        """Initialize a [`LossMetric`][klax.LossMetric] object.
+        """Initialize the [`LossMetric`][klax.LossMetric].
 
         Args:
-            loss: A [loss][klax.Loss] returning a scalar a dictionary of scalar
+            loss: A [loss][klax.Loss] returning a scalar a dictionary of arrays
                 values via the `aux` return.
             batch_generator: A `Generator` returning a batch of data on which
-                the [loss][klax.Loss] is evaluated, everytime the
+                the [loss][klax.Loss] is evaluated, every time the
                 [LossMetric][klax.LossMetric] is called.
             name: A string prefix to prepend to the keys returned by loss.
-            vmap_ensemble: Set to `True` if the
+            vmap_ensemble: Whether to vmap over the training state when
+                evaluating the loss function. Set to `True` if the
                 [`TrainingState`][klax.TrainingState] passed to
-                [`LossMetric`][klax.LossMetric] contains an ensamble.
+                [`LossMetric`][klax.LossMetric] contains an ensemble.
             jit_compile: Whether to jit compile the loss function for faster
-                metric compuations.
+                metric computations.
 
         """
         super().__init__(name=name)
@@ -125,10 +156,11 @@ class MetricLogger(Callback):
         """Initialize the [`MetricLogger`][klax.MetricLogger].
 
         Args:
-            metrics: Sequence of [metrics][klax.Metric] to evaluate.
-                If multiple metrics share the same name, the later metrics will
-                overwrite prior metrics.
-            log_every: Frequency of logging metrics (in steps).
+            metrics: Sequence of [metrics][klax.Metric] to evaluate and log.
+            log_every: Frequency of logging metrics in steps. Defaults to 100.
+
+        Raises:
+            ValueError: If multiple metrics use the same name(-space).
 
         """
         metrics = list(metrics)
@@ -186,7 +218,8 @@ class ProgressMeter(Callback):
             keys: The keys of the metrics that shall be printed alongside the
                 progress meter.
             exclude_keys: The keys of the metrics that shell be excluded from
-                the progress meter.
+                the progress meter. This parameter is ignored, if `keys` is not
+                `None`.
 
         """
         if progress_bar and not HAS_TQDM:
