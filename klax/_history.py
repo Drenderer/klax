@@ -17,6 +17,7 @@
 import json
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, NamedTuple, Self
 
@@ -285,5 +286,5 @@ class History:
             new_history.total_time += history.total_time
             new_history.total_steps += history.total_steps
             for k, v in history._content.items():
-                new_history._content[f"{prefix}/{k}"] = v
+                new_history._content[f"{prefix}/{k}"] = deepcopy(v)
         return new_history

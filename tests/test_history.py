@@ -142,3 +142,19 @@ class TestHistory:
 
         assert stacked_history.total_steps == 26
         assert stacked_history.total_time == 7.2
+
+    def test_stack_copies_history_data(self):
+        history = klax.History()
+        value = np.array(0.5)
+        history.append(key="loss", step=0, value=value)
+
+        stacked_history = klax.History.stack({"train": history})
+        value[...] = 1.0
+        history.append(key="loss", step=1, value=np.array(0.2))
+
+        steps, values = stacked_history["train/loss"]
+        assert steps == [0]
+        np.testing.assert_array_equal(values[0], np.array(0.5))
+
+        stacked_history.append("train/loss", step=1, value=np.array(0.3))
+        assert history["loss"].steps == [0, 1]
