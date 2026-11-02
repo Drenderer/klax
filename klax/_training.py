@@ -293,7 +293,14 @@ def fit[T: eqx.Module](
     Returns:
         A tuple of the trained model and the training history.
 
+    Raises:
+        ValueError: If `metrics` are provided, but `make_logger=False`.
+
     """
+    # Input validation
+    if metrics and not make_logger:
+        raise ValueError("Metrics provided while make_logger=False.")
+
     # Transform the step function
     step_function = make_step
     if vmap_ensemble:
@@ -329,7 +336,7 @@ def fit[T: eqx.Module](
 
     if make_logger:
         if metrics is None:
-            metrics = []
+            metrics = list(metrics or [])
 
         metrics.append(
             LossMetric(
