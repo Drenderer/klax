@@ -171,7 +171,7 @@ def fit[T: eqx.Module](
     init_opt_state: PyTree[Any] = None,
     batcher: Batcher = batch_data,
     make_logger: bool = True,
-    metrics: list[Metric] | None = None,
+    metrics: Sequence[Metric] | None = None,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
@@ -335,8 +335,7 @@ def fit[T: eqx.Module](
     callbacks = [] if callbacks is None else list(callbacks)
 
     if make_logger:
-        if metrics is None:
-            metrics = list(metrics or [])
+        metrics: list[Metric] = list(metrics) if metrics is not None else []
 
         metrics.append(
             LossMetric(
