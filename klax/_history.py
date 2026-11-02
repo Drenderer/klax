@@ -94,11 +94,20 @@ class History:
             step: The step, at which the new value is inserted.
             value: The actual `ArrayLike` value that is inserted.
 
+        Raises:
+            ValueError: If the provided `step` is not strictly
+                increasing for the series specified by `key`.
+
         """
-        if key not in self._content:
-            self._content[key] = StepsAndValues(steps=[], values=[])
-        self._content[key].steps.append(step)
-        self._content[key].values.append(value)
+        series = self._content.setdefault(key, StepsAndValues([], []))
+        if series.steps and step <= series.steps[-1]:
+            raise ValueError(
+                f"History already has a value for '{key}' at step "
+                f"{series.steps[-1]}; cannot append step {step}. "
+                "Two metrics are probably writing to the same key."
+            )
+        series.steps.append(step)
+        series.values.append(value)
 
     def keys(self) -> list[str]:
         """Get the names of the metrics stored in the history.

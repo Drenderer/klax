@@ -25,6 +25,14 @@ class TestHistory:
             history._content["array"].values[0] == jnp.array([0.2, 2.0])
         )
 
+    def test_append_raises_on_non_increasing_step(self):
+        history = klax.History()
+        history.append(key="loss", step=0, value=jnp.array(1.0))
+        with pytest.raises(ValueError):
+            history.append(key="loss", step=0, value=jnp.array(1.0))
+        with pytest.raises(ValueError):
+            history.append(key="loss", step=-1, value=jnp.array(1.0))
+
     def test_getitem_existing_metric(self):
         """Test retrieving an existing metric using __getitem__."""
         history = klax.History()
