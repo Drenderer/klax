@@ -234,7 +234,7 @@ def fit[T: eqx.Module](
         batcher: The data loader that splits inputs and targets into batches.
             Defaults to `batch_data`.
         make_logger: Whether to create a [`MetricLogger`][klax.MetricLogger].
-        metrics: List of [metrics][klax.Metric] to be added to the
+        metrics: Sequence of [metrics][klax.Metric] to be added to the
             [`MetricLogger`][klax.MetricLogger].
             To overwrite the default metrics `"training"` and `"validation"`
             (if `validation_data` is set) use `make_logger=False` and create
