@@ -15,9 +15,11 @@
 """Utilities for logging during training."""
 
 import warnings
+from abc import ABC, abstractmethod
+from collections import Counter
 from collections.abc import Generator, Iterable, Sequence
 from time import time
-from typing import Any, Protocol
+from typing import Any
 
 import equinox as eqx
 import jax
@@ -30,11 +32,40 @@ from ._losses import Loss
 from ._trainstate import TrainingContext, TrainingState
 
 
-class Metric(Protocol):
-    """The call interface for a metric."""
+class Metric(ABC):
+    """Abstract metric.
 
-    def __call__(self, state: TrainingState) -> dict[str, Array]:
-        """Compute the metric.
+    At its core, a metric is a simple function that computes a dictionary
+    `dict[str, Array]` from a given [training state][klax.TrainingState].
+    A metric additionally has a name that is used as a prefix to the
+    dictionary keys. This avoids name conflicts, if the same keys are used
+    in different metrics, e.g., `"training/loss"` and `"validation/loss"`
+    for two metrics with names `"training"` and `"validation"`.
+
+    Metrics are given to the [`MetricLogger`][klax.MetricLogger] callback,
+    which evaluates the metrics periodically during training and adds the
+    key value pairs to the [`History`][klax.History].
+
+    !!!warning
+        Stateful metrics can carry information about past evaluations and
+        should therefore not be reused for different training runs.
+
+    """
+
+    name: str
+
+    def __init__(self, name: str) -> None:
+        """Initialize the metric.
+
+        Args:
+            name: The metrics namespace prefix.
+
+        """
+        self.name = name
+
+    @abstractmethod
+    def values(self, state: TrainingState) -> dict[str, Array]:
+        """Compute the metric values.
 
         Args:
             state: The current [training state][klax.TrainingState] on which
@@ -44,43 +75,93 @@ class Metric(Protocol):
             A dictionary with pairs of metric names and values.
 
         """
-        pass
+        ...
+
+    def __call__(self, state: TrainingState) -> dict[str, Array]:
+        """Compute the metric values and prefix the key by the metrics name.
+
+        Args:
+            state: The current [training state][klax.TrainingState] on which
+                the metric is evaluated.
+
+        Returns:
+            A dictionary with pairs of metric names prefixed by the metrics name
+                and the corresponding values.
+
+        """
+        return {f"{self.name}/{k}": v for k, v in self.values(state).items()}
 
 
-class LossMetric:
-    """Evaluates a [`Metric`][klax.Metric] on a dataset given a [`TrainingState`][klax.TrainingState].
+def metric(name: str):
+    """Metric decorator.
 
-    The dataset is provided to the [`LossMetric`][klax.LossMetric] via
-    the `batch_generator` attribute, which returs a batch of data/or the
-    whole dataset, every time the `LossMetric` object is called.
+    Create a metric from a function using a decorator.
+
+    !!!Example
+        ```python
+        @klax.metric(name="model_components")
+        def my_metric(state: klax.TrainingState) -> dict[str, Array]:
+            return {"bias": state.model.bias, "weight": state.model.weight}
+        ```
+
+    Args:
+        name: Name for the metric namespace.
+
+    """
+
+    def decorator(func):
+        class FuncMetric(Metric):
+            def __init__(self, name: str):
+                super().__init__(name)
+
+            def values(self, state: TrainingState) -> dict[str, Array]:
+                return func(state)
+
+        return FuncMetric(name)
+
+    return decorator
+
+
+class LossMetric(Metric):
+    """A metric based on a [`loss`][klax.Loss] and a dataset.
+
+    A stateful metric, that owns it own batch generator to evaluate a loss
+    function. The metric values are given by the loss' auxiliary quantities.
+
+    !!!warning
+        Reusing the same LossMetric instance for multiple training runs
+        may result in different logged metric values due to the stateful nature
+        of a batch generator. It is therefore recommended to create a new
+        LossMetric instance for each run.
     """
 
     def __init__(
         self,
         loss: Loss,
         batch_generator: Generator[PyTree, None, None],
-        prefix: str = "",
+        name: str = "",
         vmap_ensemble: bool = False,
         jit_compile: bool = True,
     ):
-        """Initialize a [`LossMetric`][klax.LossMetric] object.
+        """Initialize the [`LossMetric`][klax.LossMetric].
 
         Args:
-            loss: A [loss][klax.Loss] returning a scalar a dictionary of scalar
+            loss: A [loss][klax.Loss] returning a scalar a dictionary of arrays
                 values via the `aux` return.
             batch_generator: A `Generator` returning a batch of data on which
-                the [loss][klax.Loss] is evaluated, everytime the
+                the [loss][klax.Loss] is evaluated, every time the
                 [LossMetric][klax.LossMetric] is called.
-            prefix: A string prefix to prepend to the keys returned by loss.
-            vmap_ensemble: Set to `True` if the
+            name: A string prefix to prepend to the keys returned by loss.
+            vmap_ensemble: Whether to vmap over the training state when
+                evaluating the loss function. Set to `True` if the
                 [`TrainingState`][klax.TrainingState] passed to
-                [`LossMetric`][klax.LossMetric] contains an ensamble.
+                [`LossMetric`][klax.LossMetric] contains an ensemble.
             jit_compile: Whether to jit compile the loss function for faster
-                metric compuations.
+                metric computations.
 
         """
+        super().__init__(name=name)
         self.batch_generator = batch_generator
-        self.prefix = prefix
         func = lambda state, batch: loss(state.model, batch, state.run_state)
         if vmap_ensemble:
             func = eqx.filter_vmap(func, in_axes=(eqx.if_array(0), None))
@@ -88,22 +169,9 @@ class LossMetric:
             func = eqx.filter_jit(func)
         self.func = func
 
-    def __call__(self, state: TrainingState) -> dict[str, Array]:
-        """Compute the metrics.
-
-        Args:
-            state: A [`TrainingState`][klax.TrainingState] containing the
-                `model` and `run_state` that are passed to the
-                [loss][klax.Loss].
-
-        Returns:
-            A dictionary containing pairs of metrics names and loss values.
-
-        """
+    def values(self, state):
         batch = next(self.batch_generator)
         _, aux = self.func(state, batch)
-        if self.prefix:
-            aux = {f"{self.prefix}/{k}": v for k, v in aux.items()}
         return aux
 
 
@@ -112,19 +180,28 @@ class MetricLogger(Callback):
 
     def __init__(
         self,
+        metrics: Sequence[Metric],
         log_every: int = 100,
-        metrics: Sequence[Metric] | None = None,
     ):
         """Initialize the [`MetricLogger`][klax.MetricLogger].
 
         Args:
-            log_every: Frequency of logging metrics (in steps).
-            metrics: Sequence of [metrics][klax.Metric] to evaluate.
-                If multiple metrics share the same name, the later metrics will
-                overwrite prior metrics.
+            metrics: Sequence of [metrics][klax.Metric] to evaluate and log.
+            log_every: Frequency of logging metrics in steps. Defaults to 100.
+
+        Raises:
+            ValueError: If multiple metrics use the same name(-space).
 
         """
-        self.metrics = [] if metrics is None else list(metrics)
+        metrics = list(metrics)
+        names = [m.name for m in metrics]
+        duplicates = [
+            name for name, count in Counter(names).items() if count > 1
+        ]
+        if duplicates:
+            raise ValueError(f"Duplicate metric namespaces: {duplicates}")
+
+        self.metrics = metrics
         self.log_every = log_every
 
     def on_training_step(self, context: TrainingContext) -> None:
@@ -171,7 +248,8 @@ class ProgressMeter(Callback):
             keys: The keys of the metrics that shall be printed alongside the
                 progress meter.
             exclude_keys: The keys of the metrics that shell be excluded from
-                the progress meter.
+                the progress meter. This parameter is ignored, if `keys` is not
+                `None`.
 
         """
         if progress_bar and not HAS_TQDM:
