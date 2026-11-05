@@ -33,8 +33,19 @@ class TestMetric:
 
         result = simple_metric(state)
 
-        assert isinstance(result, dict)
         assert result == {"test/value": jnp.array(5.0)}
+
+    def test_metric_decorator(self):
+
+        @klax.metric(name="test")
+        def my_metric(state: klax.TrainingState):
+            return {"value": state.model}
+
+        state = klax.TrainingState(model=12, opt_state=None, run_state=None)
+
+        result = my_metric(state)
+
+        assert result == {"test/value": 12}
 
 
 # ===---------------------------------------------------------------------=== #

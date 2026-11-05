@@ -22,6 +22,8 @@ a `tqdm` progress bar.
             - value
             - __call__
 
+::: klax.metric
+
 ::: klax.LossMetric
     options:
         members:

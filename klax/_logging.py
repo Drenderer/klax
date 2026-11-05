@@ -92,6 +92,36 @@ class Metric(ABC):
         return {f"{self.name}/{k}": v for k, v in self.values(state).items()}
 
 
+def metric(name: str):
+    """Metric decorator.
+
+    Create a metric from a function using a decorator.
+
+    !!!Example
+        ```python
+        @klax.metric(name="model_components")
+        def my_metric(state: klax.TrainingState) -> dict[str, Array]:
+            return {"bias": state.model.bias, "weight": state.model.weight}
+        ```
+
+    Args:
+        name: Name for the metric namespace.
+
+    """
+
+    def decorator(func):
+        class FuncMetric(Metric):
+            def __init__(self, name: str):
+                super().__init__(name)
+
+            def values(self, state: TrainingState) -> dict[str, Array]:
+                return func(state)
+
+        return FuncMetric(name)
+
+    return decorator
+
+
 class LossMetric(Metric):
     """A metric based on a [`loss`][klax.Loss] and a dataset.
 
