@@ -158,3 +158,15 @@ class TestHistory:
 
         stacked_history.append("train/loss", step=1, value=np.array(0.3))
         assert history["loss"].steps == [0, 1]
+
+    def test_stack_raises_on_key_collision(self):
+        history1 = klax.History()
+        history1.append(key="b/c", step=0, value=jnp.array(0.5))
+
+        history2 = klax.History()
+        history2.append(key="c", step=0, value=jnp.array(0.3))
+
+        with pytest.raises(
+            ValueError, match="Duplicate metric key after stacking: 'a/b/c'"
+        ):
+            klax.History.stack({"a": history1, "a/b": history2})

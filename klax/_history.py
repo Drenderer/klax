@@ -286,5 +286,10 @@ class History:
             new_history.total_time += history.total_time
             new_history.total_steps += history.total_steps
             for k, v in history._content.items():
-                new_history._content[f"{prefix}/{k}"] = deepcopy(v)
+                key = f"{prefix}/{k}"
+                if key in new_history._content:
+                    raise ValueError(
+                        f"Duplicate metric key after stacking: '{key}'."
+                    )
+                new_history._content[key] = deepcopy(v)
         return new_history
