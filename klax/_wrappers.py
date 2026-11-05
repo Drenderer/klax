@@ -40,16 +40,13 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Self, TypeVar, override
+from typing import TYPE_CHECKING, Any, Self, override
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, PyTree
-
-T = TypeVar("T")
-
 
 # ===----------------------------------------------------------------------===#
 #  Unwrappable
@@ -126,7 +123,7 @@ def unwrap[T: PyTree](tree: T) -> T:
 
 # This class is derived from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
-class Parameterize(Unwrappable[T]):
+class Parameterize[T](Unwrappable[T]):
     """Unwrap an object by calling `fn` with `args` and ``kwargs`.
 
     All of `fn`, `*args` and `**kwargs` may contain trainable parameters.
@@ -212,7 +209,7 @@ def non_trainable(tree: PyTree) -> PyTree:
 
 # This class is derived from paramax and has been lightly modified.
 # Original Copyright 2022 Daniel Ward
-class NonTrainable(Unwrappable[T]):
+class NonTrainable[T](Unwrappable[T]):
     """Applies stop gradient to all ArrayLike leaves before unwrapping.
 
     See also [`klax.non_trainable`][], which is probably a generally preferable

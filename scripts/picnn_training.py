@@ -7,7 +7,6 @@ import numpy as np
 import optax
 from jax import numpy as jnp
 from jax import random as jr
-from mpl_toolkits.mplot3d import Axes3D
 
 import klax
 

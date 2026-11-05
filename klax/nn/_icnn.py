@@ -15,7 +15,7 @@
 """Implementations of convex neural networks."""
 
 from collections.abc import Callable, Sequence
-from typing import Literal, cast
+from typing import Literal
 
 import equinox as eqx
 import jax

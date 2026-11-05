@@ -33,8 +33,6 @@ from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
 
-type Leaf = Any
-
 param_spec = eqx.is_inexact_array
 
 
