@@ -115,9 +115,11 @@ class FICNNLayer(eqx.Module, strict=True):
 
         # In case the `activation` is learnt, make a
         # separate copy of their weights for every neuron.
-        self.activation_y = eqx.filter_vmap(
-            lambda: activation, axis_size=y_out_size
-        )()
+        self.activation_y = (
+            activation
+            if y_out_size == "scalar"
+            else eqx.filter_vmap(lambda: activation, axis_size=y_out_size)()
+        )
 
         if use_passthrough:
             _weight_inits = (
@@ -180,7 +182,7 @@ class FICNNLayer(eqx.Module, strict=True):
         Float[Array, "... y_out_size"],
         Float[Array, "... x_size"],
     ]:
-        if self.use_passthrough:
+        if isinstance(self.linear_y, InputSplitLinear):
             y = self.linear_y(y, x, key=key)
         else:
             y = self.linear_y(y, key=key)
@@ -197,7 +199,7 @@ class FICNN(eqx.Module, strict=True):
     of the output `y` is a convex function of the input `x`.
     """
 
-    layers: tuple[FICNNLayer]
+    layers: tuple[FICNNLayer, ...]
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
@@ -502,18 +504,26 @@ class PICNNLayer(eqx.Module, strict=True):
 
         # In case any `activation` is learnt, make a
         # separate copy of their weights for every neuron.
-        activation_y = eqx.filter_vmap(
-            lambda: activation_y, axis_size=y_out_size
-        )()
-        activation_u = eqx.filter_vmap(
-            lambda: activation_u, axis_size=u_out_size
-        )()
-        activation_yu = eqx.filter_vmap(
-            lambda: activation_yu, axis_size=y_in_size
-        )()
-        activation_xu = eqx.filter_vmap(
-            lambda: activation_xu, axis_size=x_size
-        )()
+        activation_y = (
+            activation_y
+            if y_out_size == "scalar"
+            else eqx.filter_vmap(lambda: activation_y, axis_size=y_out_size)()
+        )
+        activation_u = (
+            activation_u
+            if u_out_size == "scalar"
+            else eqx.filter_vmap(lambda: activation_u, axis_size=u_out_size)()
+        )
+        activation_yu = (
+            activation_yu
+            if y_in_size == "scalar"
+            else eqx.filter_vmap(lambda: activation_yu, axis_size=y_in_size)()
+        )
+        activation_xu = (
+            activation_xu
+            if x_size == "scalar"
+            else eqx.filter_vmap(lambda: activation_xu, axis_size=x_size)()
+        )
 
         key_y, key_u, key_yu, key_xu = jr.split(key, 4)
         if use_passthrough:
@@ -625,12 +635,16 @@ class PICNNLayer(eqx.Module, strict=True):
     ]:
         w_y = self.activation_yu(self.linear_yu(u)) * y
         if self.use_passthrough:
+            assert self.activation_xu is not None
+            assert self.linear_xu is not None
             w_x = self.activation_xu(self.linear_xu(u)) * x
             y = self.activation_y(self.linear_y(w_y, w_x, u))
         else:
             y = self.activation_y(self.linear_y(w_y, u))
 
         if self.update_u:
+            assert self.activation_u is not None
+            assert self.linear_u is not None
             u = self.activation_u(self.linear_u(u))
 
         return y, u, x
@@ -646,7 +660,7 @@ class PICNN(eqx.Module, strict=True):
     whose weights and biases are functions of the input `p`.
     """
 
-    layers: tuple[PICNNLayer]
+    layers: tuple[PICNNLayer, ...]
     use_bias: bool = eqx.field(static=True)
     use_final_bias: bool = eqx.field(static=True)
     use_passthrough: bool = eqx.field(static=True)
