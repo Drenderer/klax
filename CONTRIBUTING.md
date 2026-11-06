@@ -25,12 +25,14 @@ from the project root. This will create a virtual environment with all the repen
 
 Next install the git hook scripts
 ```bash
-pre-commit install
+uv run pre-commit install
 ```
+
+This installs two hooks: a `pre-commit` hook that lints and formats your code with ruff, and a `commit-msg` hook that checks your commit messages (see [Commit messages](#commit-messages)).
 
 (optional) Run against all the files. It's usually a good idea to run the hooks against all of the files when adding new hooks (usually pre-commit will only run on the changed files during git hooks)
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ---
@@ -43,6 +45,17 @@ pytest
 ```
 
 Then push your changes to GitHub and open a pull request describing your changes.
+
+---
+
+## Commit messages
+klax uses [Conventional Commits](https://www.conventionalcommits.org/), which are checked by [commitizen](https://commitizen-tools.github.io/commitizen/). Version bumps and the changelog are generated from the commit history, so every commit message must follow the format
+```
+<type>(<optional scope>): <description>
+```
+for example `feat(klax.Loss): add helpful error message` or `fix(test): fix failing training test`. Common types are `feat`, `fix`, `docs`, `test`, `refactor`, `build`, and `ci`. Mark breaking changes with a `!` after the type (e.g., `feat!: ...`) or a `BREAKING CHANGE:` footer.
+
+The `commit-msg` hook rejects non-conforming messages locally, and the CI checks all commits of a pull request. If you are unsure about the format, `uv run cz commit` guides you through writing a commit message interactively.
 
 ---
 
@@ -70,3 +83,38 @@ To update the minimal dependency versions and to sync the virtual environment ac
 uv lock --upgrade
 uv sync
 ```
+
+
+# Releasing a new version
+
+Version bumps are done with [commitizen](https://commitizen-tools.github.io/commitizen/), which determines the new version from the commit messages since the last release (see [Commit messages](#commit-messages)). A `fix` commit leads to a patch bump, a `feat` commit to a minor bump. While klax is below version 1.0, breaking changes also lead to a minor bump. Commits that do not follow the convention are ignored.
+
+Releases are prepared on the `dev` branch. Make sure it is up to date and that your working tree is clean, since all modified files are included in the bump commit:
+
+```bash
+git switch dev
+git pull
+```
+
+Preview the new version and the changelog entry with
+
+```bash
+uv run cz bump --dry-run
+```
+
+If everything looks right, run
+
+```bash
+uv run cz bump
+```
+
+This updates the version in `pyproject.toml`, adds the changes to `CHANGELOG.md`, creates a `bump: version X → Y` commit, and tags it as `vY`. To override the detected increment, pass `--increment PATCH|MINOR|MAJOR`.
+
+Push the commit and the tag
+
+```bash
+git push
+git push --tags
+```
+
+and open a pull request from `dev` into `main`. Merging it publishes the new version to PyPI.

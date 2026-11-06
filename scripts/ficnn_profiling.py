@@ -370,8 +370,6 @@ ax.plot(
 )
 ax.plot(x_eval, jax.vmap(klax.finalize(_mlp))(x_eval), ls="-.", label="MLP")
 ax.plot(x_eval, jax.vmap(klax.finalize(_hc_ficnn))(x_eval), label="HCFICNN")
-ax.plot(
-    x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN"
-)
+ax.plot(x_eval, jax.vmap(klax.finalize(_ficnn))(x_eval), ls="--", label="FICNN")
 ax.legend()
 plt.show()

@@ -27,7 +27,7 @@ import jax.numpy as jnp
 from jax.nn.initializers import he_normal, variance_scaling, zeros
 from jaxtyping import Array, PRNGKeyArray
 
-from .._initializers import Initializer, canonicalize_initializer
+from .._initializers import SupportedInitializer, canonicalize_initializer
 from .._misc import default_floating_dtype
 from .._wrappers import (
     ContainsUnwrappablesError,
@@ -53,8 +53,8 @@ class Matrix(eqx.Module):
         in_size: int | Literal["scalar"],
         shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int],
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,  # type: ignore
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -142,7 +142,7 @@ class ConstantMatrix(eqx.Module):
     def __init__(
         self,
         shape: int | AtLeast2DTuple[int],
-        init: Initializer = variance_scaling(
+        init: SupportedInitializer = variance_scaling(
             scale=1, mode="fan_avg", distribution="normal"
         ),
         dtype: Any | None = None,
@@ -199,8 +199,8 @@ class SkewSymmetricMatrix(eqx.Module):
         in_size: int | Literal["scalar"],
         shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int],
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,  # type: ignore
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -294,7 +294,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
     def __init__(
         self,
         shape: int | AtLeast2DTuple[int],
-        init: Initializer = variance_scaling(
+        init: SupportedInitializer = variance_scaling(
             scale=1, mode="fan_avg", distribution="normal"
         ),
         dtype: Any | None = None,
@@ -359,8 +359,8 @@ class SPDMatrix(eqx.Module):
         shape: int | AtLeast2DTuple[int],
         width_sizes: Sequence[int],
         epsilon: float = 1e-6,
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,  # type: ignore
+        weight_init: SupportedInitializer = he_normal(),
+        bias_init: SupportedInitializer = zeros,
         activation: Callable = jax.nn.softplus,
         final_activation: Callable = lambda x: x,
         use_bias: bool = True,
@@ -463,7 +463,7 @@ class ConstantSPDMatrix(eqx.Module):
         self,
         shape: int | AtLeast2DTuple[int],
         epsilon: float = 1e-6,
-        init: Initializer = variance_scaling(
+        init: SupportedInitializer = variance_scaling(
             scale=1, mode="fan_avg", distribution="normal"
         ),
         dtype: Any | None = None,
