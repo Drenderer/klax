@@ -87,7 +87,7 @@ def _leaf_take(leaf: Any, spec: int | None, indices: Any) -> Any:
 
 def broadcast_and_get_size[T](
     data: PyTree[Any, "T"],
-    batch_axes: PyTree[int | None, "T ..."],
+    batch_axes: PyTree[int | None],
 ) -> tuple[PyTree[int | None, "T"], int]:
     """Broadcast `batch_axes` to the same structure as `data` and get size.
 
