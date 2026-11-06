@@ -33,8 +33,6 @@ from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
 
-type Leaf = Any
-
 param_spec = eqx.is_inexact_array
 
 
@@ -103,7 +101,9 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    return state.replace(model=model, opt_state=opt_state)
+    return TrainingState(
+        model=model, opt_state=opt_state, run_state=state.run_state
+    )
 
 
 def run_training_loop(

@@ -14,7 +14,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from functools import wraps
 from typing import Any
 
 import equinox as eqx
@@ -188,9 +187,10 @@ def loss(
     """
 
     class FuncLoss(Loss):
-        @wraps(func)
         def value(self, model, batch, run_state):
             return func(model, batch, run_state)
+
+    FuncLoss.value.__doc__ = func.__doc__
 
     return FuncLoss()
 
