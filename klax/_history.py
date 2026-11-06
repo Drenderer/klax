@@ -17,6 +17,7 @@
 import json
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, NamedTuple, Self
 
@@ -94,11 +95,20 @@ class History:
             step: The step, at which the new value is inserted.
             value: The actual `ArrayLike` value that is inserted.
 
+        Raises:
+            ValueError: If the provided `step` is not strictly
+                increasing for the series specified by `key`.
+
         """
-        if key not in self._content:
-            self._content[key] = StepsAndValues(steps=[], values=[])
-        self._content[key].steps.append(step)
-        self._content[key].values.append(value)
+        series = self._content.setdefault(key, StepsAndValues([], []))
+        if series.steps and step <= series.steps[-1]:
+            raise ValueError(
+                f"History already has a value for '{key}' at step "
+                f"{series.steps[-1]}; cannot append step {step}. "
+                "Two metrics are probably writing to the same key."
+            )
+        series.steps.append(step)
+        series.values.append(value)
 
     def keys(self) -> list[str]:
         """Get the names of the metrics stored in the history.
@@ -276,5 +286,10 @@ class History:
             new_history.total_time += history.total_time
             new_history.total_steps += history.total_steps
             for k, v in history._content.items():
-                new_history._content[f"{prefix}/{k}"] = v
+                key = f"{prefix}/{k}"
+                if key in new_history._content:
+                    raise ValueError(
+                        f"Duplicate metric key after stacking: '{key}'."
+                    )
+                new_history._content[key] = deepcopy(v)
         return new_history
