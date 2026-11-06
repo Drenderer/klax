@@ -102,8 +102,8 @@ where:
 - the weight $U_i(u_i) = \tilde U_i \cdot \texttt{diag}(\sigma^{yu}(W^{yu}u_i+b^{yu}))$ is computed from a constant weight matrix $\tilde U_i$, that is column-wise modulated by $u_i$ via a single layer MLP,
 - the weight $W(u_i) = \tilde W_i \cdot \texttt{diag}(\sigma^{xu}(W^{xu}u_i+b^{xu}))$ is similarly computed from a constant weight matrix $\tilde W_i$, that is column-wise modulated by $u_i$ via a single layer MLP (only when `use_passthrough=True`),
 - the bias $b(u_i) = W^{bu}u_i+b^{bu}$ is provided through an additional affine projection of $u_i$.
-- $\sigma_{yu}$ must be **non-negative** (default: `softplus`) to preserve convexity,
-- $\sigma_{xu}$ has no sign constraint by default (identity), but must be non-negative when
+- $\sigma^{yu}$ must be **non-negative** (default: `softplus`) to preserve convexity,
+- $\sigma^{xu}$ has no sign constraint by default (identity), but must be non-negative when
   `non_decreasing=True`.
 
 Note that information from $x$ **never** enters the arbitrary path $u$, preserving the
