@@ -191,16 +191,23 @@ def loss(
             return func(model, batch, run_state)
 
     FuncLoss.value.__doc__ = func.__doc__
+    FuncLoss.__doc__ = func.__doc__
+    FuncLoss.__module__ = func.__module__
 
     return FuncLoss()
 
 
 @loss
-def mse(model, data, run_state):
-    """Mean squared error for a tuple of data `(x, y)`.
+def mse(model: PyTree, data: PyTree, run_state: PyTree):
+    r"""Mean squared error for a tuple of data `(x, y)`.
+
+    This loss computes
+    $MSE = \sum_i(y^\text{pred}_i(\boldsymbol{x}) - y_i)^2$
+    with `y_pred = jax.vmap(model)(x)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
+
     """
     x, y = data
     y_pred = jax.vmap(model)(x)
@@ -209,11 +216,16 @@ def mse(model, data, run_state):
 
 
 @loss
-def mae(model, data, run_state):
-    """Mean absolute error for a tuple of data `(x, y)`.
+def mae(model: PyTree, data: PyTree, run_state: PyTree):
+    r"""Mean absolute error for a tuple of data `(x, y)`.
+
+    This loss computes
+    $MAE = \sum_i| y^\text{pred}_i(\boldsymbol{x}) - y_i|$
+    with `y_pred = jax.vmap(model)(x)`.
 
     The inputs `x` and the outputs `y` are expected to have the same batch axis
     and equal length along that axis.
+
     """
     x, y = data
     y_pred = jax.vmap(model)(x)
