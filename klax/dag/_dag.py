@@ -163,9 +163,7 @@ class Graph:
     def _plan_cache(self) -> dict:
         return {}
 
-    def plan(
-        self, have: Iterable[str], want: Iterable[str]
-    ) -> tuple[int, ...]:
+    def plan(self, have: Iterable[str], want: Iterable[str]) -> tuple[int, ...]:
         """Return a plan to compute `want` from `have`.
 
         A plan is a tuple of block indices in the order in which they should be
