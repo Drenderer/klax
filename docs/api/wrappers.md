@@ -14,6 +14,10 @@ In short, a [Unwrappable][klax.Unwrappable] wraps around a model parameter (or e
             - unwrap
 ::: klax.unwrap
 ::: klax.contains_unwrappables
+::: klax.ContainsUnwrappablesError
+    options:
+        members: false
+::: klax.assert_unwrapped
 ---
 ::: klax.Constraint
     options:
