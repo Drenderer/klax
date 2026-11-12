@@ -72,7 +72,8 @@ def getzerowrap():
 class TestLinear:
     """Test suite for the Linear layer."""
 
-    def test_zero_sizes(self, getkey):
+    @staticmethod
+    def test_zero_sizes(getkey):
         """Test that zero input or output sizes are supported."""
         linear = Linear(0, 4, uniform(), key=getkey())
         x = jrandom.normal(getkey(), (0,))
@@ -82,7 +83,8 @@ class TestLinear:
         x = jrandom.normal(getkey(), (4,))
         assert linear(x).shape == (0,)
 
-    def test_argument_styles(self, getkey):
+    @staticmethod
+    def test_argument_styles(getkey):
         """Test positional, mixed and keyword-only construction."""
         x = jrandom.normal(getkey(), (3,))
 
@@ -97,7 +99,8 @@ class TestLinear:
         )
         assert linear(x).shape == (4,)
 
-    def test_scalar_shapes(self, getkey):
+    @staticmethod
+    def test_scalar_shapes(getkey):
         """Test the special value "scalar" for input and output sizes."""
         linear = Linear("scalar", 2, uniform(), key=getkey())
         x = jrandom.normal(getkey(), ())
@@ -107,7 +110,8 @@ class TestLinear:
         x = jrandom.normal(getkey(), (2,))
         assert linear(x).shape == ()
 
-    def test_wrappers(self, getkey, getzerowrap):
+    @staticmethod
+    def test_wrappers(getkey, getzerowrap):
         """Test that weight and bias wrappers are applied on finalizing."""
         linear = Linear(
             3,
@@ -120,6 +124,7 @@ class TestLinear:
         x = jrandom.normal(getkey(), (3,))
         assert jnp.all(klax.finalize(linear)(x) == 0.0)
 
+    @staticmethod
     @pytest.mark.parametrize(
         "wrap_weight, wrap_bias",
         [
@@ -129,7 +134,7 @@ class TestLinear:
         ],
     )
     def test_call_with_unwrappables_raises(
-        self, wrap_weight, wrap_bias, getkey, getzerowrap
+        wrap_weight, wrap_bias, getkey, getzerowrap
     ):
         """Test that calling with unwrapped Unwrappables raises an error."""
         linear = Linear(
@@ -145,13 +150,15 @@ class TestLinear:
         with pytest.raises(klax.ContainsUnwrappablesError):
             linear(x)
 
-    def test_dtype(self, getkey):
+    @staticmethod
+    def test_dtype(getkey):
         """Test that the specified dtype is preserved."""
         linear = Linear(2, "scalar", uniform(), key=getkey(), dtype=jnp.float16)
         x = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
         assert linear(x).dtype == jnp.float16
 
-    def test_complex_dtype(self, getkey):
+    @staticmethod
+    def test_complex_dtype(getkey):
         """Test complex dtypes (uniform does not accept complex numbers)."""
         linear = Linear(
             2,
@@ -172,7 +179,8 @@ class TestLinear:
 class TestInputSplitLinear:
     """Test suite for the InputSplitLinear layer."""
 
-    def test_zero_sizes(self, getkey):
+    @staticmethod
+    def test_zero_sizes(getkey):
         """Test that zero input or output sizes are supported."""
         is_linear = InputSplitLinear((0,), 4, uniform(), key=getkey())
         x = jrandom.normal(getkey(), (0,))
@@ -186,7 +194,8 @@ class TestInputSplitLinear:
         x = jrandom.normal(getkey(), (2,))
         assert is_linear(x).shape == (0,)
 
-    def test_number_of_inputs(self, getkey):
+    @staticmethod
+    def test_number_of_inputs(getkey):
         """Test one and multiple non-zero inputs."""
         is_linear = InputSplitLinear((3,), 4, uniform(), key=getkey())
         x = jrandom.normal(getkey(), (3,))
@@ -198,7 +207,8 @@ class TestInputSplitLinear:
         x2 = jrandom.normal(getkey(), (5,))
         assert is_linear(x0, x1, x2).shape == (4,)
 
-    def test_scalar_shapes(self, getkey):
+    @staticmethod
+    def test_scalar_shapes(getkey):
         """Test the special value "scalar" for input and output sizes."""
         is_linear = InputSplitLinear(
             ("scalar", 2), 3, (uniform(), uniform()), key=getkey()
@@ -212,7 +222,8 @@ class TestInputSplitLinear:
         z = jrandom.normal(getkey(), (3,))
         assert is_linear(y, z).shape == ()
 
-    def test_weight_wraps(self, getkey):
+    @staticmethod
+    def test_weight_wraps(getkey):
         """Test that weight wrappers are applied per weight."""
         is_linear = InputSplitLinear(
             (2, 3),
@@ -224,6 +235,7 @@ class TestInputSplitLinear:
         assert isinstance(is_linear.weights[0], klax.NonNegative)
         assert isinstance(is_linear.weights[1], jax.Array)
 
+    @staticmethod
     @pytest.mark.parametrize(
         "wrap_weights, wrap_bias",
         [
@@ -234,7 +246,7 @@ class TestInputSplitLinear:
         ],
     )
     def test_call_with_unwrappables_raises(
-        self, wrap_weights, wrap_bias, getkey, getzerowrap
+        wrap_weights, wrap_bias, getkey, getzerowrap
     ):
         """Test that calling with unwrapped Unwrappables raises an error."""
         is_linear = InputSplitLinear(
@@ -251,8 +263,9 @@ class TestInputSplitLinear:
         with pytest.raises(klax.ContainsUnwrappablesError):
             is_linear(y, z)
 
+    @staticmethod
     @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32, jnp.complex64])
-    def test_dtype(self, dtype, getkey):
+    def test_dtype(dtype, getkey):
         """Test that the specified dtype is preserved."""
         is_linear = InputSplitLinear(
             (2, 3), "scalar", he_normal(), key=getkey(), dtype=dtype
