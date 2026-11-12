@@ -3,19 +3,19 @@
 import functools
 import importlib.util
 
-HAS_PLOT = importlib.util.find_spec("matplotlib") is not None
+HAS_MATPLOTLIB = importlib.util.find_spec("matplotlib") is not None
 
 
 @functools.cache
-def get_plot():
+def get_matplotlib():
     try:
-        import matplotlib.pyplot as plt
+        import matplotlib
     except ImportError as exc:
         raise ImportError(
-            "This feature requires the 'plot' extra. "
-            "Install with: pip install klax[plot]"
+            "This feature requires 'matplotlib'. "
+            "Install with: pip install klax[plot]."
         ) from exc
-    return plt
+    return matplotlib
 
 
 HAS_TQDM = importlib.util.find_spec("tqdm") is not None
@@ -27,7 +27,7 @@ def get_tqdm():
         from tqdm.auto import tqdm
     except ImportError as exc:
         raise ImportError(
-            "This feature requires the 'tqdm' extra. "
-            "Install with: pip install klax[tqdm]"
+            "This feature requires 'tqdm'. "
+            "Install with: pip install klax[tqdm]."
         ) from exc
     return tqdm
