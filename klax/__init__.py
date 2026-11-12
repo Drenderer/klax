@@ -17,15 +17,16 @@ from ._callbacks import Callback as Callback
 from ._datahandler import Batcher as Batcher
 from ._datahandler import batch_data as batch_data
 from ._datahandler import split_data as split_data
+from ._history import History as History
 from ._initializers import Initializer as Initializer
 from ._initializers import SupportedInitializer as SupportedInitializer
 from ._initializers import canonicalize_initializer as canonicalize_initializer
 from ._initializers import hoedt_bias as hoedt_bias
 from ._initializers import hoedt_normal as hoedt_normal
-from ._logging import BatchMetric as BatchMetric
-from ._logging import History as History
+from ._logging import LossMetric as LossMetric
 from ._logging import Metric as Metric
 from ._logging import MetricLogger as MetricLogger
+from ._logging import ProgressMeter as ProgressMeter
 from ._logging import metric as metric
 from ._losses import Loss as Loss
 from ._losses import loss as loss
@@ -38,12 +39,14 @@ from ._serialization import (
     text_serialize_filter_spec as text_serialize_filter_spec,
 )
 from ._tools import count_parameters as count_parameters
+from ._training import StepFunction as StepFunction
 from ._training import fit as fit
 from ._training import make_step as make_step
 from ._training import run_training_loop as run_training_loop
 from ._trainstate import TrainingContext as TrainingContext
 from ._trainstate import TrainingState as TrainingState
 from ._wrappers import Constraint as Constraint
+from ._wrappers import ContainsUnwrappablesError as ContainsUnwrappablesError
 from ._wrappers import NonNegative as NonNegative
 from ._wrappers import NonTrainable as NonTrainable
 from ._wrappers import Parameterize as Parameterize
@@ -51,6 +54,7 @@ from ._wrappers import SkewSymmetric as SkewSymmetric
 from ._wrappers import Symmetric as Symmetric
 from ._wrappers import Unwrappable as Unwrappable
 from ._wrappers import apply as apply
+from ._wrappers import assert_unwrapped as assert_unwrapped
 from ._wrappers import contains_constraints as contains_constraints
 from ._wrappers import contains_unwrappables as contains_unwrappables
 from ._wrappers import finalize as finalize

@@ -15,18 +15,24 @@ y = jnp.sin(x)
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 
-@klax.metric("bias")
-def get_bias(context):
-    return context.state.model.layers[0].bias
+@klax.metric("model")
+def get_bias(state):
+    return {"bias": state.model.layers[0].bias}
 
 
 class ResetBias(klax.Callback):
     def on_training_step(self, context):
-        if context.state.step % 1000 == 0:
-            context.state.model = eqx.tree_at(
+        if context.step % 1000 == 0:
+            state = context.state
+            new_model = eqx.tree_at(
                 lambda m: m.layers[0].bias,
-                context.state.model,
+                state.model,
                 replace_fn=lambda x: jnp.zeros(shape=x.shape),
+            )
+            context.state = klax.TrainingState(
+                model=new_model,
+                opt_state=state.opt_state,
+                run_state=state.run_state,
             )
 
 
@@ -34,7 +40,8 @@ class ResetBias(klax.Callback):
 def my_loss(model, batch, run_state):
     x, y = batch
     y_pred = jax.vmap(model)(x)
-    return jnp.mean((y - y_pred) ** 2)
+    mse = jnp.mean((y - y_pred) ** 2)
+    return mse, {"mse": mse}
 
 
 model, history = klax.fit(
@@ -49,13 +56,13 @@ model, history = klax.fit(
     key=train_key,
 )
 
-steps, values = history["bias"]
+steps, values = history["model/bias"]
 fig, ax = plt.subplots()
 ax.plot(steps, values)
 ax.set(xlabel="step", yscale="linear", title="Recorded bias values")
 plt.show()
 
-ax = history.plot("loss", "validation_loss")
+ax = history.plot("training/mse", "validation/mse")
 plt.show()
 
 y_pred = jax.vmap(model)(x)

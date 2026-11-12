@@ -15,8 +15,10 @@
 """Continued training example.
 
 This example demonstrates how to continue a training session.
-It shows how to initialize the optax initializer state with a previous training session's final state,
-and how to use the `HistoryCallback` to add the training history to the subsequent training sessions.
+It shows how to capture the final optimizer state of a training session with a
+`klax.Callback`, how to initialize the optimizer state of a subsequent session
+with it via `init_opt_state`, and how to add the history of a subsequent
+session to the previous one with `klax.History.append`.
 """
 
 import jax.random as jr
@@ -35,18 +37,41 @@ y += 0.01 * jr.normal(data_key, y.shape)  # Add some noise
 
 
 def metrics_factory():
-    metric = klax.BatchMetric(
-        "loss",
+    # LossMetrics own a stateful batch generator, so we create new ones for
+    # every training session.
+    metric = klax.LossMetric(
         klax.mse,
-        (x, y),
-        klax.batch_data,
-        batch_size=x.shape[0],
-        batch_axes=0,
-        key=data_key,
+        klax.batch_data((x, y), x.shape[0], 0, key=data_key),
+        name="full_batch",
     )
     return [
         metric,
     ]
+
+
+class KeepOptState(klax.Callback):
+    """Store the optimizer state at the end of a training session."""
+
+    opt_state = None
+
+    def on_training_end(self, context: klax.TrainingContext) -> None:
+        self.opt_state = context.state.opt_state
+
+
+def extend(history: klax.History, other: klax.History) -> None:
+    """Append the entries of a subsequent session's history to `history`.
+
+    The steps of `other` are offset by the number of steps in `history`.
+    The initial (step 0) entries of `other` are skipped, since they coincide
+    with the final entries of `history`.
+    """
+    offset = history.total_steps
+    for key in other.keys():
+        for step, value in zip(*other[key]):
+            if step > 0:
+                history.append(key, offset + step, value)
+    history.total_steps += other.total_steps
+    history.total_time += other.total_time
 
 
 # A: Complete training for 2000 steps
@@ -67,6 +92,7 @@ model, history_complete = klax.fit(
 #    We still expect slight differences from the continuous training,
 #    since we get different batches in the second session.
 model = klax.nn.MLP(2, "scalar", 2 * [16], key=model_key)
+keep_opt_state = KeepOptState()
 model, history_continued = klax.fit(
     model,
     (x, y),
@@ -74,6 +100,7 @@ model, history_continued = klax.fit(
     optimizer=optax.adabelief(1e-5),
     log_every=10,
     metrics=metrics_factory(),
+    callbacks=[keep_opt_state],
     key=train1_key,
 )
 
@@ -82,12 +109,12 @@ model, history_continued_2 = klax.fit(
     (x, y),
     steps=1900,
     optimizer=optax.adabelief(1e-5),  # (!) Same optimizer as in first session
-    init_opt_state=history_continued.final_opt_state,  # Initialize the optimizer state with the last state
+    init_opt_state=keep_opt_state.opt_state,  # Initialize the optimizer state with the last state
     log_every=10,
     metrics=metrics_factory(),
     key=train2_key,
 )
-history_continued.extend(history_continued_2)
+extend(history_continued, history_continued_2)
 
 # C: Training split into two sessions with reset optimizer state.
 model = klax.nn.MLP(2, "scalar", 2 * [16], key=model_key)
@@ -111,7 +138,7 @@ model, history_reset_2 = klax.fit(
     metrics=metrics_factory(),
     key=train2_key,
 )
-history_reset.extend(history_reset_2)
+extend(history_reset, history_reset_2)
 
 # D: Plot the recorded losses
 fig, ax = plt.subplots()
@@ -120,7 +147,7 @@ for history, label in zip(
     [history_complete, history_continued, history_reset],
     ["Continuous training", "Continued training", "Reset optimizer state"],
 ):
-    history.plot("loss", ax=ax)
+    history.plot("full_batch/mse", ax=ax)
     legend_labels.append("Loss - " + label)
 ax.legend(legend_labels)
 ax.set(

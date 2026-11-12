@@ -1,4 +1,3 @@
-import equinox as eqx
 import jax
 import matplotlib.pyplot as plt
 from jax import numpy as jnp
@@ -12,10 +11,13 @@ model_key, train_key, aux_key = jr.split(key, 3)
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 
-class UpdateAux(klax.Callback):
-    @eqx.filter_jit
+class UpdateRunState(klax.Callback):
     def on_training_step(self, context):
-        context.state.run_state, _ = jr.split(context.state.run_state)
+        state = context.state
+        new_key, _ = jr.split(state.run_state)
+        context.state = klax.TrainingState(
+            model=state.model, opt_state=state.opt_state, run_state=new_key
+        )
 
 
 @klax.loss
@@ -24,14 +26,15 @@ def my_loss(model, batch, run_state):
     x = jr.normal(key, (64,))
     y = jnp.sin(x)
     y_pred = jax.vmap(model)(x)
-    return jnp.mean((y - y_pred) ** 2)
+    mse = jnp.mean((y - y_pred) ** 2)
+    return mse, {"mse": mse}
 
 
 model, history = klax.fit(
     model,
     data=None,
     steps=30_000,
-    callbacks=[UpdateAux()],
+    callbacks=[UpdateRunState()],
     run_state=aux_key,
     loss=my_loss,
     key=train_key,
@@ -40,8 +43,9 @@ model, history = klax.fit(
 x = jnp.linspace(-4, 4, 100)
 y = jnp.sin(x)
 
-ax = history.plot("loss")
+ax = history.plot()
 plt.show()
+
 y_pred = jax.vmap(model)(x)
 fig, ax = plt.subplots()
 ax.plot(x, y, label="True", marker="o", markevery=10)

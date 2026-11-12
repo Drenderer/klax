@@ -19,6 +19,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import pytest
+from jaxtyping import Array
 
 from klax import (
     NonNegative,
@@ -35,7 +36,33 @@ from klax import (
 )
 
 
-def test_nested_unwrap():
+@pytest.fixture
+def getarraywrap():
+    from typing import Self
+
+    import equinox as eqx
+
+    import klax
+
+    class Wrapper(klax.Constraint):
+        """A constraint that multiplies the parameter by 2 when applied."""
+
+        parameter: Array
+
+        def unwrap(self) -> Array:
+            return self.parameter
+
+        def apply(self) -> Self:
+            return eqx.tree_at(
+                lambda x: x.parameter,
+                self,
+                replace_fn=lambda x: 2 * x,
+            )
+
+    return Wrapper
+
+
+def test_unwrap():
     param = Parameterize(
         jnp.square,
         Parameterize(jnp.square, Parameterize(jnp.square, 2)),
@@ -82,7 +109,6 @@ def test_non_negative(getkey):
 
 
 def test_symmetric(getkey):
-    # Constraint
     parameter = jr.normal(getkey(), (3, 10, 3, 3))
     symmetric = Symmetric(parameter)
     _symmetric = unwrap(symmetric)
@@ -93,7 +119,6 @@ def test_symmetric(getkey):
 
 
 def test_skewsymmetric(getkey):
-    # Constraint
     parameter = jr.normal(getkey(), (3, 10, 3, 3))
     symmetric = SkewSymmetric(parameter)
     _symmetric = unwrap(symmetric)

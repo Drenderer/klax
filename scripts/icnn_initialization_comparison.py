@@ -50,13 +50,11 @@ for (
         key=model_key,
     )
 
-    logger = klax.MetricLogger(log_every=10)
-
     ficnn, history = klax.fit(
         ficnn,
         (x, y),
         steps=100_000,
-        logger=logger,
+        log_every=10,
         key=train_key,
     )
     results[name] = dict(ficnn=ficnn, history=history)
@@ -67,9 +65,9 @@ fig, ax = plt.subplots()
 
 for name, result in results.items():
     history = result["history"]
-    (line,) = ax.plot(*history["loss"], label=f"{name} loss")
+    (line,) = ax.plot(*history["training/mse"], label=f"{name} loss")
     # ax.plot(
-    #     *history["validation_loss"],
+    #     *history["validation/mse"],
     #     label=f"{name} val loss",
     #     c=line.get_color(),
     #     ls="--",
@@ -84,3 +82,4 @@ ax.set(
     xlim=[10, 10000],
 )
 ax.legend()
+plt.show()

@@ -1,4 +1,3 @@
-import equinox as eqx
 import jax
 import matplotlib.pyplot as plt
 from jax import numpy as jnp
@@ -15,16 +14,19 @@ y = jnp.sin(x)
 model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 
-@klax.metric("bias")
-def get_bias(context):
-    return context.state.model.layers[0].bias
-
-
 @klax.loss
 def my_loss(model, batch, run_state):
     x, y = batch
     y_pred = jax.vmap(model)(x)
-    return jnp.mean((y - y_pred) ** 2)
+    diff = y - y_pred
+    mse = jnp.mean(diff**2)
+    mae = jnp.mean(jnp.abs(diff))
+    return mse, {"mae": mae, "mse": mse}
+
+
+@klax.metric("model")
+def get_bias(state):
+    return {"bias": state.model.layers[0].bias}
 
 
 model, history = klax.fit(
@@ -32,20 +34,18 @@ model, history = klax.fit(
     (x, y),
     validation_data=(x, y),
     steps=30_000,
-    metrics=[get_bias],
-    # callbacks=[MyCallback()],
     batcher=klax.batch_data,
     loss=my_loss,
+    metrics=[get_bias],
     key=train_key,
 )
 
-steps, values = history["bias"]
-fig, ax = plt.subplots()
-ax.plot(steps, values)
-ax.set(xlabel="step", yscale="linear", title="Recorded bias values")
+history.plot(exclude_keys=["model/bias"])
 plt.show()
 
-ax = history.plot("loss", "validation_loss")
+fig, ax = plt.subplots()
+history.plot("model/bias", ax=ax)
+ax.set(yscale="linear")
 plt.show()
 
 y_pred = jax.vmap(model)(x)
