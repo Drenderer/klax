@@ -69,69 +69,106 @@ def getzerowrap():
 # ===---------------------------------------------------------------------=== #
 
 
-def test_linear(getkey, getzerowrap):
-    # Zero input shape
-    linear = Linear(0, 4, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (0,))
-    assert linear(x).shape == (4,)
+class TestLinear:
+    """Test suite for the Linear layer."""
 
-    # Zero output shape
-    linear = Linear(4, 0, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (4,))
-    assert linear(x).shape == (0,)
+    @staticmethod
+    def test_zero_sizes(getkey):
+        """Test that zero input or output sizes are supported."""
+        linear = Linear(0, 4, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (0,))
+        assert linear(x).shape == (4,)
 
-    # Positional arguments
-    linear = Linear(3, 4, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (3,))
-    assert linear(x).shape == (4,)
+        linear = Linear(4, 0, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (4,))
+        assert linear(x).shape == (0,)
 
-    # Some keyword arguments
-    linear = Linear(3, out_features=4, weight_init=uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (3,))
-    assert linear(x).shape == (4,)
+    @staticmethod
+    def test_argument_styles(getkey):
+        """Test positional, mixed and keyword-only construction."""
+        x = jrandom.normal(getkey(), (3,))
 
-    # All keyword arguments
-    linear = Linear(
-        in_features=3, out_features=4, weight_init=uniform(), key=getkey()
+        linear = Linear(3, 4, uniform(), key=getkey())
+        assert linear(x).shape == (4,)
+
+        linear = Linear(3, out_features=4, weight_init=uniform(), key=getkey())
+        assert linear(x).shape == (4,)
+
+        linear = Linear(
+            in_features=3, out_features=4, weight_init=uniform(), key=getkey()
+        )
+        assert linear(x).shape == (4,)
+
+    @staticmethod
+    def test_scalar_shapes(getkey):
+        """Test the special value "scalar" for input and output sizes."""
+        linear = Linear("scalar", 2, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), ())
+        assert linear(x).shape == (2,)
+
+        linear = Linear(2, "scalar", uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (2,))
+        assert linear(x).shape == ()
+
+    @staticmethod
+    def test_wrappers(getkey, getzerowrap):
+        """Test that weight and bias wrappers are applied on finalizing."""
+        linear = Linear(
+            3,
+            4,
+            uniform(),
+            weight_wrap=getzerowrap,
+            bias_wrap=getzerowrap,
+            key=getkey(),
+        )
+        x = jrandom.normal(getkey(), (3,))
+        assert jnp.all(klax.finalize(linear)(x) == 0.0)
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "wrap_weight, wrap_bias",
+        [
+            pytest.param(True, False, id="weight"),
+            pytest.param(False, True, id="bias"),
+            pytest.param(True, True, id="weight_and_bias"),
+        ],
     )
-    x = jrandom.normal(getkey(), (3,))
-    assert linear(x).shape == (4,)
+    def test_call_with_unwrappables_raises(
+        wrap_weight, wrap_bias, getkey, getzerowrap
+    ):
+        """Test that calling with unwrapped Unwrappables raises an error."""
+        linear = Linear(
+            3,
+            4,
+            uniform(),
+            weight_wrap=getzerowrap if wrap_weight else None,
+            bias_wrap=getzerowrap if wrap_bias else None,
+            key=getkey(),
+        )
+        x = jrandom.normal(getkey(), (3,))
 
-    # Scalar shapes
-    linear = Linear("scalar", 2, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), ())
-    assert linear(x).shape == (2,)
+        with pytest.raises(klax.ContainsUnwrappablesError):
+            linear(x)
 
-    linear = Linear(2, "scalar", uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (2,))
-    assert linear(x).shape == ()
+    @staticmethod
+    def test_dtype(getkey):
+        """Test that the specified dtype is preserved."""
+        linear = Linear(2, "scalar", uniform(), key=getkey(), dtype=jnp.float16)
+        x = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
+        assert linear(x).dtype == jnp.float16
 
-    # Wrappers
-    linear = Linear(
-        3,
-        4,
-        uniform(),
-        weight_wrap=getzerowrap,
-        bias_wrap=getzerowrap,
-        key=getkey(),
-    )
-    x = jrandom.normal(getkey(), (3,))
-    assert jnp.all(klax.finalize(linear)(x) == 0.0)
-
-    # Data type
-    linear = Linear(2, "scalar", uniform(), key=getkey(), dtype=jnp.float16)
-    x = jrandom.normal(getkey(), (2,), dtype=jnp.float16)
-    assert linear(x).dtype == jnp.float16
-
-    linear = Linear(
-        2,
-        "scalar",
-        he_normal(),  # since uniform does not accept complex numbers
-        key=getkey(),
-        dtype=jnp.complex64,
-    )
-    x = jrandom.normal(getkey(), (2,), dtype=jnp.complex64)
-    assert linear(x).dtype == jnp.complex64
+    @staticmethod
+    def test_complex_dtype(getkey):
+        """Test complex dtypes (uniform does not accept complex numbers)."""
+        linear = Linear(
+            2,
+            "scalar",
+            he_normal(),
+            key=getkey(),
+            dtype=jnp.complex64,
+        )
+        x = jrandom.normal(getkey(), (2,), dtype=jnp.complex64)
+        assert linear(x).dtype == jnp.complex64
 
 
 # ===---------------------------------------------------------------------=== #
@@ -139,59 +176,97 @@ def test_linear(getkey, getzerowrap):
 # ===---------------------------------------------------------------------=== #
 
 
-def test_input_split_linear(getkey):
-    # Zero input length
-    is_linear = InputSplitLinear((0,), 4, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (0,))
-    assert is_linear(x).shape == (4,)
+class TestInputSplitLinear:
+    """Test suite for the InputSplitLinear layer."""
 
-    is_linear = InputSplitLinear((0, 0), 4, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (0,))
-    assert is_linear(x, x).shape == (4,)
+    @staticmethod
+    def test_zero_sizes(getkey):
+        """Test that zero input or output sizes are supported."""
+        is_linear = InputSplitLinear((0,), 4, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (0,))
+        assert is_linear(x).shape == (4,)
 
-    # Zero length output
-    is_linear = InputSplitLinear((2,), 0, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (2,))
-    assert is_linear(x).shape == (0,)
+        is_linear = InputSplitLinear((0, 0), 4, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (0,))
+        assert is_linear(x, x).shape == (4,)
 
-    # One non-zero input
-    is_linear = InputSplitLinear((3,), 4, uniform(), key=getkey())
-    x = jrandom.normal(getkey(), (3,))
-    assert is_linear(x).shape == (4,)
+        is_linear = InputSplitLinear((2,), 0, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (2,))
+        assert is_linear(x).shape == (0,)
 
-    # Multiple non-zero inputs
-    is_linear = InputSplitLinear((3, 2, 5), 4, uniform(), key=getkey())
-    x0 = jrandom.normal(getkey(), (3,))
-    x1 = jrandom.normal(getkey(), (2,))
-    x2 = jrandom.normal(getkey(), (5,))
-    assert is_linear(x0, x1, x2).shape == (4,)
+    @staticmethod
+    def test_number_of_inputs(getkey):
+        """Test one and multiple non-zero inputs."""
+        is_linear = InputSplitLinear((3,), 4, uniform(), key=getkey())
+        x = jrandom.normal(getkey(), (3,))
+        assert is_linear(x).shape == (4,)
 
-    # Scalar shapes
-    is_linear = InputSplitLinear(
-        ("scalar", 2), 3, (uniform(), uniform()), key=getkey()
+        is_linear = InputSplitLinear((3, 2, 5), 4, uniform(), key=getkey())
+        x0 = jrandom.normal(getkey(), (3,))
+        x1 = jrandom.normal(getkey(), (2,))
+        x2 = jrandom.normal(getkey(), (5,))
+        assert is_linear(x0, x1, x2).shape == (4,)
+
+    @staticmethod
+    def test_scalar_shapes(getkey):
+        """Test the special value "scalar" for input and output sizes."""
+        is_linear = InputSplitLinear(
+            ("scalar", 2), 3, (uniform(), uniform()), key=getkey()
+        )
+        y = jrandom.normal(getkey(), ())
+        z = jrandom.normal(getkey(), (2,))
+        assert is_linear(y, z).shape == (3,)
+
+        is_linear = InputSplitLinear((2, 3), "scalar", uniform(), key=getkey())
+        y = jrandom.normal(getkey(), (2,))
+        z = jrandom.normal(getkey(), (3,))
+        assert is_linear(y, z).shape == ()
+
+    @staticmethod
+    def test_weight_wraps(getkey):
+        """Test that weight wrappers are applied per weight."""
+        is_linear = InputSplitLinear(
+            (2, 3),
+            "scalar",
+            uniform(),
+            weight_wraps=[klax.NonNegative, None],
+            key=getkey(),
+        )
+        assert isinstance(is_linear.weights[0], klax.NonNegative)
+        assert isinstance(is_linear.weights[1], jax.Array)
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "wrap_weights, wrap_bias",
+        [
+            pytest.param((True, False), False, id="first_weight"),
+            pytest.param((False, True), False, id="second_weight"),
+            pytest.param((False, False), True, id="bias"),
+            pytest.param((True, True), True, id="all"),
+        ],
     )
-    y = jrandom.normal(getkey(), ())
-    z = jrandom.normal(getkey(), (2,))
-    assert is_linear(y, z).shape == (3,)
+    def test_call_with_unwrappables_raises(
+        wrap_weights, wrap_bias, getkey, getzerowrap
+    ):
+        """Test that calling with unwrapped Unwrappables raises an error."""
+        is_linear = InputSplitLinear(
+            (2, 3),
+            4,
+            uniform(),
+            weight_wraps=[getzerowrap if w else None for w in wrap_weights],
+            bias_wrap=getzerowrap if wrap_bias else None,
+            key=getkey(),
+        )
+        y = jrandom.normal(getkey(), (2,))
+        z = jrandom.normal(getkey(), (3,))
 
-    is_linear = InputSplitLinear((2, 3), "scalar", uniform(), key=getkey())
-    y = jrandom.normal(getkey(), (2,))
-    z = jrandom.normal(getkey(), (3,))
-    assert is_linear(y, z).shape == ()
+        with pytest.raises(klax.ContainsUnwrappablesError):
+            is_linear(y, z)
 
-    # Weight wrappers
-    is_linear = InputSplitLinear(
-        (2, 3),
-        "scalar",
-        uniform(),
-        weight_wraps=[klax.NonNegative, None],
-        key=getkey(),
-    )
-    assert isinstance(is_linear.weights[0], klax.NonNegative)
-    assert isinstance(is_linear.weights[1], jax.Array)
-
-    # Data types
-    for dtype in [jnp.float16, jnp.float32, jnp.complex64]:
+    @staticmethod
+    @pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32, jnp.complex64])
+    def test_dtype(dtype, getkey):
+        """Test that the specified dtype is preserved."""
         is_linear = InputSplitLinear(
             (2, 3), "scalar", he_normal(), key=getkey(), dtype=dtype
         )
