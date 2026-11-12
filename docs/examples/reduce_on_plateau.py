@@ -62,11 +62,11 @@ class TrackScale(klax.Callback):
         self.steps = []
         self.log_every = log_every
 
-    def on_training_step(self, view, step):
-        if step % self.log_every == 0:
-            scale = otu.tree_get(view.opt_state, "scale")
+    def on_training_step(self, context: klax.TrainingContext):
+        if context.step % self.log_every == 0:
+            scale = otu.tree_get(context.state.opt_state, "scale")
             self.scales.append(scale)
-            self.steps.append(step)
+            self.steps.append(context.step)
 
 
 scale_tracker = TrackScale(log_every=100)
