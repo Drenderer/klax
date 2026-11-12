@@ -37,7 +37,7 @@ class TestMakeStep:
             optax.noisy_sgd(1.0, key=jr.key(0)),
             optax.novograd(1.0),
             optax.optimistic_gradient_descent(1.0),
-            optax.optimistic_adam(1.0),
+            optax.optimistic_adam_v2(1.0),
             optax.polyak_sgd(1.0),
             optax.radam(1.0),
             optax.rmsprop(1.0),
@@ -282,52 +282,7 @@ class TestFit:
         assert len(loss_values) == 1
 
     @staticmethod
-    def test_fit_with_xarray(getkey):
-        xr = pytest.importorskip(
-            "xarray", reason="xarray dependency is not installed"
-        )
-        # xarray_jax registers xr.Dataset/DataArray as JAX pytrees, which is
-        # required for `eqx.filter_jit` to flatten an xarray batch into array
-        # leaves instead of trying to hash the whole Dataset as a static arg.
-        pytest.importorskip(
-            "xarray_jax", reason="xarray_jax dependency is not installed"
-        )
-
-        model = klax.nn.FICNN(2, "scalar", [4, 4], key=getkey())
-
-        class MyLoss(klax.Loss):
-            def value(self, model, batch, run_state):
-                y_pred = jax.vmap(model)(batch.x.data)
-                mse = jnp.mean((batch.y.data - y_pred) ** 2)
-                return mse, {"mse": mse}
-
-        data = xr.Dataset(
-            {
-                "x": (("batch", "i"), jr.uniform(getkey(), (100, 2))),
-                "y": (("batch",), jr.uniform(getkey(), (100,))),
-            },
-            coords={"batch": jnp.arange(100), "i": jnp.arange(2)},
-        )
-
-        trained_model, history = klax.fit(
-            model,
-            data,
-            batch_size=5,
-            batch_axes="batch",
-            steps=5,
-            loss=MyLoss(),
-            optimizer=optax.sgd(0.1),
-            key=getkey(),
-        )
-
-        assert isinstance(trained_model, klax.nn.FICNN)
-        assert history.total_steps == 5
-        assert "training/mse" in history.keys()
-        loss_steps, loss_values = history["training/mse"]
-        assert loss_steps == [0]
-        assert len(loss_values) == 1
-
-    def test_vmap_training(self, getkey):
+    def test_vmap_training(getkey):
         # Create ensemble of models
         keys = jr.split(getkey(), 3)
 
@@ -341,7 +296,7 @@ class TestFit:
         x = jr.uniform(getkey(), (20,))
         y = jr.uniform(getkey(), (20,))
 
-        trained_ensemble, history = klax.fit(
+        _ = klax.fit(
             model_ensemble,
             (x, y),
             batch_size=5,
@@ -351,3 +306,17 @@ class TestFit:
             vmap_ensemble=True,
             key=getkey(),
         )
+
+    @staticmethod
+    def test_no_metrics_appended_in_caller_scope(getkey):
+        """Assert that `klax.fit` does not append to `metrics`."""
+        # Check that no element is appended to an empty list
+        metrics = []
+        data = (jnp.zeros(0), jnp.zeros(0))
+        _ = klax.fit(lambda x: x, data, steps=0, metrics=metrics, key=getkey())
+        assert len(metrics) == 0
+
+        # Check that a None input remains None
+        metrics = None
+        _ = klax.fit(lambda x: x, data, steps=0, metrics=metrics, key=getkey())
+        assert metrics is None

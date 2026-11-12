@@ -36,6 +36,7 @@ from .._wrappers import (
     Constraint,
     ContainsUnwrappablesError,
     Unwrappable,
+    assert_unwrapped,
     contains_unwrappables,
 )
 
@@ -85,7 +86,7 @@ class Linear(eqx.Module, strict=True):
                 Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
             Note that `in_features` also supports the string `"scalar"` as a
@@ -163,18 +164,14 @@ class Linear(eqx.Module, strict=True):
             `out_features="scalar"`.)
 
         """
-        if contains_unwrappables(self):
-            raise ContainsUnwrappablesError(
-                "Model must be finalized before calling, see `klax.finalize`."
-            )
-        weight = cast(Array, self.weight)
+        weight = assert_unwrapped(self.weight, Array)
         if self.in_features == "scalar":
             if jnp.shape(x) != ():
                 raise ValueError("x must have scalar shape")
             x = jnp.broadcast_to(x, (1,))
         x = jnp.matmul(x, weight)
         if self.bias is not None:
-            bias = cast(Array, self.bias)
+            bias = assert_unwrapped(self.bias, Array)
             x = x + bias
         if self.out_features == "scalar":
             assert jnp.shape(x) == (1,), (
@@ -340,21 +337,22 @@ class InputSplitLinear(eqx.Module, strict=True):
             `out_features="scalar"`.)
 
         """
-        if contains_unwrappables(self):
-            raise ContainsUnwrappablesError(
-                "Model must be finalized before calling, see `klax.finalize`."
-            )
         if len(xs) != self._num_inputs:
             raise ValueError(
                 f"Number of call arguments ({len(xs)}) does not match the "
                 f"number of inputs ({self._num_inputs})"
             )
 
-        def mult(weight, in_feature, x):
+        def mult(
+            weight: Array | Unwrappable[Array],
+            in_feature: int | Literal["scalar"],
+            x: Array,
+        ):
             if in_feature == "scalar":
                 if jnp.shape(x) != ():
                     raise ValueError("y must have scalar shape")
                 x = jnp.broadcast_to(x, (1,))
+            weight = assert_unwrapped(weight, Array)
             return jnp.matmul(x, weight)
 
         y = jnp.stack(
@@ -365,7 +363,7 @@ class InputSplitLinear(eqx.Module, strict=True):
             axis=0,
         ).sum(axis=0)
         if self.bias is not None:
-            bias = cast(Array, self.bias)
+            bias = assert_unwrapped(self.bias, Array)
             y = y + bias
         if self.out_features == "scalar":
             assert jnp.shape(y) == (1,), (

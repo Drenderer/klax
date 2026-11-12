@@ -40,16 +40,13 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Self, TypeVar, override
+from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, PyTree
-
-T = TypeVar("T")
-
 
 # ===----------------------------------------------------------------------===#
 #  Unwrappable
@@ -126,7 +123,7 @@ def unwrap[T: PyTree](tree: T) -> T:
 
 # This class is derived from paramax and has been slightly modified.
 # Original Copyright 2022 Daniel Ward
-class Parameterize(Unwrappable[T]):
+class Parameterize[T](Unwrappable[T]):
     """Unwrap an object by calling `fn` with `args` and ``kwargs`.
 
     All of `fn`, `*args` and `**kwargs` may contain trainable parameters.
@@ -212,7 +209,7 @@ def non_trainable(tree: PyTree) -> PyTree:
 
 # This class is derived from paramax and has been lightly modified.
 # Original Copyright 2022 Daniel Ward
-class NonTrainable(Unwrappable[T]):
+class NonTrainable[T](Unwrappable[T]):
     """Applies stop gradient to all ArrayLike leaves before unwrapping.
 
     See also [`klax.non_trainable`][], which is probably a generally preferable
@@ -457,7 +454,7 @@ def finalize[T: PyTree](tree: T) -> T:
 
         ```python
         >>> finalized_model = klax.finalize(model)
-        >>> y = finalized_model(x)            # Call finalized model
+        >>> y = finalized_model(x)           # Call finalized model
         >>> model, history = fit(model, ...) # Continue training with constrained model
         ```
 
@@ -502,3 +499,51 @@ class ContainsUnwrappablesError(RuntimeError):
     """
 
     pass
+
+
+def assert_unwrapped[T](tree: T | Unwrappable[T], typ: type[T]) -> T:
+    """Assert that a model component is unwrapped.
+
+    This helper function does two things:
+        1. Check if the `tree` contains any [unwrappables][klax.Unwrappable], and
+            raise a helpful error message if it does.
+        2. Cast the output to the specified type.
+
+    This function is intended to verify that a variable is unwrapped, ensuring
+    proper typing and a helpful error to any user that forgot to unwrap before
+    using the variable.
+
+    !!!Example
+        ```python
+        class MyModel(eqx.Module):
+            weight: Array | NonNegative[Array]
+
+            def __call__(self, x):
+                weight = assert_unwrapped(self.weight, Array)
+                return weight @ x
+        ```
+        In the above code the user will get a
+        [ContainsUnwrappablesError][klax.ContainsUnwrappablesError]
+        when calling the model directly and `weight` is still `NonNegative`.
+        Furthermore, for a typechecker the `weight` variable is of type Array.
+
+
+    Args:
+        tree: Pytree of type `typ` or an Unwrappable that unwraps to `typ`.
+        typ: The type of `[klax.unwrap][klax.unwrap](tree)`.
+
+    Raises:
+        ContainsUnwrappablesError: If `tree` contains unwrappables.
+
+
+
+    Returns:
+        `tree` unmodified.
+
+    """
+    if contains_unwrappables(tree):
+        raise ContainsUnwrappablesError(
+            "Model or PyTree contains Unwrappables. "
+            "Did you forget to call `klax.finalize`?"
+        )
+    return cast(T, tree)

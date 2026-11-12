@@ -89,7 +89,7 @@ class Matrix(eqx.Module):
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
             Note that `in_size` also supports the string `"scalar"` as a
@@ -153,7 +153,7 @@ class ConstantMatrix(eqx.Module):
 
         Args:
             shape: The matrix shape. The output from the module will be a Array
-                with sthe specified `shape`. For square matrices a single
+                with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             init: The array initializer of type
                 `Initializer`. (Defaults to
@@ -162,7 +162,7 @@ class ConstantMatrix(eqx.Module):
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         """
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -185,7 +185,7 @@ class ConstantMatrix(eqx.Module):
 
 
 class SkewSymmetricMatrix(eqx.Module):
-    """A kkew-symmetric matrix-valued function based on an MLP.
+    """A skew-symmetric matrix-valued function based on an MLP.
 
     The MLP maps the input to a vector of elements that are transformed into a
     skew-symmetric matrix.
@@ -215,7 +215,7 @@ class SkewSymmetricMatrix(eqx.Module):
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
             shape: The matrix shape. The output from the module will be a Array
-                with sthe specified `shape`. For square matrices a single
+                with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list.
@@ -235,7 +235,7 @@ class SkewSymmetricMatrix(eqx.Module):
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
             Note that `in_size` also supports the string `"scalar"` as a
@@ -284,7 +284,7 @@ class SkewSymmetricMatrix(eqx.Module):
 class ConstantSkewSymmetricMatrix(eqx.Module):
     """A constant skew-symmetric matrix.
 
-    It is a wrapper around a constant skew-symmetry-constraind array that
+    It is a wrapper around a constant skew-symmetry-constrained array that
     implements the matrix-valued function interface.
     """
 
@@ -305,7 +305,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
 
         Args:
             shape: The matrix shape. The output from the module will be a Array
-                with sthe specified `shape`. For square matrices a single
+                with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             init: The array initializer of type
                 `Initializer`. (Defaults to
@@ -314,7 +314,7 @@ class ConstantSkewSymmetricMatrix(eqx.Module):
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         """
         dtype = default_floating_dtype() if dtype is None else dtype
@@ -375,7 +375,7 @@ class SPDMatrix(eqx.Module):
             in_size: The input size. The input to the module should be a vector
                 of shape `(in_size,)`
             shape: The matrix shape. The output from the module will be a Array
-                with sthe specified `shape`. For square matrices a single
+                with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             width_sizes: The sizes of each hidden layer of the underlying MLP
                 in a list.
@@ -399,7 +399,7 @@ class SPDMatrix(eqx.Module):
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         Note:
             Note that `in_size` also supports the string `"scalar"` as a
@@ -451,7 +451,7 @@ class SPDMatrix(eqx.Module):
 class ConstantSPDMatrix(eqx.Module):
     """A constant symmetric positive definite matrix-valued function.
 
-    It is a wrapper around a constant symmetric postive semi-definite matrix
+    It is a wrapper around a constant symmetric positive semi-definite matrix
     with the matrix-valued function interface.
     """
 
@@ -474,7 +474,7 @@ class ConstantSPDMatrix(eqx.Module):
 
         Args:
             shape: The matrix shape. The output from the module will be a
-                Array with sthe specified `shape`. For square matrices a single
+                Array with the specified `shape`. For square matrices a single
                 integer N can be used as a shorthand for (N, N).
             epsilon: Small value that is added to the diagonal of the output
                 matrix to ensure positive definiteness. If only positive
@@ -488,7 +488,7 @@ class ConstantSPDMatrix(eqx.Module):
                 (Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
                 depending on whether JAX is in 64-bit mode.)
             key: A `jax.random.PRNGKey` used to provide randomness for
-                parameter initialisation. (Keyword only argument.)
+                parameter initialization. (Keyword only argument.)
 
         """
         shape = shape if isinstance(shape, tuple) else (shape, shape)

@@ -33,8 +33,6 @@ from ._losses import Loss, mse
 from ._trainstate import TrainingContext, TrainingState
 from ._wrappers import apply
 
-type Leaf = Any
-
 param_spec = eqx.is_inexact_array
 
 
@@ -103,7 +101,9 @@ def make_step(
     # Apply the constraints to ensure they are met again after the update.
     model = apply(model)
 
-    return state.replace(model=model, opt_state=opt_state)
+    return TrainingState(
+        model=model, opt_state=opt_state, run_state=state.run_state
+    )
 
 
 def run_training_loop(
@@ -161,7 +161,7 @@ def fit[T: eqx.Module](
     data: PyTree[Any],
     *,
     batch_size: int = 32,
-    batch_axes: PyTree[int | str | None] = 0,
+    batch_axes: PyTree[int | None] = 0,
     run_state: PyTree[Any] = None,
     validation_data: PyTree[Any] = None,
     steps: int = 1000,
@@ -171,7 +171,7 @@ def fit[T: eqx.Module](
     init_opt_state: PyTree[Any] = None,
     batcher: Batcher = batch_data,
     make_logger: bool = True,
-    metrics: list[Metric] | None = None,
+    metrics: Sequence[Metric] | None = None,
     log_every: int = 100,
     verbose: Literal[0, 1, 2] = 2,
     callbacks: Sequence[Callback] | None = None,
@@ -193,14 +193,13 @@ def fit[T: eqx.Module](
             tuple `(x, y)` with model inputs `x` and model outputs `y`.
         batch_size: The number of examples in a batch.
         batch_axes: A `PyTree` denoting, which axis is the batch axis for
-            arrays in `data`. Each leaf is one of `int` (positional axis on
-            an array leaf), `str` (dim name on an `xarray` leaf), or `None`
-            (the corresponding subtree is not batched). `batch_axes` must
-            be a prefix of `data`. By specifying `batch_axes` as a `PyTree`
-            it is possible to specify different batch axes for different
-            leaves of `data`. (Defaults to `0`, meaning the first axes of
-            arrays in `data` are batch dimensions. xarray leaves require
-            an explicit `str` dim name.)
+            arrays in `data`. Each leaf is either an `int` (positional axis
+            on an array leaf) or `None` (the corresponding subtree is not
+            batched). `batch_axes` must be a prefix of `data`. By specifying
+            `batch_axes` as a `PyTree` it is possible to specify different
+            batch axes for different leaves of `data`. (Defaults to `0`,
+            meaning the first axes of arrays in `data` are batch
+            dimensions.)
 
             !!!Example
                 For a dataset of 100 examples `data = (x, (y1, y2), "some_string")`
@@ -221,27 +220,25 @@ def fit[T: eqx.Module](
             Defaults to `None`
         steps: Number of gradient updates to apply.
             Defaults to 1000.
-        loss: The loss function with call signature
-            `(model: PyTree, data: PyTree, run_state: PyTree) -> float`.
-            Defaults to `mse`.
+        loss: [`Loss`][klax.Loss] object defining the loss function.
+            Defaults to [`mse`][klax.mse].
         optimizer: The optimizer. Any optax gradient transform to calculate
             the updates for the model.
             Defaults to optax.adam(1e-3).
         init_opt_state: The initial state of the optimizer. If `None`, the
             optimizer is initialized from scratch. By providing a value for
             `init_opt_state`, the user can resume training from a previous
-            state (e.g., obtained from the `HistoryCallback.last_opt_state`).
+            state (e.g., obtained from `history.final_opt_state`).
             Defaults to `None`.
         batcher: The data loader that splits inputs and targets into batches.
             Defaults to `batch_data`.
-        make_logger: Wether to create a [`MetricLogger`][klax.MetricLogger].
-            If `False` the arguments `metrics`, `log_every` and `verbose`
-            don't have any effect and `fit` will return `None` instead of a
-            `History`. This is useful for implementing custom logging.
-        metrics: FIX ME Sequence of [metrics][klax.Metric] to be evaluated at regular
-            intervals during the training. You can overwrite the default "loss"
-            and "validation_loss" metrics, by adding custom metrics with the same
-            name.
+        make_logger: Whether to create a [`MetricLogger`][klax.MetricLogger].
+        metrics: Sequence of [metrics][klax.Metric] to be added to the
+            [`MetricLogger`][klax.MetricLogger].
+            To overwrite the default metrics `"training"` and `"validation"`
+            (if `validation_data` is set) use `make_logger=False` and create
+            your own [metric logger][klax.MetricLogger] and pass it as a
+            callback.
             Defaults to `None`.
         log_every: Interval for both metric evaluation and progress logging.
             A value `log_every=n` means that every `n` steps during the training
@@ -253,10 +250,9 @@ def fit[T: eqx.Module](
             - 2: A progressbar is used and updated every `log_every` steps.
             Defaults to `2`.
         callbacks: List of [Callbacks][klax.Callback]. They can be used to
-            implement early stopping, custom logging and more. The argument
-            to the callback function is aCallbackArgs object.
+            implement early stopping, custom logging and more.
             Defaults to `None`.
-        jit_compile: Wether to compile the function that computes the gradient
+        jit_compile: Whether to compile the function that computes the gradient
             update step (this includes the loss function). You generally want
             this to be `True`. However, in cases where the loss function itself
             is not jit-able (e.g., when computing different parts of the
@@ -276,7 +272,7 @@ def fit[T: eqx.Module](
             !!!Example
                 ```python
                     @eqx.filter_vmap
-                    def make_mlp_ensemble(key):
+                    def make_ensemble(key):
                         return klax.nn.MLP("scalar", "scalar", [16, 16], key=key)
 
                     mlp_ensemble = make_ensemble(jr.split(key, 10))
@@ -295,7 +291,14 @@ def fit[T: eqx.Module](
     Returns:
         A tuple of the trained model and the training history.
 
+    Raises:
+        ValueError: If `metrics` are provided, but `make_logger=False`.
+
     """
+    # Input validation
+    if metrics and not make_logger:
+        raise ValueError("Metrics provided while make_logger=False.")
+
     # Transform the step function
     step_function = make_step
     if vmap_ensemble:
@@ -330,14 +333,13 @@ def fit[T: eqx.Module](
     callbacks = [] if callbacks is None else list(callbacks)
 
     if make_logger:
-        if metrics is None:
-            metrics = []
+        metrics: list[Metric] = list(metrics) if metrics is not None else []
 
         metrics.append(
             LossMetric(
                 loss,
                 batch_generator=batcher(data, batch_size, batch_axes, key=bkey),
-                prefix="training",
+                name="training",
                 vmap_ensemble=vmap_ensemble,
                 jit_compile=True,
             )
@@ -349,13 +351,13 @@ def fit[T: eqx.Module](
                     batch_generator=batcher(
                         validation_data, 4 * batch_size, batch_axes, key=bkey
                     ),
-                    prefix="validation",
+                    name="validation",
                     vmap_ensemble=vmap_ensemble,
                     jit_compile=True,
                 )
             )
 
-        logger = MetricLogger(log_every, metrics)
+        logger = MetricLogger(metrics, log_every)
         # Prepend logger to ensure it's the first callback to be evaluated.
         callbacks = [logger] + callbacks
 

@@ -31,22 +31,3 @@ def get_tqdm():
             "Install with: pip install klax[tqdm]"
         ) from exc
     return tqdm
-
-
-HAS_XARRAY = (
-    importlib.util.find_spec("xarray") is not None
-    and importlib.util.find_spec("xarray_jax") is not None
-)
-
-
-@functools.cache
-def get_xarray():
-    try:
-        import xarray as xr
-        import xarray_jax as jxr
-    except ImportError as exc:
-        raise ImportError(
-            "This feature requires the 'xarray-experimental' extra. "
-            "Install with: pip install klax[xarray-experimental]"
-        ) from exc
-    return xr, jxr

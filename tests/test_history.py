@@ -25,6 +25,14 @@ class TestHistory:
             history._content["array"].values[0] == jnp.array([0.2, 2.0])
         )
 
+    def test_append_raises_on_non_increasing_step(self):
+        history = klax.History()
+        history.append(key="loss", step=0, value=jnp.array(1.0))
+        with pytest.raises(ValueError):
+            history.append(key="loss", step=0, value=jnp.array(1.0))
+        with pytest.raises(ValueError):
+            history.append(key="loss", step=-1, value=jnp.array(1.0))
+
     def test_getitem_existing_metric(self):
         """Test retrieving an existing metric using __getitem__."""
         history = klax.History()
@@ -134,3 +142,31 @@ class TestHistory:
 
         assert stacked_history.total_steps == 26
         assert stacked_history.total_time == 7.2
+
+    def test_stack_copies_history_data(self):
+        history = klax.History()
+        value = np.array(0.5)
+        history.append(key="loss", step=0, value=value)
+
+        stacked_history = klax.History.stack({"train": history})
+        value[...] = 1.0
+        history.append(key="loss", step=1, value=np.array(0.2))
+
+        steps, values = stacked_history["train/loss"]
+        assert steps == [0]
+        np.testing.assert_array_equal(values[0], np.array(0.5))
+
+        stacked_history.append("train/loss", step=1, value=np.array(0.3))
+        assert history["loss"].steps == [0, 1]
+
+    def test_stack_raises_on_key_collision(self):
+        history1 = klax.History()
+        history1.append(key="b/c", step=0, value=jnp.array(0.5))
+
+        history2 = klax.History()
+        history2.append(key="c", step=0, value=jnp.array(0.3))
+
+        with pytest.raises(
+            ValueError, match="Duplicate metric key after stacking: 'a/b/c'"
+        ):
+            klax.History.stack({"a": history1, "a/b": history2})

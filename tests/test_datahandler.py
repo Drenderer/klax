@@ -12,17 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 import jax.random as jrandom
 import numpy as np
 import pytest
 
 import klax
-from klax._compat import HAS_XARRAY, get_xarray
 from klax._datahandler import broadcast_and_get_size
 
 # ===---------------------------------------------------------------------=== #
@@ -89,63 +85,13 @@ class TestBroadcastAndGetSize:
             broadcast_and_get_size(data, 0)
 
     @staticmethod
-    def test_str_spec_on_non_xarray_leaf_raises(getkey):
+    def test_non_int_spec_raises(getkey):
         data = jrandom.uniform(getkey(), (8,))
         with pytest.raises(
             TypeError,
-            match="String dim names are only valid for xarray leaves",
+            match="batch_axes leaves must be `int` or `None`",
         ):
             broadcast_and_get_size(data, "batch")
-
-    @staticmethod
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
-    def test_xarray_leaf_with_str_spec(getkey):
-        xr, _ = get_xarray()
-        data = xr.DataArray(
-            jrandom.uniform(getkey(), (64,)),
-            coords={"batch": jnp.arange(64)},
-            dims="batch",
-        )
-        axes, size = broadcast_and_get_size(data, "batch")
-        assert axes == "batch"
-        assert size == 64
-
-    @staticmethod
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
-    def test_xarray_leaf_with_int_spec_raises(getkey):
-        xr, _ = get_xarray()
-        data = xr.DataArray(
-            jrandom.uniform(getkey(), (64,)),
-            coords={"batch": jnp.arange(64)},
-            dims="batch",
-        )
-        with pytest.raises(
-            TypeError,
-            match=re.escape(
-                "batch_axes spec for an xarray leaf must be a `str` dim name, "
-                "got int (0). "
-                "Available dims: ('batch',)"
-            ),
-        ):
-            broadcast_and_get_size(data, 0)
-
-    @staticmethod
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
-    def test_xarray_leaf_with_unknown_dim_raises(getkey):
-        xr, _ = get_xarray()
-        data = xr.DataArray(
-            jrandom.uniform(getkey(), (64,)),
-            coords={"batch": jnp.arange(64)},
-            dims="batch",
-        )
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Dim 'nope' not present on xarray leaf. "
-                "Available dims: ('batch',)"
-            ),
-        ):
-            broadcast_and_get_size(data, "nope")
 
 
 # ===---------------------------------------------------------------------=== #
@@ -162,49 +108,6 @@ class TestBatchData:
 
         # Test not equal, i.e., the dataset was sorted
         assert not (data[:32] == next(generator)).all()
-
-    @staticmethod
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
-    def test_with_xarray_data_array(getkey):
-        xr, _ = get_xarray()
-        data = xr.DataArray(
-            jrandom.uniform(getkey(), (64,)),
-            coords={"batch": jnp.arange(64)},
-            dims="batch",
-        )
-
-        # Test that the data is still the same, but the 'batch' axis was still
-        # sorted. Hence, in direct comparsion the DataArrays are equal, but
-        # they are still in different order.
-        generator = klax.batch_data(
-            data, batch_size=32, batch_axes="batch", key=getkey()
-        )
-        batch = next(generator)
-        assert (data[:32] == batch).all()
-        assert not (data.batch[:32].data == batch.batch.data).all()
-
-    @staticmethod
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
-    def test_with_xarray_leaf_inside_pytree(getkey):
-        xr, _ = get_xarray()
-        arr = jrandom.uniform(getkey(), (64,))
-        da = xr.DataArray(
-            jrandom.uniform(getkey(), (64,)),
-            coords={"batch": jnp.arange(64)},
-            dims="batch",
-        )
-        data = {"arr": arr, "da": da}
-        batch_axes = {"arr": 0, "da": "batch"}
-        generator = klax.batch_data(
-            data, batch_size=8, batch_axes=batch_axes, key=getkey()
-        )
-        batch = next(generator)
-        assert set(batch.keys()) == {"arr", "da"}
-        assert batch["arr"].shape == (8,)
-        # The xarray leaf survived as a DataArray (i.e., `_is_leaf` stopped
-        # the tree-walker from flattening it) and was sliced via `.isel`.
-        assert isinstance(batch["da"], xr.DataArray)
-        assert batch["da"].sizes["batch"] == 8
 
     @staticmethod
     def test_with_nested_pytree(getkey):
@@ -391,20 +294,3 @@ class TestSplitData:
         # Split is a partition: every original index appears in exactly one subset.
         assert len(union) == len(data)
         assert set(union.tolist()) == set(data.tolist())
-
-    @staticmethod
-    @pytest.mark.skipif(not HAS_XARRAY, reason="needs xarray and xarray_jax")
-    def test_with_xarray_data_array(getkey):
-        xr, _ = get_xarray()
-        data = xr.DataArray(
-            jrandom.uniform(getkey(), (64,)),
-            coords={"batch": jnp.arange(64)},
-            dims="batch",
-        )
-        s1, s2 = klax.split_data(data, (3, 1), batch_axes="batch", key=getkey())
-        assert s1.sizes["batch"] == 48
-        assert s2.sizes["batch"] == 16
-        s1_idx = set(np.asarray(s1.batch).tolist())
-        s2_idx = set(np.asarray(s2.batch).tolist())
-        assert s1_idx.isdisjoint(s2_idx)
-        assert s1_idx | s2_idx == set(range(64))

@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
 import typing
 
 import jax
-import jax.numpy as jnp
 import pytest
-from jaxtyping import Array
 
-typing.TESTING = True  # pyright: ignore
+typing.TESTING = True  # pyright: ignore  # ty: ignore[unresolved-attribute]
 
 # Causes issues because implicit data type promotion is used in klax.fit since
 # the default batch_data works with numpy arrays

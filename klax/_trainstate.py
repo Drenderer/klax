@@ -32,19 +32,11 @@ class TrainingState:
 
     This class essentially behaves just like
     ```python
-        @jax.tree_util.register_dataclass
-        @dataclass
-        class TrainingState:
-            model: PyTree
-            opt_state: PyTree
-            run_state: PyTree
+    from collections import namedtuple
 
-            def replace(self, *, model=None, opt_state=None, run_state=None):
-                return TrainingState(
-                    model if model is not None else self.model,
-                    opt_state if opt_state is not None else self.opt_state,
-                    run_state if run_state is not None else self.run_state,
-                )
+    TrainingState = namedtuple(
+        "TrainingState", ["model", "opt_state", "run_state"]
+    )
     ```
 
     Internally, however, it implements the unflattening trick, mentioned in
@@ -74,9 +66,7 @@ class TrainingState:
         self, model: PyTree, opt_state: PyTree, run_state: PyTree
     ) -> None:
         tree = _TrainingState(model, opt_state, run_state)
-        leaves, treedef = jax.tree.flatten(tree)
-        self._leaves = leaves
-        self._treedef = treedef
+        self._leaves, self._treedef = jax.tree.flatten(tree)
         self._cache = None
 
     def _get(self):
@@ -90,41 +80,13 @@ class TrainingState:
     def model(self):
         return self._get().model
 
-    @model.setter
-    def model(self, value):
-        raise AttributeError(
-            "TrainingState is immutable; use .replace(model=...) instead."
-        )
-
     @property
     def opt_state(self):
         return self._get().opt_state
 
-    @opt_state.setter
-    def opt_state(self, value):
-        raise AttributeError(
-            "TrainingState is immutable; use .replace(opt_state=...) instead."
-        )
-
     @property
     def run_state(self):
         return self._get().run_state
-
-    @run_state.setter
-    def run_state(self, value):
-        raise AttributeError(
-            "TrainingState is immutable; use .replace(run_state=...) instead."
-        )
-
-    def replace(
-        self, *, model=None, opt_state=None, run_state=None
-    ) -> "TrainingState":
-        current = self._get()
-        return TrainingState(
-            model if model is not None else current.model,
-            opt_state if opt_state is not None else current.opt_state,
-            run_state if run_state is not None else current.run_state,
-        )
 
     @staticmethod
     def _flatten(state):

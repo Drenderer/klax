@@ -1,4 +1,3 @@
-import equinox as eqx
 import jax
 import matplotlib.pyplot as plt
 from jax import numpy as jnp

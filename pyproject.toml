@@ -16,7 +16,7 @@ requires-python = ">=3.12"
 dependencies = [
     "equinox>=0.11.10",
     "jax>=0.4.35",
-    "optax>=0.2.4",
+    "optax>=0.2.6",
 ]
 
 classifiers = [
@@ -55,14 +55,11 @@ tqdm = [
 
 [dependency-groups]
 dev = [
+    "commitizen>=4.19.3",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "ruff>=0.11.10",
     "ty>=0.0.53",
-]
-xarray-experimental = [
-    "gdm-xarray-jax",
-    "xarray>=2026.4.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -104,5 +101,11 @@ ignore = [
     "UP038",
 ]
 
-[tool.uv.sources]
-gdm-xarray-jax = { git = "https://github.com/google-deepmind/xarray_jax.git", rev = "v0.1.1" }
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+changelog_incremental = true
+major_version_zero = true
