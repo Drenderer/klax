@@ -156,7 +156,7 @@ def run_training_loop(
     return context
 
 
-def fit[T: eqx.Module](
+def fit[T: Any](
     model: T,
     data: PyTree[Any],
     *,
