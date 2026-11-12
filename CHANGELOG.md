@@ -1,3 +1,43 @@
+## v0.3.0 (2026-11-12)
+
+### BREAKING CHANGE
+
+- Any user code that relied on the replace method breaks.
+- This breaks pure function metrics, since they don't have the name attribute.
+
+### Feat
+
+- **assert_unwrapped**: add helper function to assert that a variable is unwrapped with improved typing
+- **metric**: add decorator for creating metrics from functions
+- **klax.Loss**: Added a helpful error message to the loss call, if value does not return a tuple.
+- **History**: Add `stack` method to History class, no longer use a default dict for `history._content, update documentation and tests, improved default values for total_time and teotal_steps.
+
+### Fix
+
+- **fit**: remove the tie to eqx.Module for the generic model type in fit
+- **scripts**: update scripts to the current klax API
+- **docs**: fix missing docs reference for klax.mse
+- **broadcast_and_get_size**: remove pytree shape typing for batch_axes
+- **klax.nn.ICNN**: fix activation vmap and typing issues
+- **loss**: fix typing issue with loss wrapper
+- **History.stack**: raise on duplicate key when stacking histories
+- **fit**: fix bug where metrics were not copied
+- **fit**: copy metric list and raise if metrics would be ignored
+- **klax.History.stack**: create deepcopies when stacking histories
+- **klax.History**: enforce strictly increasing step cound for appending to a history
+- **Metric,-LossMetric,-MetricLogger**: change Metric to be a small base class with own name prefix and check for namespace collisions in MetricLogger
+- **test**: Fixed xarray training test error, which was caused by an old-style loss definition.
+- **ruff**: Ran the ruff formatter.
+- **pre-commit**: update ruff version to v0.16.10 to reflect the local environment.
+- **test_training**: Changed training test to conform to the new code.
+- **test_losses**: Fixed loss tests to confirm to the new code.
+
+### Refactor
+
+- **TrainingState**: remove the TrainingState.replace method
+- **datahandler**: Remove experimental xarray support.
+- **tests**: Adapted the logging tests to the new code.
+
 ## v0.2.0 (2026-05-05)
 
 ### BREAKING CHANGE
