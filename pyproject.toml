@@ -38,6 +38,16 @@ Issues = "https://github.com/Drenderer/klax/issues"
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.10.3"]
+tqdm = ["tqdm>=4.67.1"]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.19.3",
+    "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "ruff>=0.11.10",
+    "ty>=0.0.53",
+]
 docs = [
     # Pin griffe to 1.x: griffe 2.x renamed the `on_package_loaded` extension
     # hook to `on_package` and removed the old name, which silently disables
@@ -48,18 +58,6 @@ docs = [
     "mkdocs-ipynb>=0.1.1",
     "mkdocs-material>=9.6.14",
     "mkdocstrings-python>=1.16.12",
-]
-tqdm = [
-    "tqdm>=4.67.1",
-]
-
-[dependency-groups]
-dev = [
-    "commitizen>=4.19.3",
-    "pre-commit>=4.2.0",
-    "pytest>=8.3.5",
-    "ruff>=0.11.10",
-    "ty>=0.0.53",
 ]
 
 [tool.hatch.build.targets.wheel]
