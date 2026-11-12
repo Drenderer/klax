@@ -13,8 +13,11 @@ model = klax.nn.MLP("scalar", "scalar", [16], key=model_key)
 
 class UpdateRunState(klax.Callback):
     def on_training_step(self, context):
-        new_key, _ = jr.split(context.state.run_state)
-        context.state = context.state.replace(run_state=new_key)
+        state = context.state
+        new_key, _ = jr.split(state.run_state)
+        context.state = klax.TrainingState(
+            model=state.model, opt_state=state.opt_state, run_state=new_key
+        )
 
 
 @klax.loss
@@ -23,7 +26,8 @@ def my_loss(model, batch, run_state):
     x = jr.normal(key, (64,))
     y = jnp.sin(x)
     y_pred = jax.vmap(model)(x)
-    return jnp.mean((y - y_pred) ** 2)
+    mse = jnp.mean((y - y_pred) ** 2)
+    return mse, {"mse": mse}
 
 
 model, history = klax.fit(

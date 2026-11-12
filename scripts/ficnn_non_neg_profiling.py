@@ -1,7 +1,24 @@
-"""Non-negative FICNN profiling script.
+"""Historical benchmark: non-negativity constraints in an FICNN.
 
-This script compares the performance of the FICNN for
-multiple different implementations of a non-negative constraint.
+This script documents why `klax.NonNegative` is implemented the way it is.
+It trains the same FICNN (a local copy of the architecture that lets the
+non-negativity wrapper be swapped) with four different wrappers:
+
+CURRENT (imported from klax):
+    `klax.NonNegative` - a `klax.Constraint`. `unwrap()` returns the raw
+        parameter, and `apply()` projects it onto `[0, inf)` via
+        `max(x, 0)`. `fit` calls `apply` after every optimizer step, so the
+        stored parameter itself always satisfies the constraint.
+
+LEGACY / ALTERNATIVES (defined in this script, not in klax):
+    `LegacyClampNonNegative` - the earlier `klax` implementation. A plain
+        `Unwrappable` that clamps with `max(x, 0)` inside `unwrap()`. The
+        stored parameter may drift negative, where its gradient is zero, so
+        those weights can get stuck ("dead" weights).
+    `SoftplusNonNegative` - reparameterization `w = softplus(p)`. Smooth and
+        never stuck, but cannot represent exactly zero weights and changes the
+        optimization geometry.
+    `NoConstraint` - unconstrained baseline (the model is then NOT convex).
 """
 
 # %% Imports
@@ -219,21 +236,13 @@ class FICNN(eqx.Module, strict=True):
         return y
 
 
-# %% Define old NonNegative Wrapper
+# %% LEGACY / ALTERNATIVE non-negative wrappers (not part of klax)
+# The CURRENT implementation is `klax.NonNegative` (imported above).
 
 
-class NonNegSoftplus(Unwrappable[Array]):
-    parameter: Array
+class LegacyClampNonNegative(Unwrappable[Array]):
+    """LEGACY: earlier klax `NonNegative`, clamps inside `unwrap()`."""
 
-    def __init__(self, x):
-        x = jnp.maximum(x, 0)
-        self.parameter = jnp.log(jnp.exp(x) - 1)
-
-    def unwrap(self) -> Array:
-        return jax.nn.softplus(self.parameter)
-
-
-class OldNonNegative(Unwrappable[Array]):
     parameter: Array
 
     def __init__(self, parameter: Array):
@@ -247,7 +256,22 @@ class OldNonNegative(Unwrappable[Array]):
         return self._non_neg(self.parameter)
 
 
+class SoftplusNonNegative(Unwrappable[Array]):
+    """ALTERNATIVE: softplus reparameterization `w = softplus(p)`."""
+
+    parameter: Array
+
+    def __init__(self, x):
+        x = jnp.maximum(x, 0)
+        self.parameter = jnp.log(jnp.exp(x) - 1)
+
+    def unwrap(self) -> Array:
+        return jax.nn.softplus(self.parameter)
+
+
 class NoConstraint(Unwrappable[Array]):
+    """BASELINE: no constraint at all (model is not convex)."""
+
     parameter: Array
 
     def unwrap(self) -> Array:
@@ -280,9 +304,13 @@ train_data, vali_data = split_data((x, y), (80, 20), key=data_key)
 
 fig, ax = plt.subplots()
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-wrappers = [NonNegative, OldNonNegative, NonNegSoftplus, NoConstraint]
-for wrapper, color in zip(wrappers, colors):
-    name = wrapper.__name__
+wrappers = {
+    "klax.NonNegative (current)": NonNegative,
+    "LegacyClampNonNegative (legacy)": LegacyClampNonNegative,
+    "SoftplusNonNegative (alternative)": SoftplusNonNegative,
+    "NoConstraint (baseline)": NoConstraint,
+}
+for (name, wrapper), color in zip(wrappers.items(), colors):
     model = FICNN(
         x.shape[-1],
         y.shape[-1],
@@ -303,15 +331,16 @@ for wrapper, color in zip(wrappers, colors):
 
     model_ = finalize(model)
 
-    ax.plot(hist.steps, hist.metrics["training_loss"], label=name, color=color)
-    ax.plot(hist.steps, hist.metrics["validation_loss"], label="", color=color)
+    ax.plot(*hist["training/mse"], label=name, color=color)
+    ax.plot(*hist["validation/mse"], label="", color=color, ls="--")
 
 
 ax.set(
     yscale="log",
     # xscale="log",
-    ylabel="loss",
+    ylabel="MSE (solid: training, dashed: validation)",
     xlabel="step",
+    title="FICNN: non-negativity constraint comparison",
 )
 
 ax.legend()

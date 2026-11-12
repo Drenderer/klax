@@ -112,10 +112,11 @@ if n == 1:
 
 
 @klax.loss
-def loss(model, batch, batch_axes):
+def loss(model, batch, run_state):
     xs, ps, ys = batch
     ys_pred = jax.vmap(model)(xs, ps)
-    return jnp.mean(jnp.square(ys - ys_pred))
+    mse = jnp.mean(jnp.square(ys - ys_pred))
+    return mse, {"mse": mse}
 
 
 picnn, hist = klax.fit(
@@ -128,6 +129,7 @@ picnn, hist = klax.fit(
 )
 
 hist.plot()
+plt.show()
 
 
 mlp, hist = klax.fit(
@@ -140,3 +142,4 @@ mlp, hist = klax.fit(
 )
 
 hist.plot()
+plt.show()
