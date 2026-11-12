@@ -4,6 +4,7 @@
 
 import timeit
 from collections.abc import Callable, Sequence
+from functools import partial
 from typing import (
     Literal,
     Self,
@@ -18,7 +19,7 @@ from jaxtyping import Array, PRNGKeyArray
 from matplotlib import pyplot as plt
 
 import klax
-from klax import Constraint, HistoryCallback, NonNegative, fit
+from klax import Constraint, NonNegative, fit
 from klax._misc import default_floating_dtype
 from klax.nn import FICNN, MLP, Linear
 
@@ -145,12 +146,9 @@ class HalfConstrainedFICNN(eqx.Module):
                 if non_decreasing:
                     constr = NonNegative
                 else:
-                    # Define a constraint type that captures n=sin
-                    class _PartialInputNonNegative(PartialInputNonNegative):
-                        def __new__(cls, parameter):
-                            return PartialInputNonNegative(parameter, n=sin)
-
-                    constr = _PartialInputNonNegative
+                    # Constrain only the first `sin` rows (the hidden-state
+                    # inputs); the passthrough inputs stay unconstrained.
+                    constr = partial(PartialInputNonNegative, n=sin)
 
             layers.append(
                 Linear(
@@ -296,7 +294,7 @@ time_code(
         hc_ficnn,
         (x, y),
         steps=10_000,
-        history=HistoryCallback(verbose=False),
+        verbose=0,
         key=key,
     ),
     "HCFICNN: ",
@@ -306,7 +304,7 @@ time_code(
         ficnn,
         (x, y),
         steps=10_000,
-        history=HistoryCallback(verbose=False),
+        verbose=0,
         key=key,
     ),
     "FICNN:   ",
@@ -338,30 +336,10 @@ eqx_mlp = eqx.nn.MLP(
     key=key,
 )
 
-_hc_ficnn, hist = fit(
-    hc_ficnn,
-    (x, y),
-    steps=20_000,
-    history=HistoryCallback(verbose=False),
-    key=key,
-)
-_ficnn, hist = fit(
-    ficnn,
-    (x, y),
-    steps=20_000,
-    history=HistoryCallback(verbose=False),
-    key=key,
-)
-_mlp, hist = fit(
-    mlp, (x, y), steps=20_000, history=HistoryCallback(verbose=False), key=key
-)
-_eqx_mlp, hist = fit(
-    eqx_mlp,
-    (x, y),
-    steps=20_000,
-    history=HistoryCallback(verbose=False),
-    key=key,
-)
+_hc_ficnn, hist = fit(hc_ficnn, (x, y), steps=20_000, verbose=0, key=key)
+_ficnn, hist = fit(ficnn, (x, y), steps=20_000, verbose=0, key=key)
+_mlp, hist = fit(mlp, (x, y), steps=20_000, verbose=0, key=key)
+_eqx_mlp, hist = fit(eqx_mlp, (x, y), steps=20_000, verbose=0, key=key)
 
 fig, ax = plt.subplots()
 ax.scatter(x, y, label="Data", marker="x", c="black")

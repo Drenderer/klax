@@ -10,20 +10,21 @@ from jax.nn.initializers import variance_scaling
 from jaxtyping import Array
 from matplotlib import pyplot as plt
 
-from klax import MetricLogger, finalize, fit
+from klax import Metric, TrainingState, finalize, fit
 from klax.nn import MLP as KLAXMLP
 
 
-# Callback for recording predictions during training
-class TrackPredictionMetric:
+# Metric for recording predictions during training
+class TrackPredictionMetric(Metric):
     x_eval: Array
 
-    def __init__(self, x_eval: Array):
+    def __init__(self, x_eval: Array, name: str = "predictions"):
+        super().__init__(name)
         self.x_eval = x_eval
 
-    def __call__(self, model):
-        model = finalize(model)
-        return jax.vmap(model)(self.x_eval)
+    def values(self, state: TrainingState) -> dict[str, Array]:
+        model = finalize(state.model)
+        return {"y": jax.vmap(model)(self.x_eval)}
 
 
 # Define a simple dataset
@@ -41,7 +42,7 @@ depth = 2
 hidden_layers = 2
 activation = jax.nn.softplus
 
-log_every_pred = 1000
+log_every = 1000
 
 # %% Initialize models
 key1, key2, train_key = jax.random.split(key, 3)
@@ -63,30 +64,28 @@ eqx_mlp = EQXMLP(
 )
 
 # Train the models
-logger = MetricLogger()
-logger.add_metric("predictions", TrackPredictionMetric(x_eval))
 klax_mlp, klax_hist = fit(
     klax_mlp,
     (x, y),
     steps=30_000,
-    logger=logger,
+    metrics=[TrackPredictionMetric(x_eval)],
+    log_every=log_every,
     key=train_key,
 )
 
-logger = MetricLogger()
-logger.add_metric("predictions", TrackPredictionMetric(x_eval))
 eqx_mlp, eqx_hist = fit(
     eqx_mlp,
     (x, y),
     steps=30_000,
-    logger=logger,
+    metrics=[TrackPredictionMetric(x_eval)],
+    log_every=log_every,
     key=train_key,
 )
 
 # %% Plot histories
 ax = plt.subplot()
-eqx_hist.plot("loss", ax=ax, label="eqx MLP", c="blue")
-klax_hist.plot("loss", ax=ax, label="klax MLP", c="orange")
+ax.plot(*eqx_hist["training/mse"], label="eqx MLP", c="blue")
+ax.plot(*klax_hist["training/mse"], label="klax MLP", c="orange")
 ax.set(
     yscale="log",
     ylabel="Loss",
@@ -98,8 +97,8 @@ plt.show()
 # %% Plot history of predictions
 fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(10, 4))
 
-steps, y_klax = klax_hist["predictions"]
-steps, y_eqx = eqx_hist["predictions"]
+steps, y_klax = klax_hist["predictions/y"]
+steps, y_eqx = eqx_hist["predictions/y"]
 y_klax = jnp.array(y_klax)
 y_eqx = jnp.array(y_eqx)
 colors = plt.cm.jet(jnp.linspace(0, 1, y_klax.shape[0]))

@@ -24,6 +24,7 @@ def my_loss(model, batch, run_state):
     return mse, {"mae": mae, "mse": mse}
 
 
+@klax.metric("model")
 def get_bias(state):
     return {"bias": state.model.layers[0].bias}
 
@@ -39,11 +40,11 @@ model, history = klax.fit(
     key=train_key,
 )
 
-history.plot(exclude_keys=["bias"])
+history.plot(exclude_keys=["model/bias"])
 plt.show()
 
 fig, ax = plt.subplots()
-history.plot("bias", ax=ax)
+history.plot("model/bias", ax=ax)
 ax.set(yscale="linear")
 plt.show()
 

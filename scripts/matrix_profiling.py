@@ -1,4 +1,38 @@
-"""Comparison of SPDMatrix to an alternative implementation."""
+# Copyright 2025 The Klax Authors.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Historical benchmark: legacy vs. current matrix-valued functions.
+
+This script documents why `klax.nn.SPDMatrix` and
+`klax.nn.SkewSymmetricMatrix` are implemented the way they are.
+
+LEGACY implementations (defined in this script, no longer in klax):
+    The MLP predicts only the independent matrix entries
+    (`n(n+1)/2` for SPD, the strictly lower triangle for skew-symmetric).
+    A constant, non-trainable index tensor `_tensor` then scatters these
+    entries into the matrix via `einsum`.
+
+CURRENT implementations (imported from `klax.nn`):
+    The MLP predicts all `n*n` entries, which are simply reshaped into a
+    matrix `B`. The structure is then imposed algebraically:
+      * `SPDMatrix`:           `B @ B* + epsilon * I`   (adopted in 174ce5d)
+      * `SkewSymmetricMatrix`: `B - B.T`                (adopted in c4142d9)
+
+The current approach slightly over-parameterizes the MLP's output layer, but
+avoids the index tensor and the `einsum`, which turned out to be both simpler
+and faster. Run this script to reproduce the comparison.
+"""
 
 # %% Imports
 import timeit
@@ -12,7 +46,7 @@ import jax.random as jr
 from jax.nn.initializers import Initializer, he_normal, zeros
 from jaxtyping import Array, PRNGKeyArray
 
-from klax.nn import MLP
+from klax.nn import MLP, SkewSymmetricMatrix, SPDMatrix
 
 
 # %% Custom code for timeing code
@@ -48,12 +82,19 @@ def time_code(func, msg=""):
     )
 
 
-# %% Define implementations
+# %% LEGACY implementations (superseded, kept for reference)
 
 type AtLeast2DTuple[T] = tuple[T, T, *tuple[T, ...]]
 
 
-class OriginalSPDMatrix(eqx.Module):
+class LegacySPDMatrix(eqx.Module):
+    """LEGACY SPD matrix (superseded by `klax.nn.SPDMatrix` in 174ce5d).
+
+    The MLP predicts the `n(n+1)/2` entries of a lower triangular matrix `L`,
+    which are scattered into `L` via a constant index tensor. The output is
+    `L @ L* + epsilon * I`.
+    """
+
     func: MLP
     shape: AtLeast2DTuple[int] = eqx.field(static=True)
     epsilon: float = eqx.field(static=True)
@@ -116,63 +157,17 @@ class OriginalSPDMatrix(eqx.Module):
         return a_matrix + self.epsilon * identity
 
 
-class AlternativeSPDMatrix(eqx.Module):
-    func: MLP
-    shape: AtLeast2DTuple[int] = eqx.field(static=True)
-    epsilon: float = eqx.field(static=True)
+class LegacySkewSymmetricMatrix(eqx.Module):
+    """LEGACY skew-symmetric matrix (superseded by `klax.nn.SkewSymmetricMatrix` in c4142d9).
 
-    def __init__(
-        self,
-        in_size: int | Literal["scalar"],
-        shape: int | AtLeast2DTuple[int],
-        width_sizes: Sequence[int],
-        epsilon: float = 1e-6,
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,  # type: ignore
-        activation: Callable = jax.nn.softplus,
-        final_activation: Callable = lambda x: x,
-        use_bias: bool = True,
-        use_final_bias: bool = True,
-        dtype: Any | None = None,
-        *,
-        key: PRNGKeyArray,
-    ):
-        shape = shape if isinstance(shape, tuple) else (shape, shape)
-        if shape[-1] != shape[-2]:
-            raise ValueError(
-                "The last two dimensions in shape must be equal for symmetric matrices."
-            )
+    The MLP predicts the entries of the strictly lower triangle, which are
+    scattered into the matrix with `+1`/`-1` signs via a constant index tensor.
 
-        num_batches = int(jnp.prod(jnp.array(shape)))
+    Note:
+        Kept verbatim. The output size is `n(n+1)/2` although only the
+        `n(n-1)/2` strictly lower entries are used, so `n` MLP outputs are
+        wasted.
 
-        self.shape = shape
-        self.epsilon = epsilon
-        self.func = MLP(
-            in_size,
-            num_batches,
-            width_sizes,
-            weight_init,
-            bias_init,
-            activation,
-            final_activation,
-            use_bias,
-            use_final_bias,
-            dtype,
-            key=key,
-        )
-
-    def __call__(self, x: Array) -> Array:
-        l_matrix = self.func(x).reshape(self.shape)
-        a_matrix = l_matrix @ jnp.conjugate(l_matrix.mT)
-        identity = jnp.broadcast_to(jnp.eye(self.shape[-1]), a_matrix.shape)
-        return a_matrix + self.epsilon * identity
-
-
-class OriginalSkewSymmetricMatrix(eqx.Module):
-    """*Skew-symmetric matrix-valued function*.
-
-    Wrapper around a_matrix `MLP` that maps the input to a_matrix vector of elements that
-    are transformed to a_matrix skew-symmetric matrix.
     """
 
     func: MLP
@@ -194,41 +189,6 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
         *,
         key: PRNGKeyArray,
     ):
-        """Initialize the `SkewSymmetricMatrix`.
-
-        Args:
-            in_size: The input size. The input to the module should be a_matrix vector
-                of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a_matrix
-                Array with sthe specified `shape`. For square matrices a_matrix single
-                integer N can be used as a_matrix shorthand for (N, N).
-                (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a_matrix list.
-                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or
-                equal to `in_size`.)
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `he_normal()`)
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `zeros`)
-            activation: The activation function after each hidden layer.
-                (Defaults to `softplus`).
-            final_activation: The activation function after the output layer.
-                (Defaults to the identity.)
-            use_bias: Whether to add on a_matrix bias to internal layers.
-                (Defaults to `True`.)
-            use_final_bias: Whether to add on a_matrix bias to the final layer.
-                (Defaults to `True`.)
-            dtype: The dtype to use for all the weights and biases in this MLP.
-                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
-                depending on whether JAX is in 64-bit mode.
-            key: a_matrix `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
-
-        Note:
-            Note that `in_size` also supports the string `"scalar"` as a_matrix special
-            value. In this case the input to the module should be of shape `()`.
-
-        """
         shape = shape if isinstance(shape, tuple) else (shape, shape)
         if shape[-1] != shape[-2]:
             raise ValueError(
@@ -267,91 +227,26 @@ class OriginalSkewSymmetricMatrix(eqx.Module):
         )
 
 
-class AlternativeSkewSymmetricMatrix(eqx.Module):
-    """*Skew-symmetric matrix-valued function*.
+# %% Benchmark helper
 
-    Wrapper around a_matrix `MLP` that maps the input to a_matrix vector of elements that
-    are transformed to a_matrix skew-symmetric matrix.
-    """
 
-    func: MLP
-    shape: AtLeast2DTuple[int] = eqx.field(static=True)
-
-    def __init__(
-        self,
-        in_size: int | Literal["scalar"],
-        shape: int | AtLeast2DTuple[int],
-        width_sizes: Sequence[int],
-        weight_init: Initializer = he_normal(),
-        bias_init: Initializer = zeros,  # type: ignore
-        activation: Callable = jax.nn.softplus,
-        final_activation: Callable = lambda x: x,
-        use_bias: bool = True,
-        use_final_bias: bool = True,
-        dtype: Any | None = None,
-        *,
-        key: PRNGKeyArray,
-    ):
-        """Initialize the `SkewSymmetricMatrix`.
-
-        Args:
-            in_size: The input size. The input to the module should be a_matrix vector
-                of shape `(in_size,)`
-            shape: The matrix shape. The output from the module will be a_matrix
-                Array with sthe specified `shape`. For square matrices a_matrix single
-                integer N can be used as a_matrix shorthand for (N, N).
-                (Defaults to `(in_size, in_size)`)
-            width_sizes: The sizes of each hidden layer of the underlying MLP in a_matrix list.
-                (Defaults to `[k,]`, where `k` is the smallest power of 2 greater or
-                equal to `in_size`.)
-            weight_init: The weight initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `he_normal()`)
-            bias_init: The bias initializer of type `jax.nn.initializers.Initializer`.
-                (Defaults to `zeros`)
-            activation: The activation function after each hidden layer.
-                (Defaults to `softplus`).
-            final_activation: The activation function after the output layer.
-                (Defaults to the identity.)
-            use_bias: Whether to add on a_matrix bias to internal layers.
-                (Defaults to `True`.)
-            use_final_bias: Whether to add on a_matrix bias to the final layer.
-                (Defaults to `True`.)
-            dtype: The dtype to use for all the weights and biases in this MLP.
-                Defaults to either `jax.numpy.float32` or `jax.numpy.float64`
-                depending on whether JAX is in 64-bit mode.
-            key: a_matrix `jax.random.PRNGKey` used to provide randomness for parameter
-                initialisation. (Keyword only argument.)
-
-        Note:
-            Note that `in_size` also supports the string `"scalar"` as a_matrix special
-            value. In this case the input to the module should be of shape `()`.
-
-        """
-        shape = shape if isinstance(shape, tuple) else (shape, shape)
-        if shape[-1] != shape[-2]:
-            raise ValueError(
-                "The last two dimensions in shape must be equal for skew-symmetric matrices."
-            )
-
-        num_elements = int(jnp.prod(jnp.array(shape)))
-        self.shape = shape
-        self.func = MLP(
-            in_size,
-            num_elements,
-            width_sizes,
-            weight_init,
-            bias_init,
-            activation,
-            final_activation,
-            use_bias,
-            use_final_bias,
-            dtype,
-            key=key,
-        )
-
-    def __call__(self, x: Array) -> Array:
-        a_matrix = self.func(x).reshape(self.shape)
-        return a_matrix - a_matrix.mT
+def compare(
+    legacy: Callable, current: Callable, x_single: Array, x_batch: Array
+) -> None:
+    """Time the legacy and current implementation with/without JIT and vmap."""
+    variants = {
+        "No JIT, no vmap": (lambda f: f, x_single),
+        "JIT,    no vmap": (jax.jit, x_single),
+        "No JIT, vmap   ": (jax.vmap, x_batch),
+        "JIT,    vmap   ": (lambda f: jax.jit(jax.vmap(f)), x_batch),
+    }
+    for label, (transform, inp) in variants.items():
+        _legacy = transform(lambda z: legacy(z))
+        _current = transform(lambda z: current(z))
+        _legacy(inp)  # Warm up / compile
+        _current(inp)
+        time_code(lambda: _legacy(inp), f"Legacy  : {label}: ")
+        time_code(lambda: _current(inp), f"Current : {label}: ")
 
 
 # %% Time the different versions
@@ -365,39 +260,18 @@ N = 50
 x = jr.normal(data_key, (n,))
 X = jr.normal(data_key, (1000, n))
 
-original = OriginalSkewSymmetricMatrix(
-    n, N, width_sizes=[128, 128], key=model_key
+print("\n=== Skew-symmetric matrix ===")
+compare(
+    LegacySkewSymmetricMatrix(n, N, width_sizes=[128, 128], key=model_key),
+    SkewSymmetricMatrix(n, N, width_sizes=[128, 128], key=model_key),
+    x,
+    X,
 )
-original(x)
-alternative = AlternativeSkewSymmetricMatrix(
-    n, N, width_sizes=[128, 128], key=model_key
+
+print("\n=== SPD matrix ===")
+compare(
+    LegacySPDMatrix(n, N, width_sizes=[128, 128], key=model_key),
+    SPDMatrix(n, N, width_sizes=[128, 128], key=model_key),
+    x,
+    X,
 )
-alternative(x)
-
-
-time_code(lambda: original(x), "Original   : No JIT, no vmap: ")
-time_code(lambda: alternative(x), "Alternative: No JIT, no vmap: ")
-
-_original = jax.jit(lambda x: original(x))
-_original(x)
-_alternative = jax.jit(lambda x: alternative(x))
-_alternative(x)
-
-time_code(lambda: _original(x), "Original   : JIT, no vmap: ")
-time_code(lambda: _alternative(x), "Alternative: JIT, no vmap: ")
-
-_original = jax.vmap(lambda x: original(x))
-_original(X)
-_alternative = jax.vmap(lambda x: alternative(x))
-_alternative(X)
-
-time_code(lambda: _original(X), "Original   : No JIT, vmap: ")
-time_code(lambda: _alternative(X), "Alternative: No JIT, vmap: ")
-
-_original = jax.jit(jax.vmap(lambda x: original(x)))
-_original(X)
-_alternative = jax.jit(jax.vmap(lambda x: alternative(x)))
-_alternative(X)
-
-time_code(lambda: _original(X), "Original   : JIT, vmap: ")
-time_code(lambda: _alternative(X), "Alternative: JIT, vmap: ")
