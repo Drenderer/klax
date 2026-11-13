@@ -1,3 +1,12 @@
+## v0.3.1 (2026-11-12)
+
+### Fix
+
+- **dependencies**: pin mkdocstrings-python below version 2 to avoid conflicts with griffe
+- **gh-pages.yml**: adapt the workflow to install 'docs', which is now a dependency group instead of an extra
+- **history**: remove unconditional matplotlib import in klax/_history.py
+- **dependencies**: turn the extra 'docs' into a dependency-group
+
 ## v0.3.0 (2026-11-12)
 
 ### BREAKING CHANGE

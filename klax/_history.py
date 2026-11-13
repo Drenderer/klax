@@ -23,9 +23,8 @@ from typing import Any, NamedTuple, Self
 import numpy as np
 from jax import numpy as jnp
 from jaxtyping import Array, ArrayLike
-from matplotlib.legend_handler import HandlerTuple
 
-from ._compat import get_plot
+from ._compat import get_matplotlib
 
 
 class StepsAndValues(NamedTuple):
@@ -223,12 +222,12 @@ class History:
             ImportError: If `matplotlib` is not installed.
 
         """
-        plt = get_plot()
+        mpl = get_matplotlib()
 
         exclude_keys = [] if exclude_keys is None else exclude_keys
 
         if ax is None:
-            _, ax = plt.subplots()
+            _, ax = mpl.pyplot.subplots()
             ax.set(
                 xlabel="Step",
                 ylabel="Metric",
@@ -254,7 +253,9 @@ class History:
         ax.legend(
             artists.values(),
             artists.keys(),
-            handler_map={tuple: HandlerTuple(ndivide=None, pad=0)},
+            handler_map={
+                tuple: mpl.legend_handler.HandlerTuple(ndivide=None, pad=0)
+            },
         )
         return ax
 
