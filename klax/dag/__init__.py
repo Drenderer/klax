@@ -6,3 +6,4 @@ from ._dag import GraphModel as GraphModel
 from ._dag_builder import GraphBuilder as GraphBuilder
 from ._dag_builder import block as block
 from ._dag_viz import to_dot as to_dot
+from ._dag_viz import to_mermaid as to_mermaid

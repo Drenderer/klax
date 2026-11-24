@@ -225,6 +225,23 @@ dot_source = to_dot(graph, have=("x",), want=("y",))
 The returned string can be rendered with Graphviz or included in a notebook
 using a Graphviz integration.
 
+`to_mermaid(graph, have=..., want=...)` takes the same arguments and returns a
+[Mermaid](https://mermaid.js.org/) flowchart instead. Mermaid renders natively
+in GitHub, GitLab and MkDocs Material, so no Graphviz installation is needed.
+Wrap the result in a ```` ```mermaid ```` code fence to embed it in Markdown.
+
+```python
+from klax.dag import to_mermaid
+
+mermaid_source = to_mermaid(graph, have=("x",), want=("y",))
+markdown = f"```mermaid\n{mermaid_source}\n```"
+```
+
+The Mermaid output follows the same drawing rules as `to_dot`, but Mermaid has
+fewer styling options. Edges of a block that belongs to several subgraphs use
+only the first subgraph's color, the "uses" rows inside a block are not
+colored, and the dashed "uses" links take part in the layout.
+
 ## API Reference
 
 ::: klax.dag.GraphModel
@@ -271,3 +288,5 @@ using a Graphviz integration.
 ::: klax.dag.block
 
 ::: klax.dag.to_dot
+
+::: klax.dag.to_mermaid

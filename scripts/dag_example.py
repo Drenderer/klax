@@ -8,7 +8,7 @@ import jax.random as jr
 from jaxtyping import Array
 
 import klax
-from klax.dag import GraphBuilder, GraphModel, to_dot
+from klax.dag import GraphBuilder, GraphModel, to_dot, to_mermaid
 from klax.nn import FICNN
 
 
@@ -225,3 +225,6 @@ if __name__ == "__main__":
 
     dot = to_dot(graph, have=("x"), want=("hamiltonian",))
     print(dot)
+
+    mermaid = to_mermaid(graph, have=("x"), want=("hamiltonian",))
+    print(mermaid)
