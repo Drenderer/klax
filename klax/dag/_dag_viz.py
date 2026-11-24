@@ -2,7 +2,7 @@ import html
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from ._dag import Graph, GraphFunctionDef, _as_tuple
+from ._dag import Graph, GraphFunctionDef
 
 # (edge/border color, light fill color) pairs, one per subfunction.
 _PALETTE = (
@@ -15,6 +15,10 @@ _PALETTE = (
 )
 
 _Palette = tuple[str, str]
+
+
+def _as_tuple(x) -> tuple:
+    return (x,) if isinstance(x, str) else tuple(x)
 
 
 @dataclass(frozen=True)

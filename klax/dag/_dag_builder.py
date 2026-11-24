@@ -1,7 +1,11 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from ._dag import Block, Graph, GraphFunctionDef, _as_tuple
+from ._dag import Block, Graph, GraphFunctionDef
+
+
+def _as_tuple(x) -> tuple:
+    return (x,) if isinstance(x, str) else tuple(x)
 
 
 # Frozen dataclass wrapper to ensure equality and hashability of the block's callable.

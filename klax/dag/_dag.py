@@ -10,10 +10,6 @@ import equinox as eqx
 from jaxtyping import PyTree
 
 
-def _as_tuple(x) -> tuple:
-    return (x,) if isinstance(x, str) else tuple(x)
-
-
 @dataclass(frozen=True)
 class GraphFunctionDef:
     """Definition of a graph function in terms of inputs to outputs."""
@@ -184,7 +180,7 @@ class Graph:
                 should be executed.
 
         """
-        have, want = frozenset(_as_tuple(have)), _as_tuple(want)
+        have, want = frozenset(tuple(have)), tuple(want)
         try:
             return self._plan_cache[have, want]
         except KeyError:
@@ -192,7 +188,9 @@ class Graph:
             self._plan_cache[have, want] = result
             return result
 
-    def _plan(self, have: frozenset[str], want: tuple[str]) -> tuple[int, ...]:
+    def _plan(
+        self, have: frozenset[str], want: tuple[str, ...]
+    ) -> tuple[int, ...]:
         required_blocks: set[int] = set()
         seen_variables: set[str] = set()
         missing: set[str] = set()
@@ -298,7 +296,6 @@ class Graph:
 
         """
         env = dict(have)
-        want = _as_tuple(want)
         for b in self.plan(tuple(have.keys()), want):
             block = self.blocks[b]
             subfns = tuple(GraphFunction(params, self, d) for d in block.uses)
