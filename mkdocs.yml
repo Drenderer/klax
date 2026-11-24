@@ -101,7 +101,9 @@ nav:
       - examples/ensemble_training.ipynb
       - examples/training_without_data.ipynb
       - examples/sample_weighting.ipynb
+      - examples/dag_model.ipynb
   - API Reference:
+      - api/dag.md
       - api/training.md
       - api/logging.md
       - api/wrappers.md
